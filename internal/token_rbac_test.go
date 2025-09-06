@@ -1,0 +1,78 @@
+package internal
+
+import (
+	"os"
+	"testing"
+)
+
+func TestTokenResolutionOrder(t *testing.T) {
+	dir := t.TempDir()
+	os.Setenv("HOME", dir)
+	defer os.Unsetenv("HOME")
+	os.Unsetenv("SIMPLE_SECRETS_TOKEN")
+
+	// Write config file
+	configPath := dir + "/.simple-secrets/config.json"
+	os.MkdirAll(dir+"/.simple-secrets", 0700)
+	os.WriteFile(configPath, []byte(`{"token":"fromconfig"}`), 0600)
+
+	// Env var wins over config
+	os.Setenv("SIMPLE_SECRETS_TOKEN", "fromenv")
+	tok, err := ResolveToken("")
+	if err != nil || tok != "fromenv" {
+		t.Fatalf("env should win: got %q, err %v", tok, err)
+	}
+	os.Unsetenv("SIMPLE_SECRETS_TOKEN")
+
+	// Config wins if no env
+	tok, err = ResolveToken("")
+	if err != nil || tok != "fromconfig" {
+		t.Fatalf("config should win: got %q, err %v", tok, err)
+	}
+
+	// CLI flag wins over all
+	tok, err = ResolveToken("fromflag")
+	if err != nil || tok != "fromflag" {
+		t.Fatalf("flag should win: got %q, err %v", tok, err)
+	}
+}
+
+func TestTokenResolutionErrors(t *testing.T) {
+	dir := t.TempDir()
+	os.Setenv("HOME", dir)
+	defer os.Unsetenv("HOME")
+	os.Unsetenv("SIMPLE_SECRETS_TOKEN")
+	// No config, no env, no flag
+	_, err := ResolveToken("")
+	if err == nil {
+		t.Fatal("expected error when no token present")
+	}
+	// Malformed config
+	os.MkdirAll(dir+"/.simple-secrets", 0700)
+	os.WriteFile(dir+"/.simple-secrets/config.json", []byte("not-json"), 0600)
+	_, err = ResolveToken("")
+	if err == nil {
+		t.Fatal("expected error on malformed config.json")
+	}
+}
+
+func TestRBACEnforcement(t *testing.T) {
+	perms := RolePermissions{
+		RoleAdmin:  {"read", "write", "rotate-tokens", "manage-users"},
+		RoleReader: {"read"},
+	}
+	admin := &User{Username: "admin", Role: RoleAdmin}
+	reader := &User{Username: "bob", Role: RoleReader}
+	if !admin.Can("write", perms) {
+		t.Error("admin should have write")
+	}
+	if reader.Can("write", perms) {
+		t.Error("reader should not have write")
+	}
+	if !admin.Can("manage-users", perms) {
+		t.Error("admin should have manage-users")
+	}
+	if reader.Can("manage-users", perms) {
+		t.Error("reader should not have manage-users")
+	}
+}

@@ -1,0 +1,347 @@
+package cmd
+
+import (
+	"bufio"
+	"crypto/rand"
+	"encoding/base64"
+	"encoding/json"
+	"fmt"
+	"os"
+	"simple-secrets/internal"
+	"strings"
+	"time"
+
+	"github.com/spf13/cobra"
+)
+
+var (
+	rotateNewYes       bool
+	rotateNewBackupDir string
+)
+
+// rotateNewCmd represents the new consolidated rotate command
+var rotateCmd = &cobra.Command{
+	Use:   "rotate [master-key|token]",
+	Short: "Rotate master key or user tokens",
+	Long: `Rotate different types of keys in the system:
+  • master-key - Rotate the master encryption key and re-encrypt all secrets
+  • token      - Generate a new authentication token for a user or yourself
+
+Token rotation options:
+  • token             - Self: rotate your own token (no username needed)
+  • token <username>  - Admin: rotate another user's token`,
+	Example: `  simple-secrets rotate master-key --yes
+  simple-secrets rotate token           # Rotate your own token
+  simple-secrets rotate token alice     # Admin rotates alice's token`,
+	Args: cobra.MinimumNArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		// Check if token flag was explicitly set to empty string
+		if flag := cmd.Flag("token"); flag != nil && flag.Changed && TokenFlag == "" {
+			return fmt.Errorf("authentication required: token cannot be empty")
+		}
+
+		switch args[0] {
+		case "master-key":
+			return rotateMasterKey()
+		case "token":
+			if len(args) < 2 {
+				// No username provided - self-rotation
+				return rotateSelfToken()
+			}
+			// Username provided - admin rotation
+			return rotateToken(args[1])
+		default:
+			return fmt.Errorf("unknown rotate type: %s. Use 'master-key' or 'token'", args[0])
+		}
+	},
+}
+
+func rotateMasterKey() error {
+	user, store, err := validateMasterKeyRotationAccess()
+	if err != nil {
+		return err
+	}
+	if user == nil {
+		return nil // First run detected, message already printed
+	}
+
+	if !rotateNewYes && !confirmMasterKeyRotation() {
+		return nil
+	}
+
+	if err := store.RotateMasterKey(rotateNewBackupDir); err != nil {
+		return err
+	}
+
+	printMasterKeyRotationSuccess()
+	return nil
+}
+
+// validateMasterKeyRotationAccess checks RBAC permissions for master key rotation
+func validateMasterKeyRotationAccess() (*internal.User, *internal.SecretsStore, error) {
+	user, _, err := RBACGuard(true, TokenFlag)
+	if err != nil {
+		return nil, nil, err
+	}
+	if user == nil {
+		return nil, nil, nil // First run message already printed
+	}
+
+	store, err := internal.LoadSecretsStore()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return user, store, nil
+}
+
+// confirmMasterKeyRotation prompts the user for confirmation and returns their choice
+func confirmMasterKeyRotation() bool {
+	printMasterKeyRotationWarning()
+
+	fmt.Print("Proceed? (type 'yes'): ")
+	in := bufio.NewReader(os.Stdin)
+	line, _ := in.ReadString('\n')
+
+	if strings.TrimSpace(strings.ToLower(line)) != "yes" {
+		fmt.Println("Aborted.")
+		return false
+	}
+	return true
+}
+
+// printMasterKeyRotationWarning displays the warning about what master key rotation will do
+func printMasterKeyRotationWarning() {
+	fmt.Println("This will:")
+	fmt.Println("  • Generate a NEW master key")
+	fmt.Println("  • Re-encrypt ALL secrets with the new key")
+	fmt.Println("  • Create a backup of the old key+secrets for rollback")
+}
+
+// printMasterKeyRotationSuccess displays the success message after rotation
+func printMasterKeyRotationSuccess() {
+	fmt.Println("✅ Master key rotation completed successfully!")
+	printBackupLocation(rotateNewBackupDir)
+	fmt.Println()
+	fmt.Println("All secrets have been re-encrypted with the new master key.")
+	fmt.Println("The old master key and secrets are backed up for emergency recovery.")
+}
+
+func rotateSelfToken() error {
+	user, usersPath, users, err := validateSelfTokenRotationAccess()
+	if err != nil {
+		return err
+	}
+	if user == nil {
+		return nil // First run or access denied
+	}
+
+	targetIndex, err := findUserIndex(users, user.Username)
+	if err != nil {
+		return err
+	}
+
+	newToken, err := generateAndUpdateUserToken(users, targetIndex)
+	if err != nil {
+		return err
+	}
+
+	if err := saveUsersList(usersPath, users); err != nil {
+		return err
+	}
+
+	printSelfTokenRotationSuccess(user.Username, users[targetIndex].Role, newToken)
+	return nil
+}
+
+func rotateToken(username string) error {
+	user, usersPath, users, err := validateTokenRotationAccess(username)
+	if err != nil {
+		return err
+	}
+	if user == nil {
+		return nil // First run or access denied
+	}
+
+	targetIndex, err := findUserIndex(users, username)
+	if err != nil {
+		return err
+	}
+
+	newToken, err := generateAndUpdateUserToken(users, targetIndex)
+	if err != nil {
+		return err
+	}
+
+	if err := saveUsersList(usersPath, users); err != nil {
+		return err
+	}
+
+	printTokenRotationSuccess(username, users[targetIndex].Role, newToken)
+	return nil
+}
+
+func init() {
+	rotateCmd.Flags().BoolVar(&rotateNewYes, "yes", false, "Skip confirmation prompt for master key rotation")
+	rotateCmd.Flags().StringVar(&rotateNewBackupDir, "backup-dir", "", "Custom backup directory for master key rotation")
+
+	rootCmd.AddCommand(rotateCmd)
+}
+
+func printBackupLocation(backupDir string) {
+	if backupDir == "" {
+		fmt.Println("📁 Backup created under ~/.simple-secrets/backups/")
+		return
+	}
+	fmt.Printf("📁 Backup created at %s\n", backupDir)
+}
+
+// validateTokenRotationAccess checks permissions and loads necessary data for token rotation
+func validateTokenRotationAccess(username string) (*internal.User, string, []*internal.User, error) {
+	user, store, err := RBACGuard(true, TokenFlag)
+	if err != nil {
+		return nil, "", nil, err
+	}
+	if user == nil {
+		return nil, "", nil, nil
+	}
+
+	if !user.Can("rotate-tokens", store.Permissions()) {
+		return nil, "", nil, fmt.Errorf("permission denied: need 'rotate-tokens' permission")
+	}
+
+	usersPath, err := internal.DefaultUserConfigPath("users.json")
+	if err != nil {
+		return nil, "", nil, err
+	}
+
+	users, err := internal.LoadUsersList(usersPath)
+	if err != nil {
+		return nil, "", nil, err
+	}
+
+	return user, usersPath, users, nil
+}
+
+// validateSelfTokenRotationAccess checks permissions for self token rotation
+func validateSelfTokenRotationAccess() (*internal.User, string, []*internal.User, error) {
+	user, store, err := RBACGuard(false, TokenFlag) // Use false - we check specific permission below
+	if err != nil {
+		return nil, "", nil, err
+	}
+	if user == nil {
+		return nil, "", nil, nil
+	}
+
+	if !user.Can("rotate-own-token", store.Permissions()) {
+		return nil, "", nil, fmt.Errorf("permission denied: cannot rotate own token")
+	}
+
+	usersPath, err := internal.DefaultUserConfigPath("users.json")
+	if err != nil {
+		return nil, "", nil, err
+	}
+
+	users, err := internal.LoadUsersList(usersPath)
+	if err != nil {
+		return nil, "", nil, err
+	}
+
+	return user, usersPath, users, nil
+}
+
+// findUserIndex locates the target user in the users slice and returns their index
+func findUserIndex(users []*internal.User, username string) (int, error) {
+	for i, u := range users {
+		if u.Username == username {
+			return i, nil
+		}
+	}
+	return -1, fmt.Errorf("user '%s' not found", username)
+}
+
+// generateAndUpdateUserToken creates a new token and updates the user record
+func generateAndUpdateUserToken(users []*internal.User, targetIndex int) (string, error) {
+	newToken, err := generateSecureTokenString()
+	if err != nil {
+		return "", fmt.Errorf("failed to generate random token: %w", err)
+	}
+
+	newTokenHash := internal.HashToken(newToken)
+	now := time.Now()
+
+	users[targetIndex].TokenHash = newTokenHash
+	users[targetIndex].TokenRotatedAt = &now
+
+	return newToken, nil
+}
+
+// generateSecureTokenString creates a new secure random token string
+func generateSecureTokenString() (string, error) {
+	randToken := make([]byte, 20)
+	if _, err := rand.Read(randToken); err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(randToken), nil
+}
+
+// saveUsersList marshals and saves the users list to disk
+func saveUsersList(usersPath string, users []*internal.User) error {
+	data, err := json.MarshalIndent(users, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal users: %w", err)
+	}
+	return os.WriteFile(usersPath, data, 0600)
+}
+
+// printTokenRotationSuccess displays the success message and instructions
+func printTokenRotationSuccess(username string, role internal.Role, newToken string) {
+	fmt.Printf("\nToken rotated for user \"%s\" (%s role).\n", username, role)
+	fmt.Printf("New token: %s\n", newToken)
+	fmt.Println()
+	printTokenRotationWarnings()
+	fmt.Println()
+	printTokenUsageInstructions()
+}
+
+// printSelfTokenRotationSuccess displays the self-rotation success message and instructions
+func printSelfTokenRotationSuccess(username string, role internal.Role, newToken string) {
+	fmt.Printf("\n✅ Your token has been rotated successfully!\n")
+	fmt.Printf("New token: %s\n", newToken)
+	fmt.Println()
+	printSelfTokenRotationWarnings()
+	fmt.Println()
+	printSelfTokenUsageInstructions()
+}
+
+// printTokenRotationWarnings displays important warnings about the token rotation
+func printTokenRotationWarnings() {
+	fmt.Println("⚠️  IMPORTANT:")
+	fmt.Println("• Store this token securely - it will not be shown again")
+	fmt.Println("• The old token is now invalid and cannot be used")
+	fmt.Println("• Update any scripts or configs that use the old token")
+}
+
+// printSelfTokenRotationWarnings displays important warnings about self token rotation
+func printSelfTokenRotationWarnings() {
+	fmt.Println("⚠️  IMPORTANT:")
+	fmt.Println("• Store this token securely - it will not be shown again")
+	fmt.Println("• Your old token is now invalid and cannot be used")
+	fmt.Println("• Update your local configuration with the new token")
+}
+
+// printTokenUsageInstructions shows how to use the new token
+func printTokenUsageInstructions() {
+	fmt.Println("To use the new token:")
+	fmt.Println("  --token <new-token> (as a flag)")
+	fmt.Println("  SIMPLE_SECRETS_TOKEN=<new-token> (as an env var)")
+	fmt.Println("  or update ~/.simple-secrets/config.json")
+}
+
+// printSelfTokenUsageInstructions shows how to use the new token for self-rotation
+func printSelfTokenUsageInstructions() {
+	fmt.Println("To use your new token:")
+	fmt.Println("  export SIMPLE_SECRETS_TOKEN=<new-token>")
+	fmt.Println("  or update ~/.simple-secrets/config.json")
+	fmt.Println("  or use --token <new-token> flag in commands")
+}

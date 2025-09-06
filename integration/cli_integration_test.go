@@ -1,0 +1,135 @@
+package main
+
+import (
+	"log"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"testing"
+)
+
+// Path to the CLI binary (adjust if needed)
+const cliBin = "../simple-secrets"
+
+func TestFirstRunCreatesAdmin(t *testing.T) {
+	tmp := t.TempDir()
+	// Set HOME to temp dir for isolation
+	cmd := exec.Command(cliBin, "list", "keys")
+	cmd.Env = append(os.Environ(), "HOME="+tmp)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("first run failed: %v\n%s", err, out)
+	}
+	// Should create .simple-secrets/users.json and roles.json
+	if _, err := os.Stat(filepath.Join(tmp, ".simple-secrets", "users.json")); err != nil {
+		t.Fatalf("users.json not created: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(tmp, ".simple-secrets", "roles.json")); err != nil {
+		t.Fatalf("roles.json not created: %v", err)
+	}
+	// Should print first-run message
+	if !strings.Contains(string(out), "First run detected") {
+		t.Fatalf("missing first-run message: %s", out)
+	}
+}
+
+func TestPutGetListDelete(t *testing.T) {
+	tmp := t.TempDir()
+	// First run: trigger creation and capture token
+	cmd := exec.Command(cliBin, "list", "keys")
+	cmd.Env = append(os.Environ(), "HOME="+tmp)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("first run failed: %v\n%s", err, out)
+	}
+	// Extract token from output
+	token := extractToken(string(out))
+	if token == "" {
+		t.Fatalf("could not extract admin token from output: %s", out)
+	}
+
+	// Put
+	cmd = exec.Command(cliBin, "put", "foo", "bar")
+	cmd.Env = append(os.Environ(), "HOME="+tmp, "SIMPLE_SECRETS_TOKEN="+token)
+	out, err = cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("put failed: %v\n%s", err, out)
+	}
+	// Get
+	cmd = exec.Command(cliBin, "get", "foo")
+	cmd.Env = append(os.Environ(), "HOME="+tmp, "SIMPLE_SECRETS_TOKEN="+token)
+	out, err = cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("get failed: %v\n%s", err, out)
+	}
+	if !strings.Contains(string(out), "bar") {
+		t.Fatalf("get did not return value: %s", out)
+	}
+	// List
+	cmd = exec.Command(cliBin, "list", "keys")
+	cmd.Env = append(os.Environ(), "HOME="+tmp, "SIMPLE_SECRETS_TOKEN="+token)
+	out, err = cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("list failed: %v\n%s", err, out)
+	}
+	if !strings.Contains(string(out), "foo") {
+		t.Fatalf("list did not show key: %s", out)
+	}
+	// Delete
+	cmd = exec.Command(cliBin, "delete", "foo")
+	cmd.Env = append(os.Environ(), "HOME="+tmp, "SIMPLE_SECRETS_TOKEN="+token)
+	out, err = cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("delete failed: %v\n%s", err, out)
+	}
+}
+
+// extractToken parses the admin token from first-run output
+func extractToken(out string) string {
+	for line := range strings.SplitSeq(out, "\n") {
+		if strings.Contains(line, "Token:") {
+			fields := strings.Fields(line)
+			if len(fields) > 1 {
+				return fields[len(fields)-1]
+			}
+		}
+	}
+	return ""
+}
+
+func TestCreateUserAndLogin(t *testing.T) {
+	tmp := t.TempDir()
+	// First run to create admin and extract token
+	cmd := exec.Command(cliBin, "list", "keys")
+	cmd.Env = append(os.Environ(), "HOME="+tmp)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("first run failed: %v\n%s", err, out)
+	}
+	token := extractToken(string(out))
+	if token == "" {
+		t.Fatalf("could not extract admin token from output: %s", out)
+	}
+	// Create user (simulate input)
+	cmd = exec.Command(cliBin, "create-user")
+	cmd.Env = append(os.Environ(), "HOME="+tmp, "SIMPLE_SECRETS_TOKEN="+token)
+	cmd.Stdin = strings.NewReader("bob\nreader\n\n")
+	out, err = cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("create-user failed: %v\n%s", err, out)
+	}
+	if !strings.Contains(string(out), "Generated token") {
+		t.Fatalf("create-user did not print token: %s", out)
+	}
+}
+
+func TestMain(m *testing.M) {
+	// Build the binary for CLI integration tests - see `cliBin` at top of file
+	cmd := exec.Command("go", "build", "-o", "simple-secrets")
+	cmd.Dir = ".." // backend directory
+	if err := cmd.Run(); err != nil {
+		log.Fatalf("Failed to build CLI binary: %v", err)
+	}
+	os.Exit(m.Run())
+}
