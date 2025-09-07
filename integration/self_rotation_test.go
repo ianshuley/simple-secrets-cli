@@ -93,8 +93,8 @@ func TestSelfTokenRotationBothWays(t *testing.T) {
 func extractTokenFromCreateUser(output string) string {
 	lines := strings.SplitSeq(output, "\n")
 	for line := range lines {
-		if strings.HasPrefix(line, "Generated token: ") {
-			return strings.TrimPrefix(line, "Generated token: ")
+		if after, ok := strings.CutPrefix(line, "Generated token: "); ok {
+			return after
 		}
 	}
 	return ""
@@ -102,8 +102,8 @@ func extractTokenFromCreateUser(output string) string {
 
 // extractTokenFromSelfRotation extracts the token from self-rotation command output
 func extractTokenFromSelfRotation(output string) string {
-	lines := strings.Split(output, "\n")
-	for _, line := range lines {
+	lines := strings.SplitSeq(output, "\n")
+	for line := range lines {
 		if after, ok := strings.CutPrefix(line, "New token: "); ok {
 			return after
 		}
