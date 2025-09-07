@@ -195,7 +195,7 @@ func generateSecureUserToken() (string, error) {
 	return base64.RawURLEncoding.EncodeToString(randToken), nil
 }
 
-// persistNewUser saves the new user to the users.json file
+// persistNewUser saves the new user to the users.json file atomically
 func persistNewUser(newUser *internal.User) error {
 	usersPath, err := internal.DefaultUserConfigPath("users.json")
 	if err != nil {
@@ -214,7 +214,7 @@ func persistNewUser(newUser *internal.User) error {
 		return err
 	}
 
-	return os.WriteFile(usersPath, data, 0600)
+	return atomicWriteFile(usersPath, data, 0600)
 }
 
 // printUserCreationSuccess displays the success message with the new token

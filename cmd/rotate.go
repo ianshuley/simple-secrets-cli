@@ -359,13 +359,14 @@ func executeTokenRotation(context *TokenRotationContext) (string, error) {
 	return newToken, nil
 }
 
-// saveUsersList marshals and saves the users list to disk
+// saveUsersList marshals and saves the users list to disk atomically
 func saveUsersList(usersPath string, users []*internal.User) error {
 	data, err := json.MarshalIndent(users, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal users: %w", err)
 	}
-	return os.WriteFile(usersPath, data, 0600)
+
+	return atomicWriteFile(usersPath, data, 0600)
 }
 
 // printTokenRotationSuccess displays the success message and instructions

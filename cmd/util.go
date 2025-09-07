@@ -17,6 +17,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 	"simple-secrets/internal"
 
 	"github.com/spf13/cobra"
@@ -129,5 +130,24 @@ func authorizeAccess(user *internal.User, store *internal.UserStore, needWrite b
 	if needWrite && !user.Can("write", store.Permissions()) {
 		return fmt.Errorf("permission denied: need 'write'")
 	}
+	return nil
+}
+
+// atomicWriteFile writes data to a file atomically using a temporary file and rename
+func atomicWriteFile(path string, data []byte, perm os.FileMode) error {
+	tmpPath := path + ".tmp"
+
+	// Write to temporary file first
+	if err := os.WriteFile(tmpPath, data, perm); err != nil {
+		return fmt.Errorf("failed to write temporary file: %w", err)
+	}
+
+	// Atomic rename to final location
+	if err := os.Rename(tmpPath, path); err != nil {
+		// Clean up temp file on failure
+		_ = os.Remove(tmpPath)
+		return fmt.Errorf("failed to atomically update file: %w", err)
+	}
+
 	return nil
 }
