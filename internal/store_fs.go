@@ -212,10 +212,17 @@ func (s *SecretsStore) EnableSecret(key string) error {
 	var found bool
 
 	for k := range s.secrets {
-		if strings.HasSuffix(k, "_"+key) && strings.HasPrefix(k, disabledPrefix) {
-			disabledKey = k
-			found = true
-			break
+		if strings.HasPrefix(k, disabledPrefix) {
+			// Remove prefix and split at first underscore to get original key
+			withoutPrefix := strings.TrimPrefix(k, disabledPrefix)
+			if idx := strings.Index(withoutPrefix, "_"); idx != -1 {
+				originalKey := withoutPrefix[idx+1:]
+				if originalKey == key {
+					disabledKey = k
+					found = true
+					break
+				}
+			}
 		}
 	}
 
