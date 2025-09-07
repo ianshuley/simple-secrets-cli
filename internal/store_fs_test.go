@@ -132,3 +132,133 @@ func TestStore_FilePermissionsAndAtomicity(t *testing.T) {
 		t.Fatalf("expected file contents to change after update")
 	}
 }
+
+func TestStore_DisableEnableSecret(t *testing.T) {
+	s := newTempStore(t)
+
+	// Setup test secrets
+	err := s.Put("test-secret", "test-value")
+	if err != nil {
+		t.Fatalf("put test secret: %v", err)
+	}
+
+	err = s.Put("other-secret", "other-value")
+	if err != nil {
+		t.Fatalf("put other secret: %v", err)
+	}
+
+	// Verify initial state
+	keys := s.ListKeys()
+	if len(keys) != 2 || keys[0] != "other-secret" || keys[1] != "test-secret" {
+		t.Fatalf("expected 2 keys [other-secret, test-secret], got %v", keys)
+	}
+
+	// Disable secret
+	err = s.DisableSecret("test-secret")
+	if err != nil {
+		t.Fatalf("disable secret: %v", err)
+	}
+
+	// Verify disabled secret is hidden from normal list
+	keys = s.ListKeys()
+	if len(keys) != 1 || keys[0] != "other-secret" {
+		t.Fatalf("expected 1 key [other-secret] after disable, got %v", keys)
+	}
+
+	// Verify disabled secret appears in disabled list
+	disabled := s.ListDisabledSecrets()
+	if len(disabled) != 1 || disabled[0] != "test-secret" {
+		t.Fatalf("expected 1 disabled secret [test-secret], got %v", disabled)
+	}
+
+	// Verify disabled secret cannot be retrieved normally
+	_, err = s.Get("test-secret")
+	if err == nil {
+		t.Fatalf("expected error getting disabled secret")
+	}
+
+	// Enable secret
+	err = s.EnableSecret("test-secret")
+	if err != nil {
+		t.Fatalf("enable secret: %v", err)
+	}
+
+	// Verify enabled secret is back in normal list
+	keys = s.ListKeys()
+	if len(keys) != 2 || keys[0] != "other-secret" || keys[1] != "test-secret" {
+		t.Fatalf("expected 2 keys [other-secret, test-secret] after enable, got %v", keys)
+	}
+
+	// Verify no disabled secrets
+	disabled = s.ListDisabledSecrets()
+	if len(disabled) != 0 {
+		t.Fatalf("expected 0 disabled secrets after enable, got %v", disabled)
+	}
+
+	// Verify secret value is preserved
+	val, err := s.Get("test-secret")
+	if err != nil {
+		t.Fatalf("get enabled secret: %v", err)
+	}
+	if val != "test-value" {
+		t.Fatalf("expected 'test-value', got %q", val)
+	}
+}
+
+func TestStore_DisableNonexistentSecret(t *testing.T) {
+	s := newTempStore(t)
+
+	err := s.DisableSecret("nonexistent")
+	if err == nil {
+		t.Fatalf("expected error disabling nonexistent secret")
+	}
+}
+
+func TestStore_EnableNonexistentSecret(t *testing.T) {
+	s := newTempStore(t)
+
+	err := s.EnableSecret("nonexistent")
+	if err == nil {
+		t.Fatalf("expected error enabling nonexistent secret")
+	}
+}
+
+func TestStore_MultipleDisableEnableCycles(t *testing.T) {
+	s := newTempStore(t)
+
+	// Setup
+	err := s.Put("cycle-test", "cycle-value")
+	if err != nil {
+		t.Fatalf("put: %v", err)
+	}
+
+	// Multiple disable/enable cycles
+	for i := 0; i < 3; i++ {
+		// Disable
+		err = s.DisableSecret("cycle-test")
+		if err != nil {
+			t.Fatalf("disable cycle %d: %v", i, err)
+		}
+
+		// Verify disabled
+		disabled := s.ListDisabledSecrets()
+		if len(disabled) != 1 || disabled[0] != "cycle-test" {
+			t.Fatalf("cycle %d: expected [cycle-test] disabled, got %v", i, disabled)
+		}
+
+		// Enable
+		err = s.EnableSecret("cycle-test")
+		if err != nil {
+			t.Fatalf("enable cycle %d: %v", i, err)
+		}
+
+		// Verify enabled and value preserved
+		val, err := s.Get("cycle-test")
+		if err != nil {
+			t.Fatalf("get cycle %d: %v", i, err)
+		}
+		if val != "cycle-value" {
+			t.Fatalf("cycle %d: value not preserved, expected 'cycle-value', got %q", i, val)
+		}
+	}
+}

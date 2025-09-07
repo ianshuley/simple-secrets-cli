@@ -354,6 +354,25 @@ func TestConsolidatedCommandHelpText(t *testing.T) {
 				"simple-secrets restore secret",
 			},
 		},
+		{
+			name: "disable help",
+			args: []string{"disable", "--help"},
+			contains: []string{
+				"Disable different types of resources",
+				"token <username>", "secret <key>",
+				"simple-secrets disable token alice",
+				"simple-secrets disable secret api-key",
+			},
+		},
+		{
+			name: "enable help",
+			args: []string{"enable", "--help"},
+			contains: []string{
+				"Re-enable resources that were previously disabled",
+				"secret <key>",
+				"simple-secrets enable secret api-key",
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -369,6 +388,145 @@ func TestConsolidatedCommandHelpText(t *testing.T) {
 				if !strings.Contains(string(out), contain) {
 					t.Errorf("help output should contain %q but got: %s", contain, out)
 				}
+			}
+		})
+	}
+}
+
+func TestConsolidatedDisableEnableCommands(t *testing.T) {
+	tmp := t.TempDir()
+
+	// First run to create admin and extract token
+	cmd := exec.Command(cliBin, "list", "keys")
+	cmd.Env = append(os.Environ(), "HOME="+tmp)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("first run failed: %v\n%s", err, out)
+	}
+	token := extractToken(string(out))
+	if token == "" {
+		t.Fatalf("could not extract admin token from output: %s", out)
+	}
+
+	tests := []struct {
+		name     string
+		args     []string
+		wantErr  bool
+		contains string
+	}{
+		// Test secret disable/enable workflow
+		{
+			name:     "put test secret",
+			args:     []string{"put", "test-key", "test-value", "--token", token},
+			wantErr:  false,
+			contains: `Secret "test-key" stored`,
+		},
+		{
+			name:     "disable secret",
+			args:     []string{"disable", "secret", "test-key", "--token", token},
+			wantErr:  false,
+			contains: "Secret 'test-key' has been disabled",
+		},
+		{
+			name:     "list keys excludes disabled",
+			args:     []string{"list", "keys", "--token", token},
+			wantErr:  false,
+			contains: "", // Should not contain test-key
+		},
+		{
+			name:     "list disabled shows secret",
+			args:     []string{"list", "disabled", "--token", token},
+			wantErr:  false,
+			contains: "test-key",
+		},
+		{
+			name:     "get disabled secret fails",
+			args:     []string{"get", "test-key", "--token", token},
+			wantErr:  true,
+			contains: "not found",
+		},
+		{
+			name:     "enable secret",
+			args:     []string{"enable", "secret", "test-key", "--token", token},
+			wantErr:  false,
+			contains: "Secret 'test-key' has been re-enabled",
+		},
+		{
+			name:     "list keys includes enabled secret",
+			args:     []string{"list", "keys", "--token", token},
+			wantErr:  false,
+			contains: "test-key",
+		},
+		{
+			name:     "get enabled secret works",
+			args:     []string{"get", "test-key", "--token", token},
+			wantErr:  false,
+			contains: "test-value",
+		},
+		// Test token disable workflow
+		{
+			name:     "create test user",
+			args:     []string{"create-user", "testuser", "reader", "--token", token},
+			wantErr:  false,
+			contains: "Generated token:",
+		},
+		{
+			name:     "disable token invalid type",
+			args:     []string{"disable", "invalid", "testuser", "--token", token},
+			wantErr:  true,
+			contains: "unknown disable type",
+		},
+		{
+			name:     "enable invalid type",
+			args:     []string{"enable", "invalid", "test-key", "--token", token},
+			wantErr:  true,
+			contains: "unknown enable type",
+		},
+		// Error cases
+		{
+			name:     "disable nonexistent secret",
+			args:     []string{"disable", "secret", "nonexistent", "--token", token},
+			wantErr:  true,
+			contains: "not found",
+		},
+		{
+			name:     "enable nonexistent secret",
+			args:     []string{"enable", "secret", "nonexistent", "--token", token},
+			wantErr:  true,
+			contains: "not found",
+		},
+		{
+			name:     "disable without token",
+			args:     []string{"disable", "secret", "test-key"},
+			wantErr:  true,
+			contains: "invalid token",
+		},
+		{
+			name:     "enable without token",
+			args:     []string{"enable", "secret", "test-key"},
+			wantErr:  true,
+			contains: "invalid token",
+		},
+	}
+
+	// Run tests sequentially to maintain state
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd := exec.Command(cliBin, tt.args...)
+			cmd.Env = append(os.Environ(), "HOME="+tmp)
+			out, err := cmd.CombinedOutput()
+
+			if tt.wantErr && err == nil {
+				t.Errorf("expected error but command succeeded: %s", out)
+				return
+			}
+			if !tt.wantErr && err != nil {
+				t.Errorf("unexpected error: %v\n%s", err, out)
+				return
+			}
+
+			if tt.contains != "" && !strings.Contains(string(out), tt.contains) {
+				t.Errorf("output should contain %q but got: %s", tt.contains, out)
 			}
 		})
 	}

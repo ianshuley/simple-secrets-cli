@@ -163,6 +163,58 @@ Focus especially on:
 - [ ] **Newline allowed**: `./simple-secrets put $'test\nkey' "value"` → should succeed (newlines are allowed)
 - [ ] **Carriage return allowed**: `./simple-secrets put $'test\rkey' "value"` → should succeed (CR is allowed)
 
+### 🚨 **Disable/Enable Secret Management**
+
+#### Secret Disable/Enable Workflow
+- [ ] **Put test secrets**: `./simple-secrets put disable-test "test-value"` and `./simple-secrets put other-key "other-value"`
+- [ ] **Disable secret**: `./simple-secrets disable secret disable-test` → success message
+- [ ] **List excludes disabled**: `./simple-secrets list keys` → should not show `disable-test`, should show `other-key`
+- [ ] **List disabled shows secret**: `./simple-secrets list disabled` → should show `disable-test` with 🚫 indicator
+- [ ] **Get disabled fails**: `./simple-secrets get disable-test` → exit code 1, "not found"
+- [ ] **Delete disabled fails**: `./simple-secrets delete disable-test` → exit code 1, "not found"
+- [ ] **Enable secret**: `./simple-secrets enable secret disable-test` → success message
+- [ ] **List includes enabled**: `./simple-secrets list keys` → should show both keys
+- [ ] **Get enabled works**: `./simple-secrets get disable-test` → returns "test-value" (preserved)
+- [ ] **Value preservation**: Verify secret value is exactly the same after disable/enable cycle
+
+#### Multiple Disable/Enable Operations
+- [ ] **Disable multiple**: Disable 3-4 different secrets
+- [ ] **List disabled multiple**: `./simple-secrets list disabled` → shows all disabled with indicators
+- [ ] **Enable specific**: Enable only 1 of the disabled secrets
+- [ ] **Mixed state**: Verify list operations show correct enabled/disabled state
+- [ ] **Enable all**: Re-enable all remaining disabled secrets
+- [ ] **Empty disabled list**: `./simple-secrets list disabled` → shows "No disabled secrets found"
+
+#### Edge Cases & Error Handling
+- [ ] **Disable nonexistent**: `./simple-secrets disable secret nonexistent` → exit code 1, clear error
+- [ ] **Enable nonexistent**: `./simple-secrets enable secret nonexistent` → exit code 1, clear error
+- [ ] **Double disable**: Disable same secret twice → should handle gracefully
+- [ ] **Double enable**: Enable same secret twice → should handle gracefully or show already enabled
+- [ ] **Large volume**: Disable/enable 50+ secrets → verify performance
+- [ ] **Special characters**: Disable/enable secrets with unicode, spaces, special chars
+- [ ] **Very long key names**: Test with maximum length key names
+
+#### Token Disable Operations
+- [ ] **Create test user**: `./simple-secrets create-user tokentest reader` → capture token
+- [ ] **Test token works**: Use captured token to list keys → succeeds
+- [ ] **Disable token**: `./simple-secrets disable token tokentest` → success message
+- [ ] **Disabled token fails**: Use disabled token to list keys → exit code 1, "invalid token"
+- [ ] **Rotate for recovery**: `./simple-secrets rotate token tokentest` → generates new token
+- [ ] **New token works**: Use new token to list keys → succeeds
+- [ ] **Old token still invalid**: Use original token → still fails
+
+#### RBAC for Disable/Enable
+- [ ] **Reader cannot disable**: Reader token trying to disable secret → exit code 1, permission denied
+- [ ] **Reader cannot enable**: Reader token trying to enable secret → exit code 1, permission denied
+- [ ] **Reader cannot disable tokens**: Reader trying to disable user tokens → exit code 1
+- [ ] **Admin can disable/enable**: Verify admin can perform all disable/enable operations
+- [ ] **No token fails**: `./simple-secrets disable secret test` → authentication required
+
+#### Integration with Other Operations
+- [ ] **Put with same name**: After disabling secret, put new secret with same name → should work (creates new, not enable old)
+- [ ] **Backup operations**: Verify disable/enable operations create backups
+- [ ] **Master key rotation**: Disable secrets, rotate master key, verify disabled secrets remain disabled but can be enabled with preserved values
+
 ---
 
 ## 5️⃣ **User Management & RBAC**
@@ -428,6 +480,47 @@ done
 - [ ] **Test data cleanup**: Tests clean up after themselves
 - [ ] **Test performance**: Test suite runs in reasonable time
 - [ ] **Test reliability**: Tests pass consistently
+
+---
+
+## 1️⃣3️⃣ **Manual Disable/Enable Workflow Testing**
+
+### Quick Smoke Test for Disable/Enable
+
+**Setup:**
+```bash
+# Build and prepare
+make build
+export TEST_TOKEN="<admin-token-from-setup>"
+
+# Create test secrets
+./simple-secrets put test-secret-1 "value-1" --token $TEST_TOKEN
+./simple-secrets put test-secret-2 "value-2" --token $TEST_TOKEN
+./simple-secrets put test-secret-3 "value-3" --token $TEST_TOKEN
+```
+
+**Secret Disable/Enable Test:**
+- [ ] **Initial state**: `./simple-secrets list keys` → shows all 3 secrets
+- [ ] **Disable one**: `./simple-secrets disable secret test-secret-2` → success message
+- [ ] **List excludes disabled**: `./simple-secrets list keys` → shows test-secret-1, test-secret-3 only
+- [ ] **List disabled**: `./simple-secrets list disabled` → shows test-secret-2 with 🚫 icon
+- [ ] **Get disabled fails**: `./simple-secrets get test-secret-2` → "not found" error
+- [ ] **Enable secret**: `./simple-secrets enable secret test-secret-2` → success message
+- [ ] **List includes enabled**: `./simple-secrets list keys` → shows all 3 secrets again
+- [ ] **Value preserved**: `./simple-secrets get test-secret-2` → returns "value-2"
+
+**Token Disable Test:**
+- [ ] **Create test user**: `./simple-secrets create-user testuser reader` → capture token
+- [ ] **Test token works**: Use captured token to list keys → succeeds
+- [ ] **Disable token**: `./simple-secrets disable token testuser` → success message
+- [ ] **Disabled token fails**: Use disabled token → "invalid token" error
+- [ ] **Generate new token**: `./simple-secrets rotate token testuser` → new token
+- [ ] **New token works**: Use new token → succeeds
+
+**Edge Cases:**
+- [ ] **Double disable**: Disable same secret twice → graceful handling
+- [ ] **Enable non-disabled**: Enable active secret → appropriate message
+- [ ] **Nonexistent operations**: Disable/enable nonexistent resources → clear errors
 
 ---
 

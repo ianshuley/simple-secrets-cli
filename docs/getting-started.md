@@ -206,6 +206,69 @@ $ simple-secrets restore secret db_password --token <admin-token>
 Secret "db_password" restored from backup.
 ```
 
+## 14. Secret Lifecycle Management
+
+### Disable Secrets
+
+Temporarily hide secrets from normal operations without deleting them:
+
+```sh
+# Disable a secret (admin only)
+$ simple-secrets disable secret sensitive_key --token <admin-token>
+✅ Secret 'sensitive_key' has been disabled
+• The secret is hidden from normal operations
+• Use 'enable secret' to re-enable this secret
+
+# Verify secret is hidden from normal list
+$ simple-secrets list keys --token <token>
+# (sensitive_key will not appear)
+
+# List disabled secrets specifically
+$ simple-secrets list disabled --token <token>
+Disabled secrets (1):
+  🚫 sensitive_key
+
+Use 'enable secret <key>' to re-enable a disabled secret.
+```
+
+### Enable Secrets
+
+Re-enable previously disabled secrets:
+
+```sh
+# Re-enable a disabled secret
+$ simple-secrets enable secret sensitive_key --token <admin-token>
+✅ Secret 'sensitive_key' has been re-enabled
+• The secret is now available for normal operations
+
+# Verify secret value is preserved
+$ simple-secrets get sensitive_key --token <token>
+# (original value returned intact)
+```
+
+### Disable User Tokens
+
+Disable user authentication tokens for security purposes:
+
+```sh
+# Disable a user's token (admin only)
+$ simple-secrets disable token alice --token <admin-token>
+✅ Token disabled for user 'alice'
+• The user can no longer authenticate with their current token
+• Use 'rotate token' to generate a new token for this user
+
+# Generate new token for user (recovery method)
+$ simple-secrets rotate token alice --token <admin-token>
+Token rotated for user "alice".
+New token: <new-secure-token>
+```
+
+**Use Cases for Disable/Enable:**
+- **Secret Rotation Planning**: Disable secrets before updating dependent systems
+- **Security Incidents**: Quickly disable compromised tokens without deleting users
+- **Maintenance Windows**: Temporarily hide secrets during system updates
+- **Audit Compliance**: Demonstrate controlled access to sensitive secrets
+
 ## 15. Shell Completion
 
 Enable shell autocompletion for better CLI experience:
@@ -254,8 +317,10 @@ Authenticate using:
 **Core Operations:**
 - `put` / `add` - Store secrets
 - `get` - Retrieve secrets
-- `list` - List keys, backups, or users
+- `list` - List keys, backups, users, or disabled secrets
 - `delete` - Remove secrets
+- `disable` - Disable secrets or user tokens
+- `enable` - Re-enable disabled secrets
 
 **User Management:**
 - `create-user` - Create admin/reader users

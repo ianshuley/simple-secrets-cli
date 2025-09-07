@@ -119,6 +119,59 @@ User "alice" created.
 Generated token: <token>
 ```
 
+## Secret Lifecycle Management
+
+### Disable Secrets
+
+Temporarily hide secrets from normal operations without deleting them:
+
+```sh
+# Disable a secret (hides from list, get, etc.)
+$ simple-secrets disable secret api_key --token <admin-token>
+✅ Secret 'api_key' has been disabled
+• The secret is hidden from normal operations
+• Use 'enable secret' to re-enable this secret
+
+# List disabled secrets
+$ simple-secrets list disabled --token <token>
+Disabled secrets (1):
+  🚫 api_key
+
+Use 'enable secret <key>' to re-enable a disabled secret.
+```
+
+### Enable Secrets
+
+Re-enable previously disabled secrets:
+
+```sh
+# Re-enable a disabled secret
+$ simple-secrets enable secret api_key --token <admin-token>
+✅ Secret 'api_key' has been re-enabled
+• The secret is now available for normal operations
+
+# Verify it's back in normal listing
+$ simple-secrets list keys --token <token>
+api_key
+```
+
+### Token Management
+
+Disable user tokens for security purposes:
+
+```sh
+# Disable a user's token (admin only)
+$ simple-secrets disable token alice --token <admin-token>
+✅ Token disabled for user 'alice'
+• The user can no longer authenticate with their current token
+• Use 'rotate token' to generate a new token for this user
+
+# Generate new token for user (recovery)
+$ simple-secrets rotate token alice --token <admin-token>
+Token rotated for user "alice".
+New token: <new-token>
+```
+
 ## Token Rotation
 
 Rotate authentication tokens for security:
