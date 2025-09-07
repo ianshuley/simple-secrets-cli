@@ -28,6 +28,7 @@ func testEnv(tmp string) []string {
 		"HOME="+tmp,
 		"SIMPLE_SECRETS_CONFIG_DIR="+tmp+"/.simple-secrets",
 		"SIMPLE_SECRETS_TEST=1", // Disable first-run protection in tests
+		"SIMPLE_SECRETS_TOKEN=", // Clear any existing token
 	)
 }
 

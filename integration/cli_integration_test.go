@@ -103,15 +103,7 @@ func TestPutGetListDelete(t *testing.T) {
 
 // extractToken parses the admin token from first-run output
 func extractToken(out string) string {
-	for line := range strings.SplitSeq(out, "\n") {
-		if strings.Contains(line, "Token:") {
-			fields := strings.Fields(line)
-			if len(fields) > 1 {
-				return fields[len(fields)-1]
-			}
-		}
-	}
-	return ""
+	return extractTokenFromOutput(out)
 }
 
 func TestCreateUserAndLogin(t *testing.T) {

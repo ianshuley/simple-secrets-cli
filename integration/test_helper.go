@@ -68,78 +68,10 @@ func (h *TestHelper) initializeFirstRun() {
 	}
 
 	// Extract token from output
-	h.token = h.extractTokenFromOutput(string(output))
+	h.token = extractTokenFromOutput(string(output))
 	if h.token == "" {
 		h.t.Fatalf("could not extract admin token from first-run output: %s", output)
 	}
-}
-
-// extractTokenFromOutput parses the admin token from first-run output
-func (h *TestHelper) extractTokenFromOutput(output string) string {
-	lines := splitLines(output)
-	for _, line := range lines {
-		if containsString(line, "Token:") {
-			fields := splitFields(line)
-			if len(fields) > 1 {
-				return fields[len(fields)-1]
-			}
-		}
-	}
-	return ""
-}
-
-// Helper functions to avoid importing strings package
-func splitLines(s string) []string {
-	var lines []string
-	start := 0
-	for i := 0; i < len(s); i++ {
-		if s[i] == '\n' {
-			lines = append(lines, s[start:i])
-			start = i + 1
-		}
-	}
-	if start < len(s) {
-		lines = append(lines, s[start:])
-	}
-	return lines
-}
-
-func containsString(s, substr string) bool {
-	return len(s) >= len(substr) && indexOf(s, substr) >= 0
-}
-
-func indexOf(s, substr string) int {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return i
-		}
-	}
-	return -1
-}
-
-func splitFields(s string) []string {
-	var fields []string
-	var current []byte
-	inField := false
-
-	for i := 0; i < len(s); i++ {
-		if s[i] == ' ' || s[i] == '\t' || s[i] == '\n' || s[i] == '\r' {
-			if inField {
-				fields = append(fields, string(current))
-				current = current[:0]
-				inField = false
-			}
-		} else {
-			current = append(current, s[i])
-			inField = true
-		}
-	}
-
-	if inField {
-		fields = append(fields, string(current))
-	}
-
-	return fields
 }
 
 // cleanEnv returns a clean environment with only the test HOME directory
