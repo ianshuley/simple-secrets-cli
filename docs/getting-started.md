@@ -298,15 +298,6 @@ Authenticate using:
 - Always keep backups safe and rotate keys regularly.
 - Database restores create pre-restore backups for safety.
 
-## Next Steps
-
-- Integrate with Ansible or GitOps workflows
-- Explore key protection backends (passphrase, keyring, KMS)
-- Set up regular key rotation schedule
-- Use shell completion for better CLI experience
-- See CLI help: `simple-secrets --help`
-- View all available commands: `simple-secrets completion --help`
-
 ### Available Commands Summary
 
 **Core Operations:**
