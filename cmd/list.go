@@ -83,7 +83,7 @@ func listKeys() error {
 	}
 	for _, k := range keys {
 		// Escape special characters to prevent multiline display issues
-		escaped := escapeKeyForDisplay(k)
+		escaped := safeDisplayFormat(k)
 		fmt.Println(escaped)
 	}
 	return nil
@@ -200,7 +200,7 @@ func listDisabledSecrets() error {
 
 	fmt.Printf("Disabled secrets (%d):\n", len(disabledSecrets))
 	for _, key := range disabledSecrets {
-		escaped := escapeKeyForDisplay(key)
+		escaped := safeDisplayFormat(key)
 		fmt.Printf("  🚫 %s\n", escaped)
 	}
 	fmt.Println()
@@ -220,11 +220,6 @@ func getTokenRotationDisplay(tokenRotatedAt *time.Time) string {
 	return tokenRotatedAt.Format("2006-01-02 15:04:05")
 }
 
-// escapeKeyForDisplay escapes special characters in key names to ensure clean, single-line display.
-// This prevents display issues caused by special characters such as newlines, tabs, or quotes,
-// which could otherwise break output formatting or cause confusion. The function uses strconv.Quote,
-// which escapes non-printable characters, quotes, and backslashes, ensuring that key names are
-// displayed safely and unambiguously.
-func escapeKeyForDisplay(key string) string {
+func safeDisplayFormat(key string) string {
 	return strconv.Quote(key)
 }

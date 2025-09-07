@@ -197,8 +197,15 @@ func (s *SecretsStore) DisableSecret(key string) error {
 	// Create backup before disabling
 	s.backupSecret(key, enc)
 
-	// Mark as disabled by adding prefix and current timestamp (nanoseconds for uniqueness)
-	disabledKey := fmt.Sprintf("%s%d_%s", disabledPrefix, time.Now().UnixNano(), key)
+	// Mark as disabled using JSON encoding to handle keys with special characters
+	timestamp := time.Now().UnixNano()
+	keyData := map[string]interface{}{
+		"timestamp": timestamp,
+		"key":       key,
+	}
+	keyJSON, _ := json.Marshal(keyData)
+	disabledKey := disabledPrefix + string(keyJSON)
+
 	s.secrets[disabledKey] = enc
 	delete(s.secrets, key)
 
@@ -209,11 +216,18 @@ func (s *SecretsStore) DisableSecret(key string) error {
 func (s *SecretsStore) buildDisabledSecretsMap() map[string]string {
 	disabledMap := make(map[string]string)
 	for k := range s.secrets {
-		if strings.HasPrefix(k, disabledPrefix) {
-			withoutPrefix := strings.TrimPrefix(k, disabledPrefix)
-			if idx := strings.Index(withoutPrefix, "_"); idx != -1 {
-				originalKey := withoutPrefix[idx+1:]
-				disabledMap[originalKey] = k
+		if jsonData, found := strings.CutPrefix(k, disabledPrefix); found {
+			var keyData map[string]interface{}
+			if err := json.Unmarshal([]byte(jsonData), &keyData); err == nil {
+				if originalKey, ok := keyData["key"].(string); ok {
+					disabledMap[originalKey] = k
+				}
+			} else {
+				// Fallback for legacy format: timestamp_key
+				if idx := strings.Index(jsonData, "_"); idx != -1 {
+					originalKey := jsonData[idx+1:]
+					disabledMap[originalKey] = k
+				}
 			}
 		}
 	}

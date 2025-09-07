@@ -22,7 +22,10 @@ import (
 	"testing"
 )
 
-// TestHelper provides utilities for integration tests
+// TestHelper manages isolated test environments with automatic first-run initialization.
+// It provides a shared binary approach for efficiency while ensuring each test runs in
+// complete isolation with its own temp directory, clean environment, and admin token.
+// This eliminates test interdependencies and makes tests both faster and more reliable.
 type TestHelper struct {
 	t          *testing.T
 	tempDir    string
