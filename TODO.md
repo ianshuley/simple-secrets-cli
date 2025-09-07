@@ -6,7 +6,7 @@ TODO: Refactor repo into a CLI-only repo
 
 TODO: Add a disable command to the CLI for tokens and secrets to make building the password expiration feature in the ui easier later
 
-TODO: Run my `testing.md` Copilot workflow again
+TODO: Run my `.github/testing-prompt.md` Copilot workflow again
 
 TODO: Figure out appropriate license, make it public
 

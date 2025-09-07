@@ -194,7 +194,7 @@ See [docs/getting-started.md](docs/getting-started.md) for a full walkthrough an
 
 ## 📋 Manual QA Checklist
 
-> See [`testing.md`](docs/testing.md) for full pre-release validation steps
+> See [`.github/testing-prompt.md`](.github/testing-prompt.md) for comprehensive pre-release validation steps
 
 ---
 
