@@ -194,8 +194,6 @@ See [docs/getting-started.md](docs/getting-started.md) for a full walkthrough an
 
 ## 📋 Manual QA Checklist
 
-> See [`.github/testing-prompt.md`](.github/testing-prompt.md) for comprehensive pre-release validation steps
+> See [`docs/testing-framework.md`](docs/testing-framework.md) for comprehensive AI-agent testing procedures
 
 ---
-
-MIT License
