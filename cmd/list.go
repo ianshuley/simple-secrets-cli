@@ -18,6 +18,7 @@ package cmd
 import (
 	"fmt"
 	"sort"
+	"strconv"
 	"time"
 
 	"simple-secrets/internal"
@@ -81,7 +82,9 @@ func listKeys() error {
 		return nil
 	}
 	for _, k := range keys {
-		fmt.Println(k)
+		// Escape special characters to prevent multiline display issues
+		escaped := escapeKeyForDisplay(k)
+		fmt.Println(escaped)
 	}
 	return nil
 }
@@ -197,7 +200,8 @@ func listDisabledSecrets() error {
 
 	fmt.Printf("Disabled secrets (%d):\n", len(disabledSecrets))
 	for _, key := range disabledSecrets {
-		fmt.Printf("  🚫 %s\n", key)
+		escaped := escapeKeyForDisplay(key)
+		fmt.Printf("  🚫 %s\n", escaped)
 	}
 	fmt.Println()
 	fmt.Println("Use 'enable secret <key>' to re-enable a disabled secret.")
@@ -214,4 +218,9 @@ func getTokenRotationDisplay(tokenRotatedAt *time.Time) string {
 		return "Unknown (legacy user)"
 	}
 	return tokenRotatedAt.Format("2006-01-02 15:04:05")
+}
+
+// escapeKeyForDisplay escapes special characters in key names for clean display
+func escapeKeyForDisplay(key string) string {
+	return strconv.Quote(key)
 }
