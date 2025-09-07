@@ -236,10 +236,9 @@ func TestCreateUserStore(t *testing.T) {
 	// createUserStore logic is tested indirectly through user operations
 	tmp := t.TempDir()
 
-	// Set HOME to temp directory
-	oldHome := os.Getenv("HOME")
-	defer os.Setenv("HOME", oldHome)
-	os.Setenv("HOME", tmp)
+	// Set environment variables for isolated testing
+	t.Setenv("HOME", tmp)
+	t.Setenv("SIMPLE_SECRETS_CONFIG_DIR", tmp+"/.simple-secrets")
 
 	// Create user store via LoadUsers
 	_, _, err := LoadUsers()

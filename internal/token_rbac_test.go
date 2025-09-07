@@ -54,8 +54,8 @@ func TestTokenResolutionOrder(t *testing.T) {
 
 func TestTokenResolutionErrors(t *testing.T) {
 	dir := t.TempDir()
-	os.Setenv("HOME", dir)
-	defer os.Unsetenv("HOME")
+	t.Setenv("HOME", dir)
+	t.Setenv("SIMPLE_SECRETS_CONFIG_DIR", dir+"/.simple-secrets")
 	os.Unsetenv("SIMPLE_SECRETS_TOKEN")
 	// No config, no env, no flag
 	_, err := ResolveToken("")
