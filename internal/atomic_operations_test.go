@@ -226,7 +226,7 @@ func TestAtomicOperationConcurrency(t *testing.T) {
 	}
 
 	// Wait for all goroutines to complete
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		select {
 		case <-done:
 			// Goroutine completed successfully
