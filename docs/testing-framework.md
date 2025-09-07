@@ -1,5 +1,13 @@
 Let's conduct a comprehensive, production-grade testing campaign for this application. Use this structured checklist as your testing framework, but feel free to expand beyond it with any additional tests you can perform as an AI agent. I want to test the crap out of this thing. You should be inferring the nature of this semantic testing process applying it to things I haven't thought of as though that directive is itself a task on the following checklist. When you come up with new tests, please add them to the checklist.
 
+## 🚨 **TESTING WORKFLOW NOTE** 🚨
+
+**IMPORTANT**: This application uses development builds for daily work. Use `make dev` for all testing unless specifically testing release functionality. Development builds show `dev-abc123` format and are the normal workflow.
+
+- **Use**: `make dev` (development builds)
+- **Shows**: `dev-<git-commit>` in version
+- **Don't use**: `make release` or version changes unless testing release features specifically
+
 I want you to execute:
 
 1. **Automated Testing**: Run all unit tests, integration tests, and any test suites
@@ -45,16 +53,25 @@ Focus especially on:
 ### Basic Build
 
 - [ ] `git pull` or clone latest code
-- [ ] `make clean && make build` - clean build succeeds
+- [ ] `make clean && make dev` - clean development build succeeds
 - [ ] Binary created: `ls -la simple-secrets`
 - [ ] Help displays: `./simple-secrets --help`
-- [ ] Version info: `./simple-secrets --version` (if available)
+- [ ] Version info: `./simple-secrets version` - shows development version (dev-abc123)
+- [ ] Short version: `./simple-secrets version --short` - shows dev-<commit>
+
+### Development vs Release Builds
+
+- [ ] **Development build**: `make dev` - shows `dev-<git-commit>`
+- [ ] **Release build**: `make release VERSION=v1.0.0-test` - shows `v1.0.0-test`
+- [ ] Version command shows: Git commit, build date, Go version, platform
+- [ ] All builds contain proper version injection
 
 ### Installation Testing
 
-- [ ] `sudo make install` - system install works
+- [ ] `sudo make install` - system install works (installs current build)
 - [ ] `which simple-secrets` - binary in PATH
 - [ ] Run from any directory - works globally
+- [ ] Version persists: `simple-secrets version` shows same info
 - [ ] `sudo make uninstall` - clean removal
 - [ ] `simple-secrets` returns "command not found" after uninstall
 
@@ -65,6 +82,29 @@ Focus especially on:
 - [ ] Windows build works (if applicable)
 
 **Exit Code Verification**: Build commands return 0 on success, non-zero on failure
+
+### 🏷️ **Version System Testing**
+
+**Note**: This application uses development builds (`make dev`) for daily work. Only test release builds when specifically testing release functionality.
+
+#### Development Version Testing
+
+- [ ] `make dev` - builds with git commit in version
+- [ ] `./simple-secrets version` - shows full build info with "dev-" prefix
+- [ ] `./simple-secrets version --short` - shows just "dev-abc123" format
+- [ ] Version includes: git commit, build date, Go version, platform
+
+#### Version Command Testing
+
+- [ ] `./simple-secrets version --help` - shows version command help
+- [ ] Version appears in main help: `./simple-secrets --help | grep version`
+- [ ] All version info is non-empty (no "unknown" values in normal builds)
+
+#### Build-time Injection Testing
+
+- [ ] Make small change, commit, rebuild - version auto-updates with new commit
+- [ ] Git commit hash matches: `git rev-parse --short HEAD` vs version output
+- [ ] Build date is recent (within last few minutes)
 
 ---
 

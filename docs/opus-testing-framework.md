@@ -44,6 +44,33 @@ As an AI agent, start here:
 - Do error messages teach me how to use it correctly?
 - What's my first "aha!" moment?
 
+### 🏷️ **Version System Discovery Testing**
+
+**Goal**: Test version system like a user discovering it naturally
+
+```
+Version exploration tasks:
+1. How does a user discover version information?
+2. Is version info consistent across commands?
+3. What does version tell you about the build?
+4. Does version behavior match user expectations?
+```
+
+**Discovery scenarios:**
+
+- Try `--version`, `-v`, `version` - what works?
+- What's the difference between `version` and `version --short`?
+- Does version info help with debugging?
+- Can you tell if you're running dev vs release build?
+- What happens if you run an old binary after updating?
+
+**Version edge cases:**
+
+- Does version work without authentication?
+- What if git isn't available during build?
+- Version display with terminal width constraints
+- Copy/paste version info for bug reports
+
 ### Phase 2: Destructive Creativity
 
 **Goal**: Find bugs through creative destruction
