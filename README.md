@@ -1,8 +1,37 @@
-# Installation & Usage (with Makefile)
+# Simple Secrets CLI
+
+A secure command-line tool for managing secrets with role-based access control (RBAC), designed for teams that need a simple, file-based secret management solution without complex infrastructure requirements.
+
+## Features
+
+- **🔐 Secure Storage**: AES-256-GCM encryption for all secrets
+- **👥 Role-Based Access Control**: Admin and reader roles with granular permissions
+- **🔄 Token Management**: Secure token rotation with self-service capabilities
+- **💾 Backup & Restore**: Automatic backups with encrypted restore capabilities
+- **🎯 Simple CLI**: Intuitive commands for common secret operations
+- **🚀 Zero Dependencies**: Single binary with no external service requirements
+
+## Installation
+
+### Build from source
+
+```bash
+git clone https://github.com/yourusername/simple-secrets-cli
+cd simple-secrets-cli
+make build
+```
+
+### Install globally
+
+```bash
+sudo make install
+```
+
+### Installation & Usage (with Makefile)
 
 You can use the provided Makefile for easy build, install, and cleanup:
 
-```sh
+```bash
 # Build the CLI
 make build
 
@@ -22,11 +51,52 @@ make clean
 make purge
 ```
 
+## Quick Start
+
+```bash
+# First run creates an admin user
+simple-secrets list keys
+
+# Store a secret
+simple-secrets put api-key "sk-1234567890abcdef" --token YOUR_ADMIN_TOKEN
+
+# Retrieve a secret
+simple-secrets get api-key --token YOUR_ADMIN_TOKEN
+
+# List all secrets
+simple-secrets list keys --token YOUR_ADMIN_TOKEN
+```
+
+## Configuration
+
+### Authentication Methods
+
+1. **Command flag**: `--token YOUR_TOKEN`
+2. **Environment variable**: `export SIMPLE_SECRETS_TOKEN=YOUR_TOKEN`
+3. **Config file**: `~/.simple-secrets/config.json`
+
+```json
+{
+  "token": "YOUR_TOKEN"
+}
+```
+
+### File Structure
+
+```text
+~/.simple-secrets/
+├── master.key      # Encryption key (protect this!)
+├── secrets.json    # Encrypted secrets
+├── users.json      # User accounts and roles
+├── roles.json      # Permission definitions
+└── backups/        # Automatic backups
+```
+
 ## Version Information
 
 Check the version and build information:
 
-```sh
+```bash
 # Show full version information
 simple-secrets version
 
@@ -41,112 +111,79 @@ simple-secrets version --short
 
 ### Build Targets
 
-```sh
+```bash
 # Development build (includes git commit)
 make dev
 
 # Release build with specific version
 make release VERSION=v1.0.0
-
-# Default build with current version
-make build
 ```
 
-The binary will be available as `simple-secrets` in your PATH after install.
+## Commands
 
-# simple-secrets
+### Secret Management
 
-A lightweight secrets manager for Ansible and GitOps workflows. `simple-secrets` securely stores secrets using AES-256-GCM encryption and supports master key rotation, multiple key protection backends, and easy CLI operations.
+```bash
+# Store secrets
+simple-secrets put KEY VALUE
+simple-secrets add KEY VALUE  # alias
 
-## Features
+# Retrieve secrets
+simple-secrets get KEY
 
-- **AES-256-GCM encryption** for all secrets
-- **Master key rotation** with automatic backup cleanup (keeps last 5 rotations)
-- **Database backup/restore** from rotation snapshots with timestamp tracking
-- **Role-based access control (RBAC)**: admin and reader roles
-- **User management**: create users via CLI
-- **Token-based authentication**: via flag, env var, or config file
-- **Individual secret backup/restore** for accidental deletions/overwrites
-- **Simple CLI** for storing, retrieving, listing, and deleting secrets
-- **Atomic updates** and backup for safe operations
+# List secrets
+simple-secrets list keys
 
-## Installation
+# Delete secrets
+simple-secrets delete KEY
 
-### Prerequisites
-
-- Go 1.20 or newer
-
-### Build from source
-
-```sh
-# Clone the repo
-$ git clone https://github.com/ianshuley/simple-secrets-cli.git
-$ cd simple-secrets-cli
-
-# Build the CLI
-$ go build -o simple-secrets
+# Disable/enable secrets
+simple-secrets disable secret KEY
+simple-secrets enable secret KEY
+simple-secrets list disabled
 ```
 
-### Install (Linux/macOS)
+### User Management
 
-```sh
-# Move binary to your PATH
-$ mv simple-secrets /usr/local/bin/
+```bash
+# Create users
+simple-secrets create-user USERNAME ROLE  # admin or reader
+
+# List users
+simple-secrets list users
+
+# Disable user tokens
+simple-secrets disable token USERNAME
 ```
 
+### Token Rotation
 
-## Quick Start
+```bash
+# Rotate your own token
+simple-secrets rotate token
 
-1. **Create your first secret:**
-   ```sh
-   $ simple-secrets put api_key "my-secret-value"
-   User setup required. Creating initial admin user...
-   Generated admin token: token_abc123...
-   Secret "api_key" stored securely.
-   ```
-
-2. **Retrieve it:**
-   ```sh
-   $ simple-secrets get api_key --token token_abc123...
-   my-secret-value
-   ```
-
-3. **List all keys:**
-   ```sh
-   $ simple-secrets list keys --token token_abc123...
-   api_key
-   ```
-
-4. **Rotate master key (creates backup):**
-   ```sh
-   $ simple-secrets rotate master-key --token token_abc123...
-   ```
-
-
-## Master Key Rotation
-
-Rotate your master key and re-encrypt all secrets (with backup):
-
-```sh
-simple-secrets rotate master-key --token <admin-token>
+# Admin: rotate another user's token
+simple-secrets rotate token USERNAME
 ```
 
-## User Management
+### Master Key Rotation
 
-Create a new user (admin or reader):
+```bash
+# Rotate encryption key (admin only)
+simple-secrets rotate master-key
+```
 
-```sh
-# Interactive (prompts for missing info)
-$ simple-secrets create-user --token <admin-token>
-Username: alice
-Role (admin/reader): reader
-Generated token: <token>
-User "alice" created.
+### Backup & Restore
 
-# Or specify username and role directly
-$ simple-secrets create-user alice reader --token <admin-token>
-User "alice" created.
-Generated token: <token>
+```bash
+# List available backups
+simple-secrets list backups
+
+# Restore a deleted secret
+simple-secrets restore secret KEY
+
+# Restore entire database from backup
+simple-secrets restore database BACKUP_ID
 ```
 
 ## Secret Lifecycle Management
@@ -155,128 +192,70 @@ Generated token: <token>
 
 Temporarily hide secrets from normal operations without deleting them:
 
-```sh
+```bash
 # Disable a secret (hides from list, get, etc.)
-$ simple-secrets disable secret api_key --token <admin-token>
-✅ Secret 'api_key' has been disabled
-• The secret is hidden from normal operations
-• Use 'enable secret' to re-enable this secret
+simple-secrets disable secret api_key --token <admin-token>
 
 # List disabled secrets
-$ simple-secrets list disabled --token <token>
-Disabled secrets (1):
-  🚫 api_key
-
-Use 'enable secret <key>' to re-enable a disabled secret.
+simple-secrets list disabled --token <token>
 ```
 
 ### Enable Secrets
 
 Re-enable previously disabled secrets:
 
-```sh
+```bash
 # Re-enable a disabled secret
-$ simple-secrets enable secret api_key --token <admin-token>
-✅ Secret 'api_key' has been re-enabled
-• The secret is now available for normal operations
-
-# Verify it's back in normal listing
-$ simple-secrets list keys --token <token>
-api_key
+simple-secrets enable secret api_key --token <admin-token>
 ```
 
 ### Token Management
 
 Disable user tokens for security purposes:
 
-```sh
+```bash
 # Disable a user's token (admin only)
-$ simple-secrets disable token alice --token <admin-token>
-✅ Token disabled for user 'alice'
-• The user can no longer authenticate with their current token
-• Use 'rotate token' to generate a new token for this user
+simple-secrets disable token alice --token <admin-token>
 
 # Generate new token for user (recovery)
-$ simple-secrets rotate token alice --token <admin-token>
-Token rotated for user "alice".
-New token: <new-token>
+simple-secrets rotate token alice --token <admin-token>
 ```
 
-## Token Rotation
+## RBAC Permissions
 
-Rotate authentication tokens for security:
+| Permission | Admin | Reader |
+|------------|-------|---------|
+| Read secrets | ✅ | ✅ |
+| Write secrets | ✅ | ❌ |
+| Delete secrets | ✅ | ❌ |
+| Manage users | ✅ | ❌ |
+| Rotate others' tokens | ✅ | ❌ |
+| Rotate own token | ✅ | ✅ |
+| Rotate master key | ✅ | ❌ |
 
-```sh
-# Rotate your own token (both admin and reader users)
-$ simple-secrets rotate token --token <your-current-token>
-✅ Your token has been rotated successfully!
-New token: <new-token>
+## Development
 
-# Admins can rotate other users' tokens
-$ simple-secrets rotate token alice --token <admin-token>
-Token rotated for user "alice" (reader role).
-New token: <new-token>
+```bash
+# Run tests
+make test
+
+# Development build
+make dev
+
+# Release build
+make release VERSION=v1.0.0
+
+# Clean build artifacts
+make clean
 ```
 
-**Note**: Old tokens are immediately invalidated after rotation.
+## Security Considerations
 
-## RBAC & Permissions
+- **Master key protection**: The `master.key` file contains your encryption key. Protect it like a private key.
+- **Token security**: Tokens are hashed with SHA-256 before storage
+- **Backup encryption**: All backups maintain encryption with their original keys
+- **File permissions**: All files created with 0600 (user read/write only)
 
-- **admin**: Can read, write, rotate keys, manage users.
-- **reader**: Can only read/list secrets.
+## License
 
-## Backup & Restore
-
-### Individual Secret Backups
-
-Previous secret values are backed up automatically on overwrite or delete. Restore a secret from backup:
-
-```sh
-simple-secrets restore secret my_api_key --token <admin-token>
-```
-
-### Database Backup & Restore
-
-Master key rotations create timestamped database backups. List available backups:
-
-```sh
-simple-secrets list backups --token <admin-token>
-```
-
-Restore your entire database from a backup:
-
-```sh
-# Restore from most recent backup
-simple-secrets restore database --token <admin-token>
-
-# Restore from specific backup
-simple-secrets restore database rotate-20240901-143022 --token <admin-token>
-
-# Skip confirmation prompt
-simple-secrets restore database --yes --token <admin-token>
-```
-
-**Note**: Database restore creates a backup of your current state before restoring, and only keeps the last 5 rotation backups automatically.
-
-
-## First-Run Experience
-
-If no users exist, a default admin user and token are created. The token is printed to the console. Store it securely; it will not be shown again.
-
-## Token Authentication
-
-Authenticate using:
-
-- `--token <token>` flag
-- `SIMPLE_SECRETS_TOKEN` environment variable
-- `~/.simple-secrets/config.json` with `{ "token": "<token>" }`
-
-## Documentation
-
-See [docs/getting-started.md](docs/getting-started.md) for a full walkthrough and advanced usage.
-
-## 📋 Manual QA Checklist
-
-> See [`docs/testing-framework.md`](docs/testing-framework.md) for comprehensive AI-agent testing procedures
-
----
+Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) for details.
