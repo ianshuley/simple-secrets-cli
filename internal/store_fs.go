@@ -197,8 +197,8 @@ func (s *SecretsStore) DisableSecret(key string) error {
 	// Create backup before disabling
 	s.backupSecret(key, enc)
 
-	// Mark as disabled by adding prefix and current timestamp
-	disabledKey := fmt.Sprintf("%s%d_%s", disabledPrefix, time.Now().Unix(), key)
+	// Mark as disabled by adding prefix and current timestamp (nanoseconds for uniqueness)
+	disabledKey := fmt.Sprintf("%s%d_%s", disabledPrefix, time.Now().UnixNano(), key)
 	s.secrets[disabledKey] = enc
 	delete(s.secrets, key)
 
