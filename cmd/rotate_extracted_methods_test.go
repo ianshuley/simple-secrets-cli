@@ -30,10 +30,9 @@ import (
 func setupTestEnvironment(t *testing.T) (string, string) {
 	tmp := t.TempDir()
 
-	// Set HOME to temp directory
-	oldHome := os.Getenv("HOME")
-	t.Cleanup(func() { os.Setenv("HOME", oldHome) })
-	os.Setenv("HOME", tmp)
+	// Set environment variables for isolated testing
+	t.Setenv("HOME", tmp)
+	t.Setenv("SIMPLE_SECRETS_CONFIG_DIR", tmp+"/.simple-secrets")
 
 	// Create initial user setup
 	store, _, err := internal.LoadUsers()

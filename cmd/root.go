@@ -37,6 +37,8 @@ Features:
 	• CLI user management (create-user, list users, token rotation)
 	• Self-service token rotation for enhanced security
 	• Individual secret backup/restore functionality
+	• Secret lifecycle management (disable/enable secrets)
+	• Token disable/enable for security management
 	• Token-based authentication (flag, env, or config file)
 
 All secrets are encrypted and stored locally in ~/.simple-secrets/.

@@ -5,13 +5,16 @@
 ## 🤖 AI Agent Testing Instructions
 
 You are a QA engineer testing this CLI application. Your goal is to:
+
 1. **Think like a user** - both experienced and novice
 2. **Think like an attacker** - try to break things
 3. **Think like a developer** - understand the implementation
 4. **Be creative** - find edge cases humans might miss
 
 ### Your Testing Persona Options
-Choose one or combine multiple:
+
+Assume the role of each of these and test one by one:
+
 - 🆕 **New User**: First time using the app, makes common mistakes
 - 👨‍💻 **Power User**: Knows CLI tools well, uses advanced features
 - 😈 **Malicious Actor**: Actively trying to break security
@@ -22,6 +25,7 @@ Choose one or combine multiple:
 ## 📋 Enhanced Interactive Testing Protocol
 
 ### Phase 1: Discovery & Learning
+
 **Goal**: Understand the application naturally, like a real user would
 
 ```
@@ -34,12 +38,41 @@ As an AI agent, start here:
 ```
 
 **Questions to explore:**
+
 - What happens if I just type `./simple-secrets`?
 - Can I guess the command structure?
 - Do error messages teach me how to use it correctly?
 - What's my first "aha!" moment?
 
+### 🏷️ **Version System Discovery Testing**
+
+**Goal**: Test version system like a user discovering it naturally
+
+```
+Version exploration tasks:
+1. How does a user discover version information?
+2. Is version info consistent across commands?
+3. What does version tell you about the build?
+4. Does version behavior match user expectations?
+```
+
+**Discovery scenarios:**
+
+- Try `--version`, `-v`, `version` - what works?
+- What's the difference between `version` and `version --short`?
+- Does version info help with debugging?
+- Can you tell if you're running dev vs release build?
+- What happens if you run an old binary after updating?
+
+**Version edge cases:**
+
+- Does version work without authentication?
+- What if git isn't available during build?
+- Version display with terminal width constraints
+- Copy/paste version info for bug reports
+
 ### Phase 2: Destructive Creativity
+
 **Goal**: Find bugs through creative destruction
 
 ```
@@ -52,14 +85,17 @@ Now actively try to break things:
 ```
 
 **Creative destruction examples:**
+
 - Put a secret with key `../../etc/passwd`
 - Create circular references in values
 - Use null bytes, control characters, ANSI escape codes
 - Rapidly rotate keys while reading secrets
 - Fill the disk during a backup operation
 - Delete files while the app is reading them
+- Test empty arguments (note: may trigger interactive prompts - use Ctrl+C or timeout in automation)
 
 ### Phase 3: Behavioral Exploration
+
 **Goal**: Discover undocumented behaviors and edge cases
 
 ```
@@ -72,6 +108,7 @@ Explore the boundaries:
 ```
 
 **Behavioral tests to try:**
+
 - Store a secret that's another encrypted secret
 - Create users with emoji names
 - Use the app in different locales/languages
@@ -82,6 +119,7 @@ Explore the boundaries:
 ## 🎯 Critical Bug Hunt Scenarios
 
 ### Scenario 1: The Paranoid Security Auditor
+
 ```
 You're a security auditor. Your job is to find any way that secrets
 could leak or unauthorized access could occur.
@@ -96,6 +134,7 @@ Try:
 ```
 
 ### Scenario 2: The Disaster Recovery Specialist
+
 ```
 You're testing disaster recovery. Assume everything that can go
 wrong will go wrong at the worst possible moment.
@@ -111,6 +150,7 @@ Simulate:
 ```
 
 ### Scenario 3: The Integration Nightmare
+
 ```
 You need to integrate this with existing systems that have
 weird requirements and constraints.
@@ -127,7 +167,9 @@ Test:
 ## 🔍 AI-Specific Testing Advantages
 
 ### Pattern Recognition Tests
+
 **Use your pattern recognition to find issues:**
+
 - Do error messages follow consistent patterns?
 - Are there commands that behave inconsistently?
 - Can you spot potential race conditions in the workflow?
@@ -135,7 +177,9 @@ Test:
 - Are there performance cliffs at certain thresholds?
 
 ### Natural Language Exploitation
+
 **Use your language understanding:**
+
 - Create secrets with multilingual content
 - Use homoglyphs and lookalike characters
 - Test with RTL (right-to-left) text
@@ -143,7 +187,9 @@ Test:
 - Test with various encodings
 
 ### Sequence Prediction
+
 **Use your sequence learning:**
+
 - Can you predict the next token value?
 - Is there a pattern in backup naming?
 - Can you guess file locations?
@@ -151,9 +197,10 @@ Test:
 
 ## 📊 Intelligent Reporting Format
 
-### For each testing session, report:
+### For each testing session, report
 
 #### 1. Executive Summary
+
 ```
 🎭 Testing Persona Used: [Which persona(s)]
 🎯 Focus Area: [What you concentrated on]
@@ -162,6 +209,7 @@ Test:
 ```
 
 #### 2. Discovered Issues (Prioritized)
+
 ```
 🚨 CRITICAL: [Security vulnerabilities, data loss risks]
 ⚠️ HIGH: [Functional bugs, performance issues]
@@ -170,6 +218,7 @@ Test:
 ```
 
 #### 3. Creative Edge Cases Found
+
 ```
 😈 "I tried X, expecting Y, but got Z instead..."
 🎪 "This weird sequence of commands causes..."
@@ -177,6 +226,7 @@ Test:
 ```
 
 #### 4. User Experience Insights
+
 ```
 😕 Confusing: [What wasn't intuitive]
 😊 Delightful: [What worked really well]
@@ -185,6 +235,7 @@ Test:
 ```
 
 #### 5. Security Observations
+
 ```
 🔒 Strong: [Good security practices noticed]
 🔓 Weak: [Potential vulnerabilities]
@@ -194,26 +245,32 @@ Test:
 ## 🎮 Gamified Testing Challenges
 
 ### Challenge 1: "Speedrun Any% Corruption"
+
 How quickly can you corrupt the database from a fresh install?
 
 ### Challenge 2: "Secret Hoarder"
+
 What's the maximum number of secrets you can create before something breaks?
 
 ### Challenge 3: "Token Collector"
+
 How many different authentication states can you create?
 
 ### Challenge 4: "Time Traveler"
+
 What breaks if you manipulate system time during operations?
 
 ### Challenge 5: "The Minimalist"
+
 What's the minimum viable setup that still works?
 
 ### Challenge 6: "The Maximalist"
+
 How complex can you make the setup while maintaining functionality?
 
 ## 🧠 AI Agent Testing Advantages
 
-### What AI Agents Do Better Than Scripts:
+### What AI Agents Do Better Than Scripts
 
 1. **Creative Thinking**
    - Generate novel test cases on the fly
@@ -243,33 +300,38 @@ How complex can you make the setup while maintaining functionality?
 ## 🔄 Iterative Testing Cycles
 
 ### Cycle 1: Innocent Explorer
+
 - Use the app as a complete newcomer
 - Document the learning journey
 - Note first impressions
 
 ### Cycle 2: Power User
+
 - Use advanced features
 - Chain complex operations
 - Test performance limits
 
 ### Cycle 3: Hostile Actor
+
 - Try to break security
 - Attempt privilege escalation
 - Look for information leaks
 
 ### Cycle 4: Production Simulator
+
 - Test real-world scenarios
 - Simulate production load
 - Test failure recovery
 
 ### Cycle 5: Integration Tester
+
 - Test with other tools
 - Verify scripting compatibility
 - Check ecosystem fit
 
 ## 📈 Testing Evolution
 
-### How to make each session better:
+### How to make each session better
 
 1. **Build on Previous Sessions**
    - Reference earlier discoveries
@@ -293,14 +355,16 @@ How complex can you make the setup while maintaining functionality?
 
 ## 🎯 Success Metrics for AI Agent Testing
 
-### Quality Indicators:
+### Quality Indicators
+
 - 🎨 **Creativity**: Found issues automated tests missed
 - 🔍 **Depth**: Went beyond surface-level testing
 - 🧩 **Connections**: Found interaction bugs
 - 💡 **Insights**: Provided valuable UX feedback
 - 🚨 **Severity**: Found critical issues early
 
-### Session Effectiveness:
+### Session Effectiveness
+
 - Found at least 3 issues scripts wouldn't catch
 - Discovered 1 creative edge case
 - Provided 5 UX improvement suggestions
@@ -309,21 +373,24 @@ How complex can you make the setup while maintaining functionality?
 
 ## 🤝 Collaboration with Human Testers
 
-### AI Agent Strengths:
+### AI Agent Strengths
+
 - Tireless exploration
 - Creative edge case generation
 - Pattern recognition
 - Never gets bored with repetitive tests
 - Can simulate multiple personas quickly
 
-### Human Tester Strengths:
+### Human Tester Strengths
+
 - Deep domain knowledge
 - Business logic understanding
 - Real-world experience
 - Intuition about what matters
 - Strategic test planning
 
-### Best Practice:
+### Best Practice
+
 Use AI agents for exploration and creative testing, then have humans verify critical findings and make strategic decisions about what matters most.
 
 ---

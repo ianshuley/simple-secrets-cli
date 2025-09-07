@@ -1,5 +1,25 @@
 # Copilot Instructions
 
+## 🚨 CRITICAL VERSIONING REMINDER 🚨
+
+### ⛔ NEVER SUGGEST VERSION CHANGES FOR DEVELOPMENT WORK ⛔
+- **User is doing DEVELOPMENT work** - NOT releasing software to the public
+- **Official releases created**: 0 (ZERO)
+- **When to suggest versioning**: ONLY when user explicitly says "I want to release this to the public"
+- **Development workflow**: ALWAYS use `make dev` (shows dev-abc123)
+- **DO NOT suggest**: Version number changes, git tags, "release" commands during normal development
+- **User understands**: Versioning is for official releases only, not PRs or daily development
+
+### 📋 User's Versioning Workflow (ALREADY ESTABLISHED):
+- **Daily work**: `make dev` → shows `dev-abc123`
+- **PRs/features**: No version changes needed
+- **Official release** (when ready): `make release VERSION=vX.Y.Z` + git tag
+- **Current status**: Still in development phase, no releases yet
+
+**STOP CONFUSING THE USER WITH VERSIONING DURING DEVELOPMENT!**
+
+---
+
 ## Code Style Guidelines
 
 ### Avoid `else` in Garbage Collected Languages

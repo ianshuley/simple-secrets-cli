@@ -47,6 +47,11 @@ func HashToken(token string) string {
 
 // DefaultUserConfigPath exports defaultUserConfigPath for CLI use.
 func DefaultUserConfigPath(filename string) (string, error) {
+	// Check for test override first
+	if testDir := os.Getenv("SIMPLE_SECRETS_CONFIG_DIR"); testDir != "" {
+		return filepath.Join(testDir, filename), nil
+	}
+
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", fmt.Errorf("find home dir: %w", err)
@@ -120,6 +125,13 @@ func (u *User) Can(perm string, perms RolePermissions) bool {
 	return perms.Has(u.Role, perm)
 }
 
+// DisableToken disables the user's token by clearing the token hash and updating the timestamp
+func (u *User) DisableToken() {
+	u.TokenHash = ""
+	now := time.Now()
+	u.TokenRotatedAt = &now
+}
+
 // LoadUsers loads users and roles. Returns (store, firstRun, error).
 func LoadUsers() (*UserStore, bool, error) {
 	usersPath, rolesPath, err := resolveConfigPaths()
@@ -129,6 +141,10 @@ func LoadUsers() (*UserStore, bool, error) {
 
 	users, err := loadUsers(usersPath)
 	if os.IsNotExist(err) {
+		// Only check first-run eligibility when users.json doesn't exist
+		if err := validateFirstRunEligibility(); err != nil {
+			return nil, false, err
+		}
 		return handleFirstRun(usersPath, rolesPath)
 	}
 	if err != nil {
@@ -162,6 +178,33 @@ func resolveConfigPaths() (string, string, error) {
 func handleFirstRun(usersPath, rolesPath string) (*UserStore, bool, error) {
 	fmt.Println("users.json not found – creating default admin user...")
 	return createDefaultUserFile(usersPath, rolesPath)
+}
+
+// validateFirstRunEligibility ensures we only run first-run setup in truly clean environments
+func validateFirstRunEligibility() error {
+	// Get the config directory from paths
+	usersPath, rolesPath, err := resolveConfigPaths()
+	if err != nil {
+		return err
+	}
+	configDir := filepath.Dir(usersPath)
+
+	// Check for existing files that would indicate this is NOT a first run
+	// Note: users.json is not checked here since this function is only called when users.json doesn't exist
+	existingFiles := []string{
+		rolesPath,                                // roles.json
+		filepath.Join(configDir, "master.key"),   // encryption key
+		filepath.Join(configDir, "secrets.json"), // secrets store
+		filepath.Join(configDir, "backups"),      // backup directory
+	}
+
+	for _, file := range existingFiles {
+		if _, err := os.Stat(file); err == nil {
+			return fmt.Errorf("existing simple-secrets installation detected (found %s). Cannot create new admin user when installation already exists. If this is unexpected, restore it from backup or manually investigate", filepath.Base(file))
+		}
+	}
+
+	return nil
 }
 
 // createUserStore constructs a UserStore with the given users and permissions

@@ -31,7 +31,7 @@ func TestFirstRunCreatesAdmin(t *testing.T) {
 	tmp := t.TempDir()
 	// Set HOME to temp dir for isolation
 	cmd := exec.Command(cliBin, "list", "keys")
-	cmd.Env = append(os.Environ(), "HOME="+tmp)
+	cmd.Env = testEnv(tmp)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("first run failed: %v\n%s", err, out)
@@ -53,7 +53,7 @@ func TestPutGetListDelete(t *testing.T) {
 	tmp := t.TempDir()
 	// First run: trigger creation and capture token
 	cmd := exec.Command(cliBin, "list", "keys")
-	cmd.Env = append(os.Environ(), "HOME="+tmp)
+	cmd.Env = testEnv(tmp)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("first run failed: %v\n%s", err, out)
@@ -66,14 +66,15 @@ func TestPutGetListDelete(t *testing.T) {
 
 	// Put
 	cmd = exec.Command(cliBin, "put", "foo", "bar")
-	cmd.Env = append(os.Environ(), "HOME="+tmp, "SIMPLE_SECRETS_TOKEN="+token)
+	envWithToken := append(testEnv(tmp), "SIMPLE_SECRETS_TOKEN="+token)
+	cmd.Env = envWithToken
 	out, err = cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("put failed: %v\n%s", err, out)
 	}
 	// Get
 	cmd = exec.Command(cliBin, "get", "foo")
-	cmd.Env = append(os.Environ(), "HOME="+tmp, "SIMPLE_SECRETS_TOKEN="+token)
+	cmd.Env = envWithToken
 	out, err = cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("get failed: %v\n%s", err, out)
@@ -83,7 +84,7 @@ func TestPutGetListDelete(t *testing.T) {
 	}
 	// List
 	cmd = exec.Command(cliBin, "list", "keys")
-	cmd.Env = append(os.Environ(), "HOME="+tmp, "SIMPLE_SECRETS_TOKEN="+token)
+	cmd.Env = envWithToken
 	out, err = cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("list failed: %v\n%s", err, out)
@@ -93,7 +94,7 @@ func TestPutGetListDelete(t *testing.T) {
 	}
 	// Delete
 	cmd = exec.Command(cliBin, "delete", "foo")
-	cmd.Env = append(os.Environ(), "HOME="+tmp, "SIMPLE_SECRETS_TOKEN="+token)
+	cmd.Env = envWithToken
 	out, err = cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("delete failed: %v\n%s", err, out)
@@ -102,22 +103,14 @@ func TestPutGetListDelete(t *testing.T) {
 
 // extractToken parses the admin token from first-run output
 func extractToken(out string) string {
-	for line := range strings.SplitSeq(out, "\n") {
-		if strings.Contains(line, "Token:") {
-			fields := strings.Fields(line)
-			if len(fields) > 1 {
-				return fields[len(fields)-1]
-			}
-		}
-	}
-	return ""
+	return extractTokenFromOutput(out)
 }
 
 func TestCreateUserAndLogin(t *testing.T) {
 	tmp := t.TempDir()
 	// First run to create admin and extract token
 	cmd := exec.Command(cliBin, "list", "keys")
-	cmd.Env = append(os.Environ(), "HOME="+tmp)
+	cmd.Env = testEnv(tmp)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("first run failed: %v\n%s", err, out)
@@ -128,7 +121,8 @@ func TestCreateUserAndLogin(t *testing.T) {
 	}
 	// Create user (simulate input)
 	cmd = exec.Command(cliBin, "create-user")
-	cmd.Env = append(os.Environ(), "HOME="+tmp, "SIMPLE_SECRETS_TOKEN="+token)
+	envWithToken := append(testEnv(tmp), "SIMPLE_SECRETS_TOKEN="+token)
+	cmd.Env = envWithToken
 	cmd.Stdin = strings.NewReader("bob\nreader\n\n")
 	out, err = cmd.CombinedOutput()
 	if err != nil {
