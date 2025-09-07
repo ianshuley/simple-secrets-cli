@@ -10,13 +10,18 @@ This guide will help you install, initialize, and use `simple-secrets` to secure
 ### Build and Install
 
 ```sh
-# Clone and build
-$ git clone https://github.com/your-org/simple-secrets.git
-$ cd simple-secrets/backend
-$ go build -o simple-secrets
+# Clone the repository
+$ git clone https://github.com/yourusername/simple-secrets-cli.git
+$ cd simple-secrets-cli
 
-# (Optional) Move to your PATH
-$ mv simple-secrets /usr/local/bin/
+# Build and install using Makefile
+$ make build
+$ sudo make install
+
+# Or install to custom location
+$ make install PREFIX=$HOME/.local
+
+# The binary will be available as 'simple-secrets' in your PATH
 ```
 
 
@@ -32,6 +37,10 @@ Save a secret value under a key (requires authentication):
 ```sh
 $ simple-secrets put db_password s3cr3tP@ssw0rd --token <your-token>
 Secret "db_password" stored.
+
+# Alternative: use the 'add' alias
+$ simple-secrets add api_key abc123xyz --token <your-token>
+Secret "api_key" stored.
 ```
 
 
@@ -114,10 +123,10 @@ Found 3 rotation backup(s):
 
 ### Restore Database from Backup
 
-Restore your entire secrets database from any backup:
+Restore your entire secrets database from any backup (two command styles available):
 
 ```sh
-# Restore from most recent backup
+# Using the consolidated restore command
 $ simple-secrets restore database --token <admin-token>
 Will restore from most recent backup: rotate-20240901-143022
   Created: 2024-09-01 14:30:22
@@ -128,11 +137,16 @@ This will:
 Proceed? (type 'yes'): yes
 Database restored successfully.
 
-# Restore from specific backup
+# Using the dedicated restore-database command (alternative)
+$ simple-secrets restore-database --token <admin-token>
+
+# Restore from specific backup (both styles work)
 $ simple-secrets restore database rotate-20240830-095505 --token <admin-token>
+$ simple-secrets restore-database rotate-20240830-095505 --token <admin-token>
 
 # Skip confirmation prompt
 $ simple-secrets restore database --yes --token <admin-token>
+$ simple-secrets restore-database --yes --token <admin-token>
 ```
 
 **Important**: Database restore affects ALL secrets and creates a pre-restore backup for safety.
@@ -192,7 +206,25 @@ $ simple-secrets restore secret db_password --token <admin-token>
 Secret "db_password" restored from backup.
 ```
 
-## 14. Token Authentication
+## 15. Shell Completion
+
+Enable shell autocompletion for better CLI experience:
+
+```sh
+# Bash completion
+$ simple-secrets completion bash > /etc/bash_completion.d/simple-secrets
+
+# Zsh completion
+$ simple-secrets completion zsh > "${fpath[1]}/_simple-secrets"
+
+# Fish completion
+$ simple-secrets completion fish > ~/.config/fish/completions/simple-secrets.fish
+
+# PowerShell completion
+$ simple-secrets completion powershell > simple-secrets.ps1
+```
+
+## 16. Token Authentication
 
 Authenticate using:
 
@@ -213,4 +245,26 @@ Authenticate using:
 - Integrate with Ansible or GitOps workflows
 - Explore key protection backends (passphrase, keyring, KMS)
 - Set up regular key rotation schedule
+- Use shell completion for better CLI experience
 - See CLI help: `simple-secrets --help`
+- View all available commands: `simple-secrets completion --help`
+
+### Available Commands Summary
+
+**Core Operations:**
+- `put` / `add` - Store secrets
+- `get` - Retrieve secrets
+- `list` - List keys, backups, or users
+- `delete` - Remove secrets
+
+**User Management:**
+- `create-user` - Create admin/reader users
+- `rotate token` - Rotate authentication tokens
+
+**Backup & Restore:**
+- `rotate master-key` - Rotate encryption key with backup
+- `restore secret` - Restore individual secrets
+- `restore database` / `restore-database` - Restore entire database
+
+**Utilities:**
+- `completion` - Generate shell autocompletion scripts
