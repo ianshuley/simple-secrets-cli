@@ -368,6 +368,7 @@ Focus especially on:
 for i in $(seq -w 001 1000); do
   ./simple-secrets put "perf-test-$i" "value-$i-$(date +%s)"
 done
+```
 
 - [ ] **List performance**: `time ./simple-secrets list keys` with many secrets
 - [ ] **Individual access**: `time ./simple-secrets get perf-test-500` → fast retrieval
