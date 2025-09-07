@@ -1,3 +1,7 @@
 .vscode/settings.json
 simple-secrets
 bin/
+
+# Coverage files
+coverage.out
+*.cover
