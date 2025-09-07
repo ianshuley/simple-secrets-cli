@@ -104,6 +104,42 @@ if !isValid(input) {
 processInput(input)
 ```
 
+### Comments Are an Admission of Failure
+- **Principle**: A comment is an admission of failure to properly express yourself in code
+- **Rationale**: If you need a comment, it usually means something needs to be abstracted and you're likely mixing abstraction layers
+- **When comments are acceptable**:
+  - Explaining complex regex patterns that are inherently non-intuitive
+  - Documenting external API requirements or constraints
+  - Explaining business rules that come from external requirements documents
+- **When to extract instead of comment**:
+  - If you're explaining what the code does → extract to a well-named method
+  - If you're explaining why variables exist → extract to meaningful variable names
+  - If you're explaining complex logic → break into smaller, self-documenting methods
+
+**❌ Instead of commenting what code does:**
+```go
+// Check if user has admin privileges and token is not expired
+if user.Role == "admin" && time.Now().Before(user.TokenExpiry) {
+    // Allow access to admin features
+    return true
+}
+```
+
+**✅ Make the code self-documenting:**
+```go
+func canAccessAdminFeatures(user User) bool {
+    return user.hasAdminPrivileges() && user.hasValidToken()
+}
+
+func (u User) hasAdminPrivileges() bool {
+    return u.Role == "admin"
+}
+
+func (u User) hasValidToken() bool {
+    return time.Now().Before(u.TokenExpiry)
+}
+```
+
 ### Other Style Guidelines
 - Use meaningful variable names that express intent
 - Prefer composition over inheritance
