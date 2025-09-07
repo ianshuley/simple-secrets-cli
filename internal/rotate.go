@@ -37,23 +37,94 @@ func (s *SecretsStore) backupCurrent(dir string) error {
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return err
 	}
-	cp := func(src, dst string) error {
-		data, err := os.ReadFile(src)
-		if err != nil {
-			if errors.Is(err, fs.ErrNotExist) {
-				return nil
-			}
+
+	if err := s.copyFileSecurely(s.KeyPath, filepath.Join(dir, "master.key")); err != nil {
+		if !errors.Is(err, fs.ErrNotExist) {
 			return err
 		}
-		return os.WriteFile(dst, data, 0600)
 	}
-	if err := cp(s.KeyPath, filepath.Join(dir, "master.key")); err != nil {
-		return err
+
+	if err := s.copyFileSecurely(s.SecretsPath, filepath.Join(dir, "secrets.json")); err != nil {
+		if !errors.Is(err, fs.ErrNotExist) {
+			return err
+		}
 	}
-	if err := cp(s.SecretsPath, filepath.Join(dir, "secrets.json")); err != nil {
-		return err
+
+	return nil
+}
+
+// decryptAllSecrets decrypts all stored secrets using the current master key
+func (s *SecretsStore) decryptAllSecrets() (map[string][]byte, error) {
+	plaintexts := make(map[string][]byte, len(s.secrets))
+	for k, enc := range s.secrets {
+		pt, err := decrypt(s.masterKey, enc)
+		if err != nil {
+			return nil, fmt.Errorf("decrypt %q with current key failed: %w", k, err)
+		}
+		plaintexts[k] = pt
+	}
+	return plaintexts, nil
+}
+
+// reencryptAllSecrets re-encrypts all plaintext secrets with a new key
+func (s *SecretsStore) reencryptAllSecrets(plaintexts map[string][]byte, newKey []byte) (map[string]string, error) {
+	reenc := make(map[string]string, len(plaintexts))
+	for k, pt := range plaintexts {
+		enc2, err := encrypt(newKey, pt)
+		if err != nil {
+			return nil, fmt.Errorf("encrypt %q with new key failed: %w", k, err)
+		}
+		reenc[k] = enc2
+	}
+	return reenc, nil
+}
+
+// performAtomicSwap atomically replaces the master key and secrets files
+func (s *SecretsStore) performAtomicSwap(tmpKey, tmpSecrets string, oldKey []byte) error {
+	// If either fails, the old state is preserved
+	if err := os.Rename(tmpKey, s.KeyPath); err != nil {
+		_ = os.Remove(tmpSecrets) // cleanup on failure
+		_ = os.Remove(tmpKey)
+		return fmt.Errorf("atomic swap of master key failed: %w", err)
+	}
+	if err := os.Rename(tmpSecrets, s.SecretsPath); err != nil {
+		// Try to restore old key if secrets rename fails
+		_ = s.writeMasterKey(oldKey)
+		_ = os.Remove(tmpSecrets)
+		return fmt.Errorf("atomic swap of secrets failed: %w", err)
 	}
 	return nil
+}
+
+// scanRotationBackupDirectories scans a backup root directory and returns rotation backup directory names
+func (s *SecretsStore) scanRotationBackupDirectories(backupRoot string) ([]string, error) {
+	entries, err := os.ReadDir(backupRoot)
+	if err != nil {
+		return nil, err
+	}
+
+	// Filter for rotation backup directories (those starting with "rotate-")
+	var rotationDirs []string
+	for _, entry := range entries {
+		if entry.IsDir() && strings.HasPrefix(entry.Name(), "rotate-") {
+			rotationDirs = append(rotationDirs, entry.Name())
+		}
+	}
+	return rotationDirs, nil
+}
+
+// validateBackupIntegrity checks if a backup directory contains both required files
+func (s *SecretsStore) validateBackupIntegrity(backupPath string) bool {
+	keyPath := filepath.Join(backupPath, "master.key")
+	secretsPath := filepath.Join(backupPath, "secrets.json")
+
+	if _, err := os.Stat(keyPath); os.IsNotExist(err) {
+		return false
+	}
+	if _, err := os.Stat(secretsPath); os.IsNotExist(err) {
+		return false
+	}
+	return true
 }
 
 // RotateMasterKey creates a backup, generates a new key,
@@ -72,13 +143,9 @@ func (s *SecretsStore) RotateMasterKey(backupDir string) error {
 	oldKey := make([]byte, len(s.masterKey))
 	copy(oldKey, s.masterKey) // Save old key before generating new one
 
-	plaintexts := make(map[string][]byte, len(s.secrets))
-	for k, enc := range s.secrets {
-		pt, err := decrypt(s.masterKey, enc)
-		if err != nil {
-			return fmt.Errorf("decrypt %q with old key failed: %w", k, err)
-		}
-		plaintexts[k] = pt
+	plaintexts, err := s.decryptAllSecrets()
+	if err != nil {
+		return fmt.Errorf("failed to decrypt existing secrets: %w", err)
 	}
 
 	// 3) Generate a NEW key
@@ -88,13 +155,9 @@ func (s *SecretsStore) RotateMasterKey(backupDir string) error {
 	}
 
 	// 4) Re-encrypt all plaintexts under the NEW key (in memory)
-	reenc := make(map[string]string, len(plaintexts))
-	for k, pt := range plaintexts {
-		enc2, err := encrypt(newKey, pt)
-		if err != nil {
-			return fmt.Errorf("encrypt %q with new key failed: %w", k, err)
-		}
-		reenc[k] = enc2
+	reenc, err := s.reencryptAllSecrets(plaintexts, newKey)
+	if err != nil {
+		return fmt.Errorf("failed to re-encrypt secrets with new key: %w", err)
 	}
 
 	// 5) Write new secrets.json to a temp file first
@@ -121,17 +184,8 @@ func (s *SecretsStore) RotateMasterKey(backupDir string) error {
 	}
 
 	// 7) ATOMIC SWAP: Rename both files simultaneously
-	// If either fails, the old state is preserved
-	if err := os.Rename(tmpKey, s.KeyPath); err != nil {
-		_ = os.Remove(tmpSecrets) // cleanup on failure
-		_ = os.Remove(tmpKey)
-		return fmt.Errorf("atomic swap of master key failed: %w", err)
-	}
-	if err := os.Rename(tmpSecrets, s.SecretsPath); err != nil {
-		// Try to restore old key if secrets rename fails
-		_ = s.writeMasterKey(oldKey)
-		_ = os.Remove(tmpSecrets)
-		return fmt.Errorf("atomic swap of secrets failed: %w", err)
+	if err := s.performAtomicSwap(tmpKey, tmpSecrets, oldKey); err != nil {
+		return err
 	}
 	s.masterKey = newKey
 	s.secrets = reenc
@@ -207,17 +261,9 @@ func (s *SecretsStore) cleanupOldBackups(keep int) error {
 		return nil // No backup directory exists
 	}
 
-	entries, err := os.ReadDir(backupRoot)
+	rotationDirs, err := s.scanRotationBackupDirectories(backupRoot)
 	if err != nil {
 		return err
-	}
-
-	// Filter for rotation backup directories (those starting with "rotate-")
-	var rotationDirs []string
-	for _, entry := range entries {
-		if entry.IsDir() && strings.HasPrefix(entry.Name(), "rotate-") {
-			rotationDirs = append(rotationDirs, entry.Name())
-		}
 	}
 
 	// Sort by name (which includes timestamp) - newest first
@@ -251,21 +297,17 @@ func (s *SecretsStore) ListRotationBackups() ([]BackupInfo, error) {
 		return []BackupInfo{}, nil
 	}
 
-	entries, err := os.ReadDir(backupRoot)
+	rotationDirs, err := s.scanRotationBackupDirectories(backupRoot)
 	if err != nil {
 		return nil, err
 	}
 
 	var backups []BackupInfo
-	for _, entry := range entries {
-		if !entry.IsDir() || !strings.HasPrefix(entry.Name(), "rotate-") {
-			continue
-		}
-
-		backupPath := filepath.Join(backupRoot, entry.Name())
+	for _, dirName := range rotationDirs {
+		backupPath := filepath.Join(backupRoot, dirName)
 
 		// Parse timestamp from directory name (format: rotate-20060102-150405)
-		timestampStr := strings.TrimPrefix(entry.Name(), "rotate-")
+		timestampStr := strings.TrimPrefix(dirName, "rotate-")
 		timestamp, err := time.Parse("20060102-150405", timestampStr)
 		if err != nil {
 			// Skip directories that don't match expected format
@@ -273,18 +315,10 @@ func (s *SecretsStore) ListRotationBackups() ([]BackupInfo, error) {
 		}
 
 		// Check if backup is valid (contains both master.key and secrets.json)
-		keyPath := filepath.Join(backupPath, "master.key")
-		secretsPath := filepath.Join(backupPath, "secrets.json")
-		isValid := true
-		if _, err := os.Stat(keyPath); os.IsNotExist(err) {
-			isValid = false
-		}
-		if _, err := os.Stat(secretsPath); os.IsNotExist(err) {
-			isValid = false
-		}
+		isValid := s.validateBackupIntegrity(backupPath)
 
 		backups = append(backups, BackupInfo{
-			Name:      entry.Name(),
+			Name:      dirName,
 			Path:      backupPath,
 			Timestamp: timestamp,
 			IsValid:   isValid,
@@ -316,11 +350,11 @@ func (s *SecretsStore) RestoreFromBackup(backupName string) error {
 	backupKeyPath := filepath.Join(backupPath, "master.key")
 	backupSecretsPath := filepath.Join(backupPath, "secrets.json")
 
-	if err := copyFile(backupKeyPath, s.KeyPath); err != nil {
+	if err := s.copyFileSecurely(backupKeyPath, s.KeyPath); err != nil {
 		return fmt.Errorf("failed to restore master.key: %w", err)
 	}
 
-	if err := copyFile(backupSecretsPath, s.SecretsPath); err != nil {
+	if err := s.copyFileSecurely(backupSecretsPath, s.SecretsPath); err != nil {
 		return fmt.Errorf("failed to restore secrets.json: %w", err)
 	}
 
@@ -336,8 +370,8 @@ func (s *SecretsStore) RestoreFromBackup(backupName string) error {
 	return nil
 }
 
-// copyFile copies a file from src to dst
-func copyFile(src, dst string) error {
+// copyFileSecurely copies a file from src to dst with secure permissions
+func (s *SecretsStore) copyFileSecurely(src, dst string) error {
 	data, err := os.ReadFile(src)
 	if err != nil {
 		return err
@@ -379,17 +413,12 @@ func (s *SecretsStore) validateSpecifiedBackup(backupName string) (string, error
 	backupPath := filepath.Join(backupRoot, backupName)
 
 	// Verify backup exists and is valid
-	keyPath := filepath.Join(backupPath, "master.key")
-	secretsPath := filepath.Join(backupPath, "secrets.json")
-
 	if _, err := os.Stat(backupPath); os.IsNotExist(err) {
 		return "", fmt.Errorf("backup '%s' not found", backupName)
 	}
-	if _, err := os.Stat(keyPath); os.IsNotExist(err) {
-		return "", fmt.Errorf("backup '%s' is missing master.key", backupName)
-	}
-	if _, err := os.Stat(secretsPath); os.IsNotExist(err) {
-		return "", fmt.Errorf("backup '%s' is missing secrets.json", backupName)
+
+	if !s.validateBackupIntegrity(backupPath) {
+		return "", fmt.Errorf("backup '%s' is missing required files", backupName)
 	}
 
 	return backupPath, nil
