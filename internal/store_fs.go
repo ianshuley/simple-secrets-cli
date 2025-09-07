@@ -205,27 +205,27 @@ func (s *SecretsStore) DisableSecret(key string) error {
 	return s.saveSecrets()
 }
 
-// EnableSecret re-enables a previously disabled secret
-func (s *SecretsStore) EnableSecret(key string) error {
-	// Find the disabled version
-	var disabledKey string
-	var found bool
-
+// buildDisabledSecretsMap creates a map from original key names to their disabled key names
+func (s *SecretsStore) buildDisabledSecretsMap() map[string]string {
+	disabledMap := make(map[string]string)
 	for k := range s.secrets {
 		if strings.HasPrefix(k, disabledPrefix) {
-			// Remove prefix and split at first underscore to get original key
 			withoutPrefix := strings.TrimPrefix(k, disabledPrefix)
 			if idx := strings.Index(withoutPrefix, "_"); idx != -1 {
 				originalKey := withoutPrefix[idx+1:]
-				if originalKey == key {
-					disabledKey = k
-					found = true
-					break
-				}
+				disabledMap[originalKey] = k
 			}
 		}
 	}
+	return disabledMap
+}
 
+// EnableSecret re-enables a previously disabled secret
+func (s *SecretsStore) EnableSecret(key string) error {
+	// Build a map of original keys to their disabled keys for efficient lookup
+	disabledMap := s.buildDisabledSecretsMap()
+
+	disabledKey, found := disabledMap[key]
 	if !found {
 		return fmt.Errorf("disabled secret '%s' not found", key)
 	}
@@ -239,19 +239,13 @@ func (s *SecretsStore) EnableSecret(key string) error {
 
 // ListDisabledSecrets returns a list of disabled secret keys
 func (s *SecretsStore) ListDisabledSecrets() []string {
-	var disabled []string
-	for k := range s.secrets {
-		if strings.HasPrefix(k, disabledPrefix) {
-			// Extract original key name: __DISABLED_<timestamp>_<key>
-			// Remove prefix first
-			withoutPrefix := strings.TrimPrefix(k, disabledPrefix)
-			// Find first underscore (separates timestamp from key)
-			if idx := strings.Index(withoutPrefix, "_"); idx != -1 {
-				originalKey := withoutPrefix[idx+1:]
-				disabled = append(disabled, originalKey)
-			}
-		}
+	disabledMap := s.buildDisabledSecretsMap()
+	
+	disabled := make([]string, 0, len(disabledMap))
+	for originalKey := range disabledMap {
+		disabled = append(disabled, originalKey)
 	}
+	
 	sort.Strings(disabled)
 	return disabled
 }
