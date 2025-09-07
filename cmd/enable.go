@@ -18,6 +18,7 @@ package cmd
 import (
 	"fmt"
 	"simple-secrets/internal"
+	"slices"
 
 	"github.com/spf13/cobra"
 )
@@ -88,13 +89,7 @@ func prepareSecretEnableContext(key string) (*SecretEnableContext, error) {
 
 	// Check if disabled secret exists
 	disabledSecrets := store.ListDisabledSecrets()
-	found := false
-	for _, disabledKey := range disabledSecrets {
-		if disabledKey == key {
-			found = true
-			break
-		}
-	}
+	found := slices.Contains(disabledSecrets, key)
 
 	if !found {
 		return nil, fmt.Errorf("disabled secret '%s' not found", key)
