@@ -513,13 +513,13 @@ func TestConsolidatedDisableEnableCommands(t *testing.T) {
 			name:     "disable without token",
 			args:     []string{"disable", "secret", "test-key"},
 			wantErr:  true,
-			contains: "invalid token",
+			contains: "authentication required",
 		},
 		{
 			name:     "enable without token",
 			args:     []string{"enable", "secret", "test-key"},
 			wantErr:  true,
-			contains: "invalid token",
+			contains: "authentication required",
 		},
 	}
 
