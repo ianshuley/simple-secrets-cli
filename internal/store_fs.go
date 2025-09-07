@@ -215,23 +215,47 @@ func (s *SecretsStore) DisableSecret(key string) error {
 // buildDisabledSecretsMap creates a map from original key names to their disabled key names
 func (s *SecretsStore) buildDisabledSecretsMap() map[string]string {
 	disabledMap := make(map[string]string)
-	for k := range s.secrets {
-		if jsonData, found := strings.CutPrefix(k, disabledPrefix); found {
-			var keyData map[string]interface{}
-			if err := json.Unmarshal([]byte(jsonData), &keyData); err == nil {
-				if originalKey, ok := keyData["key"].(string); ok {
-					disabledMap[originalKey] = k
-				}
-			} else {
-				// Fallback for legacy format: timestamp_key
-				if idx := strings.Index(jsonData, "_"); idx != -1 {
-					originalKey := jsonData[idx+1:]
-					disabledMap[originalKey] = k
-				}
-			}
+	for disabledKey := range s.secrets {
+		if originalKey := s.extractOriginalKeyFromDisabled(disabledKey); originalKey != "" {
+			disabledMap[originalKey] = disabledKey
 		}
 	}
 	return disabledMap
+}
+
+func (s *SecretsStore) extractOriginalKeyFromDisabled(disabledKey string) string {
+	jsonData, isDisabled := strings.CutPrefix(disabledKey, disabledPrefix)
+	if !isDisabled {
+		return ""
+	}
+
+	if originalKey := s.parseJsonFormat(jsonData); originalKey != "" {
+		return originalKey
+	}
+
+	return s.parseLegacyFormat(jsonData)
+}
+
+func (s *SecretsStore) parseJsonFormat(jsonData string) string {
+	var keyData map[string]interface{}
+	if err := json.Unmarshal([]byte(jsonData), &keyData); err != nil {
+		return ""
+	}
+
+	originalKey, ok := keyData["key"].(string)
+	if !ok {
+		return ""
+	}
+
+	return originalKey
+}
+
+func (s *SecretsStore) parseLegacyFormat(data string) string {
+	idx := strings.Index(data, "_")
+	if idx == -1 {
+		return ""
+	}
+	return data[idx+1:]
 }
 
 // EnableSecret re-enables a previously disabled secret
