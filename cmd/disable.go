@@ -104,12 +104,12 @@ type SecretDisableContext struct {
 }
 
 // prepareTokenDisableContext validates access and prepares context for token disabling
-func prepareTokenDisableContext(username string) (*TokenDisableContext, error) {
-	user, _, err := validateTokenDisableAccess()
+func prepareTokenDisableContext(targetUsername string) (*TokenDisableContext, error) {
+	currentUser, _, err := validateTokenDisableAccess()
 	if err != nil {
 		return nil, err
 	}
-	if user == nil {
+	if currentUser == nil {
 		return nil, nil
 	}
 
@@ -123,15 +123,15 @@ func prepareTokenDisableContext(username string) (*TokenDisableContext, error) {
 		return nil, err
 	}
 
-	targetIndex, err := findUserIndex(users, username)
+	targetIndex, err := findUserIndex(users, targetUsername)
 	if err != nil {
 		return nil, err
 	}
 
 	return &TokenDisableContext{
-		RequestingUser: user,
+		RequestingUser: currentUser,
 		TargetUser:     users[targetIndex],
-		TargetUsername: username,
+		TargetUsername: targetUsername,
 		TargetIndex:    targetIndex,
 		UsersPath:      usersPath,
 		Users:          users,

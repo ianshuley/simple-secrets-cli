@@ -542,3 +542,4 @@ func TestConsolidatedDisableEnableCommands(t *testing.T) {
 		})
 	}
 }
+

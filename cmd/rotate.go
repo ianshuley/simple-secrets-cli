@@ -160,8 +160,23 @@ func rotateSelfToken() error {
 	return nil
 }
 
-func rotateToken(username string) error {
-	context, err := prepareTokenRotationContextForUser(username)
+func rotateToken(targetUsername string) error {
+	// First, check if this is actually self-rotation (user specified their own username)
+	currentUser, _, err := RBACGuard(false, TokenFlag) // Don't require write access yet
+	if err != nil {
+		return err
+	}
+	if currentUser == nil {
+		return nil // First run detected
+	}
+
+	// If the target username matches the current user, treat as self-rotation
+	if targetUsername == currentUser.Username {
+		return rotateSelfToken()
+	}
+
+	// Otherwise, proceed with admin rotation (requires rotate-tokens permission)
+	context, err := prepareTokenRotationContextForUser(targetUsername)
 	if err != nil {
 		return err
 	}
@@ -194,16 +209,16 @@ func printBackupLocation(backupDir string) {
 }
 
 // validateTokenRotationAccess checks permissions and loads necessary data for token rotation
-func validateTokenRotationAccess(username string) (*internal.User, string, []*internal.User, error) {
-	user, store, err := RBACGuard(true, TokenFlag)
+func validateTokenRotationAccess(targetUsername string) (*internal.User, string, []*internal.User, error) {
+	currentUser, store, err := RBACGuard(true, TokenFlag)
 	if err != nil {
 		return nil, "", nil, err
 	}
-	if user == nil {
+	if currentUser == nil {
 		return nil, "", nil, nil
 	}
 
-	if !user.Can("rotate-tokens", store.Permissions()) {
+	if !currentUser.Can("rotate-tokens", store.Permissions()) {
 		return nil, "", nil, fmt.Errorf("permission denied: need 'rotate-tokens' permission")
 	}
 
@@ -217,20 +232,20 @@ func validateTokenRotationAccess(username string) (*internal.User, string, []*in
 		return nil, "", nil, err
 	}
 
-	return user, usersPath, users, nil
+	return currentUser, usersPath, users, nil
 }
 
 // validateSelfTokenRotationAccess checks permissions for self token rotation
 func validateSelfTokenRotationAccess() (*internal.User, string, []*internal.User, error) {
-	user, store, err := RBACGuard(false, TokenFlag) // Use false - we check specific permission below
+	currentUser, store, err := RBACGuard(false, TokenFlag) // Use false - we check specific permission below
 	if err != nil {
 		return nil, "", nil, err
 	}
-	if user == nil {
+	if currentUser == nil {
 		return nil, "", nil, nil
 	}
 
-	if !user.Can("rotate-own-token", store.Permissions()) {
+	if !currentUser.Can("rotate-own-token", store.Permissions()) {
 		return nil, "", nil, fmt.Errorf("permission denied: cannot rotate own token")
 	}
 
@@ -244,7 +259,7 @@ func validateSelfTokenRotationAccess() (*internal.User, string, []*internal.User
 		return nil, "", nil, err
 	}
 
-	return user, usersPath, users, nil
+	return currentUser, usersPath, users, nil
 }
 
 // findUserIndex locates the target user in the users slice and returns their index
@@ -295,23 +310,23 @@ type TokenRotationContext struct {
 
 // prepareTokenRotationContext prepares the context for self token rotation
 func prepareTokenRotationContext(isSelfRotation bool) (*TokenRotationContext, error) {
-	user, usersPath, users, err := validateSelfTokenRotationAccess()
+	currentUser, usersPath, users, err := validateSelfTokenRotationAccess()
 	if err != nil {
 		return nil, err
 	}
-	if user == nil {
+	if currentUser == nil {
 		return nil, nil
 	}
 
-	targetIndex, err := findUserIndex(users, user.Username)
+	targetIndex, err := findUserIndex(users, currentUser.Username)
 	if err != nil {
 		return nil, err
 	}
 
 	return &TokenRotationContext{
-		RequestingUser: user,
+		RequestingUser: currentUser,
 		TargetUser:     users[targetIndex],
-		TargetUsername: user.Username,
+		TargetUsername: currentUser.Username,
 		TargetIndex:    targetIndex,
 		UsersPath:      usersPath,
 		Users:          users,
@@ -320,24 +335,24 @@ func prepareTokenRotationContext(isSelfRotation bool) (*TokenRotationContext, er
 }
 
 // prepareTokenRotationContextForUser prepares the context for admin token rotation
-func prepareTokenRotationContextForUser(username string) (*TokenRotationContext, error) {
-	user, usersPath, users, err := validateTokenRotationAccess(username)
+func prepareTokenRotationContextForUser(targetUsername string) (*TokenRotationContext, error) {
+	currentUser, usersPath, users, err := validateTokenRotationAccess(targetUsername)
 	if err != nil {
 		return nil, err
 	}
-	if user == nil {
+	if currentUser == nil {
 		return nil, nil
 	}
 
-	targetIndex, err := findUserIndex(users, username)
+	targetIndex, err := findUserIndex(users, targetUsername)
 	if err != nil {
 		return nil, err
 	}
 
 	return &TokenRotationContext{
-		RequestingUser: user,
+		RequestingUser: currentUser,
 		TargetUser:     users[targetIndex],
-		TargetUsername: username,
+		TargetUsername: targetUsername,
 		TargetIndex:    targetIndex,
 		UsersPath:      usersPath,
 		Users:          users,
