@@ -336,7 +336,7 @@ func writeConfigFileSecurely(path string, data any) error {
 }
 
 // marshalConfigData converts config data to formatted JSON
-func marshalConfigData(data interface{}) ([]byte, error) {
+func marshalConfigData(data any) ([]byte, error) {
 	encoded, err := json.MarshalIndent(data, "", "  ")
 	if err != nil {
 		return nil, fmt.Errorf("marshal config data: %w", err)
