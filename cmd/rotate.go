@@ -143,56 +143,38 @@ func printMasterKeyRotationSuccess() {
 }
 
 func rotateSelfToken() error {
-	user, usersPath, users, err := validateSelfTokenRotationAccess()
+	context, err := prepareTokenRotationContext(true) // self=true
 	if err != nil {
 		return err
 	}
-	if user == nil {
+	if context == nil {
 		return nil // First run or access denied
 	}
 
-	targetIndex, err := findUserIndex(users, user.Username)
+	newToken, err := executeTokenRotation(context)
 	if err != nil {
 		return err
 	}
 
-	newToken, err := generateAndUpdateUserToken(users, targetIndex)
-	if err != nil {
-		return err
-	}
-
-	if err := saveUsersList(usersPath, users); err != nil {
-		return err
-	}
-
-	printSelfTokenRotationSuccess(user.Username, users[targetIndex].Role, newToken)
+	printSelfTokenRotationSuccess(context.TargetUsername, context.TargetUser.Role, newToken)
 	return nil
 }
 
 func rotateToken(username string) error {
-	user, usersPath, users, err := validateTokenRotationAccess(username)
+	context, err := prepareTokenRotationContextForUser(username)
 	if err != nil {
 		return err
 	}
-	if user == nil {
+	if context == nil {
 		return nil // First run or access denied
 	}
 
-	targetIndex, err := findUserIndex(users, username)
+	newToken, err := executeTokenRotation(context)
 	if err != nil {
 		return err
 	}
 
-	newToken, err := generateAndUpdateUserToken(users, targetIndex)
-	if err != nil {
-		return err
-	}
-
-	if err := saveUsersList(usersPath, users); err != nil {
-		return err
-	}
-
-	printTokenRotationSuccess(username, users[targetIndex].Role, newToken)
+	printTokenRotationSuccess(context.TargetUsername, context.TargetUser.Role, newToken)
 	return nil
 }
 
@@ -298,6 +280,83 @@ func generateSecureTokenString() (string, error) {
 		return "", err
 	}
 	return base64.RawURLEncoding.EncodeToString(randToken), nil
+}
+
+// TokenRotationContext holds all the data needed for token rotation
+type TokenRotationContext struct {
+	RequestingUser *internal.User
+	TargetUser     *internal.User
+	TargetUsername string
+	TargetIndex    int
+	UsersPath      string
+	Users          []*internal.User
+	IsSelfRotation bool
+}
+
+// prepareTokenRotationContext prepares the context for self token rotation
+func prepareTokenRotationContext(isSelfRotation bool) (*TokenRotationContext, error) {
+	user, usersPath, users, err := validateSelfTokenRotationAccess()
+	if err != nil {
+		return nil, err
+	}
+	if user == nil {
+		return nil, nil
+	}
+
+	targetIndex, err := findUserIndex(users, user.Username)
+	if err != nil {
+		return nil, err
+	}
+
+	return &TokenRotationContext{
+		RequestingUser: user,
+		TargetUser:     users[targetIndex],
+		TargetUsername: user.Username,
+		TargetIndex:    targetIndex,
+		UsersPath:      usersPath,
+		Users:          users,
+		IsSelfRotation: isSelfRotation,
+	}, nil
+}
+
+// prepareTokenRotationContextForUser prepares the context for admin token rotation
+func prepareTokenRotationContextForUser(username string) (*TokenRotationContext, error) {
+	user, usersPath, users, err := validateTokenRotationAccess(username)
+	if err != nil {
+		return nil, err
+	}
+	if user == nil {
+		return nil, nil
+	}
+
+	targetIndex, err := findUserIndex(users, username)
+	if err != nil {
+		return nil, err
+	}
+
+	return &TokenRotationContext{
+		RequestingUser: user,
+		TargetUser:     users[targetIndex],
+		TargetUsername: username,
+		TargetIndex:    targetIndex,
+		UsersPath:      usersPath,
+		Users:          users,
+		IsSelfRotation: false,
+	}, nil
+}
+
+// executeTokenRotation performs the actual token rotation and persistence
+func executeTokenRotation(context *TokenRotationContext) (string, error) {
+	newToken, err := generateAndUpdateUserToken(context.Users, context.TargetIndex)
+	if err != nil {
+		return "", err
+	}
+
+	if err := saveUsersList(context.UsersPath, context.Users); err != nil {
+		return "", err
+	}
+
+	return newToken, nil
 }
 
 // saveUsersList marshals and saves the users list to disk

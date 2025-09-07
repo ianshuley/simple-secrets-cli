@@ -190,39 +190,55 @@ func (us *UserStore) Permissions() RolePermissions {
 }
 
 func loadUsers(path string) ([]*User, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
 	var users []*User
-	if err := json.Unmarshal(data, &users); err != nil {
+	if err := readConfigFile(path, &users); err != nil {
+		if os.IsNotExist(err) {
+			return nil, err
+		}
 		return nil, fmt.Errorf("users.json is corrupted or invalid: %w. Please fix or delete the file.", err)
 	}
-	// Ensure at least one admin user exists and usernames are unique
-	hasAdmin := false
-	usernameSet := make(map[string]struct{})
-	for _, u := range users {
-		if _, exists := usernameSet[u.Username]; exists {
-			return nil, fmt.Errorf("duplicate username found: %s", u.Username)
-		}
-		usernameSet[u.Username] = struct{}{}
-		if u.Role == RoleAdmin {
-			hasAdmin = true
-		}
+
+	return validateUsersList(users)
+}
+
+// validateUsersList ensures users list meets business rules
+func validateUsersList(users []*User) ([]*User, error) {
+	if err := checkForDuplicateUsernames(users); err != nil {
+		return nil, err
 	}
-	if !hasAdmin {
-		return nil, fmt.Errorf("no admin user found in users.json. Please fix the file or recreate users.")
+
+	if err := ensureAdminExists(users); err != nil {
+		return nil, err
 	}
+
 	return users, nil
 }
 
-func loadRoles(path string) (RolePermissions, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
+// checkForDuplicateUsernames validates that all usernames are unique
+func checkForDuplicateUsernames(users []*User) error {
+	usernameSet := make(map[string]struct{})
+	for _, u := range users {
+		if _, exists := usernameSet[u.Username]; exists {
+			return fmt.Errorf("duplicate username found: %s", u.Username)
+		}
+		usernameSet[u.Username] = struct{}{}
 	}
+	return nil
+}
+
+// ensureAdminExists validates that at least one admin user exists
+func ensureAdminExists(users []*User) error {
+	for _, u := range users {
+		if u.Role == RoleAdmin {
+			return nil
+		}
+	}
+	return fmt.Errorf("no admin user found in users.json. Please fix the file or recreate users.")
+}
+
+func loadRoles(path string) (RolePermissions, error) {
 	var perms RolePermissions
-	if err := json.Unmarshal(data, &perms); err != nil {
+	if err := readConfigFile(path, &perms); err != nil {
 		return nil, fmt.Errorf("unmarshal roles.json: %w", err)
 	}
 	return perms, nil
@@ -310,22 +326,46 @@ func ensureConfigDirectory(usersPath string) error {
 	return os.MkdirAll(filepath.Dir(usersPath), 0700)
 }
 
+// writeConfigFileSecurely marshals and writes any config data to JSON with secure permissions
+func writeConfigFileSecurely(path string, data interface{}) error {
+	encoded, err := marshalConfigData(data)
+	if err != nil {
+		return err
+	}
+	return writeFileAtomically(path, encoded)
+}
+
+// marshalConfigData converts config data to formatted JSON
+func marshalConfigData(data interface{}) ([]byte, error) {
+	encoded, err := json.MarshalIndent(data, "", "  ")
+	if err != nil {
+		return nil, fmt.Errorf("marshal config data: %w", err)
+	}
+	return encoded, nil
+}
+
+// writeFileAtomically writes data to a file with secure permissions
+func writeFileAtomically(path string, data []byte) error {
+	return os.WriteFile(path, data, 0600)
+}
+
+// readConfigFile reads and unmarshals a JSON config file
+func readConfigFile(path string, target interface{}) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(data, target)
+}
+
 // writeUsersFile marshals and writes the users list to JSON
 func writeUsersFile(usersPath string, users []*User) error {
-	usersEncoded, err := json.MarshalIndent(users, "", "  ")
-	if err != nil {
-		return fmt.Errorf("marshal users: %w", err)
-	}
-	return os.WriteFile(usersPath, usersEncoded, 0600)
+	return writeConfigFileSecurely(usersPath, users)
 }
 
 // writeRolesFile marshals and writes the roles to JSON
 func writeRolesFile(rolesPath string, roles RolePermissions) error {
-	rolesEncoded, err := json.MarshalIndent(roles, "", "  ")
-	if err != nil {
-		return fmt.Errorf("marshal roles: %w", err)
-	}
-	return os.WriteFile(rolesPath, rolesEncoded, 0600)
+	return writeConfigFileSecurely(rolesPath, roles)
 }
 
 // printFirstRunSuccess displays the success message with the new admin token

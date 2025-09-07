@@ -79,10 +79,8 @@ func (s *SecretsStore) saveSecrets() error {
 
 // backupSecret creates an encrypted backup of a secret
 func (s *SecretsStore) backupSecret(key, encryptedValue string) {
-	home, _ := os.UserHomeDir()
-	backupDir := filepath.Join(home, ".simple-secrets", "backups")
-	_ = os.MkdirAll(backupDir, 0700)
-	backupPath := filepath.Join(backupDir, key+".bak")
+	backupPath := s.getBackupPath(key)
+	s.createBackupDirectory()
 	_ = os.WriteFile(backupPath, []byte(encryptedValue), 0600)
 }
 
@@ -97,19 +95,34 @@ func (s *SecretsStore) Put(key, value string) error {
 	return s.saveSecrets()
 }
 
-// ensureBackupExists creates a backup for the secret - either the previous value or the new value
+// ensureBackupExists creates a backup for the secret using the appropriate strategy
 func (s *SecretsStore) ensureBackupExists(key, newEncryptedValue string) {
-	backupValue := s.determineBackupValue(key, newEncryptedValue)
+	strategy := s.determineBackupStrategy(key)
+	backupValue := strategy.selectBackupValue(newEncryptedValue)
 	s.backupSecret(key, backupValue)
 }
 
-// determineBackupValue decides what to backup: previous value if it exists, otherwise the new value
-func (s *SecretsStore) determineBackupValue(key, newEncryptedValue string) string {
-	previousValue := newEncryptedValue // Default to backing up the new value
-	if existingValue, hasExistingValue := s.secrets[key]; hasExistingValue {
-		previousValue = existingValue // Override to backup the previous value
+// BackupStrategy defines how to handle backup for a secret
+type BackupStrategy struct {
+	hasExistingValue bool
+	existingValue    string
+}
+
+// selectBackupValue chooses what value to backup based on the strategy
+func (bs *BackupStrategy) selectBackupValue(newValue string) string {
+	if bs.hasExistingValue {
+		return bs.existingValue // Backup the previous value
 	}
-	return previousValue
+	return newValue // Backup the new value if no previous value exists
+}
+
+// determineBackupStrategy decides what backup approach to use for a secret
+func (s *SecretsStore) determineBackupStrategy(key string) *BackupStrategy {
+	existingValue, hasExisting := s.secrets[key]
+	return &BackupStrategy{
+		hasExistingValue: hasExisting,
+		existingValue:    existingValue,
+	}
 }
 
 func (s *SecretsStore) Get(key string) (string, error) {
@@ -155,3 +168,20 @@ func (s *SecretsStore) DecryptBackup(encryptedData string) (string, error) {
 }
 
 var ErrNotFound = os.ErrNotExist
+
+// createBackupDirectory ensures the backup directory exists with secure permissions
+func (s *SecretsStore) createBackupDirectory() {
+	backupDir := s.getBackupDirectory()
+	_ = os.MkdirAll(backupDir, 0700)
+}
+
+// getBackupDirectory returns the path to the backup directory
+func (s *SecretsStore) getBackupDirectory() string {
+	home, _ := os.UserHomeDir()
+	return filepath.Join(home, ".simple-secrets", "backups")
+}
+
+// getBackupPath returns the full path for a secret's backup file
+func (s *SecretsStore) getBackupPath(key string) string {
+	return filepath.Join(s.getBackupDirectory(), key+".bak")
+}
