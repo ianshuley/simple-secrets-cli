@@ -21,9 +21,9 @@ import "strings"
 // This is shared utility used by multiple test files to avoid duplication
 func extractTokenFromOutput(output string) string {
 	lines := strings.SplitSeq(output, "\n")
-	for line := range lines {
-		if strings.Contains(line, "Token:") {
-			fields := strings.Fields(line)
+	for outputLine := range lines {
+		if strings.Contains(outputLine, "Token:") {
+			fields := strings.Fields(outputLine)
 			if len(fields) > 1 {
 				return fields[len(fields)-1]
 			}

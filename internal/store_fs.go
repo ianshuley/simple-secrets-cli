@@ -251,11 +251,13 @@ func (s *SecretsStore) parseJsonFormat(jsonData string) string {
 }
 
 func (s *SecretsStore) parseLegacyFormat(data string) string {
-	idx := strings.Index(data, "_")
-	if idx == -1 {
+	const notFound = -1
+	underscorePosition := strings.Index(data, "_")
+	if underscorePosition == notFound {
 		return ""
 	}
-	return data[idx+1:]
+	positionAfterUnderscore := underscorePosition + 1
+	return data[positionAfterUnderscore:]
 }
 
 // EnableSecret re-enables a previously disabled secret
