@@ -36,6 +36,11 @@ func (s *SecretsStore) loadOrCreateKey() error {
 
 // writeMasterKey overwrites the key file (0600).
 func (s *SecretsStore) writeMasterKey(newKey []byte) error {
-	enc := base64.StdEncoding.EncodeToString(newKey)
-	return os.WriteFile(s.KeyPath, []byte(enc), 0600)
+	return writeMasterKeyToPath(s.KeyPath, newKey)
+}
+
+// writeMasterKeyToPath writes a master key to the specified path.
+func writeMasterKeyToPath(path string, key []byte) error {
+	enc := base64.StdEncoding.EncodeToString(key)
+	return os.WriteFile(path, []byte(enc), 0600)
 }

@@ -82,20 +82,21 @@ func (s *SecretsStore) RotateMasterKey(backupDir string) error {
 		reenc[k] = enc2
 	}
 
-	// 5) Write new secrets.json to a temp file first (atomic swap)
-	tmp := s.SecretsPath + ".tmp"
+	// 5) Write new secrets.json to a temp file first
+	tmpSecrets := s.SecretsPath + ".tmp"
 	data, err := json.MarshalIndent(reenc, "", "  ")
 	if err != nil {
 		return err
 	}
-	if err := os.WriteFile(tmp, data, 0600); err != nil {
+	if err := os.WriteFile(tmpSecrets, data, 0600); err != nil {
 		return err
 	}
 
-	// 6) Persist the NEW master key
-	if err := s.writeMasterKey(newKey); err != nil {
-		_ = os.Remove(tmp) // cleanup temp on failure
-		return fmt.Errorf("write new master key failed: %w", err)
+	// 6) Write the NEW master key to a temp file
+	tmpKey := s.KeyPath + ".tmp"
+	if err := writeMasterKeyToPath(tmpKey, newKey); err != nil {
+		_ = os.Remove(tmpSecrets) // cleanup temp files on failure
+		return fmt.Errorf("write new master key to temp failed: %w", err)
 	}
 
 	// 6.5) Re-encrypt individual backup files with the new key
@@ -104,9 +105,18 @@ func (s *SecretsStore) RotateMasterKey(backupDir string) error {
 		fmt.Printf("Warning: failed to re-encrypt some backup files: %v\n", err)
 	}
 
-	// 7) Swap temp secrets into place and update in-memory state
-	if err := os.Rename(tmp, s.SecretsPath); err != nil {
-		return err
+	// 7) ATOMIC SWAP: Rename both files simultaneously
+	// If either fails, the old state is preserved
+	if err := os.Rename(tmpKey, s.KeyPath); err != nil {
+		_ = os.Remove(tmpSecrets) // cleanup on failure
+		_ = os.Remove(tmpKey)
+		return fmt.Errorf("atomic swap of master key failed: %w", err)
+	}
+	if err := os.Rename(tmpSecrets, s.SecretsPath); err != nil {
+		// Try to restore old key if secrets rename fails
+		_ = s.writeMasterKey(oldKey)
+		_ = os.Remove(tmpSecrets)
+		return fmt.Errorf("atomic swap of secrets failed: %w", err)
 	}
 	s.masterKey = newKey
 	s.secrets = reenc
