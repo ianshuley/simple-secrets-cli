@@ -1,5 +1,3 @@
-TODO: Address GitHub Copilot feedback
-
 TODO: Add `platform` command teasing what's coming next: The Simple Secrets Platform is coming soon! Visit https://simple-secrets.io to join the waitlist or learn more
 
 TODO: Refactor repo into a CLI-only repo
