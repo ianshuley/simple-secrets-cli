@@ -5,6 +5,7 @@ This guide will help you install, initialize, and use `simple-secrets` to secure
 ## 1. Installation
 
 ### Prerequisites
+
 - Go 1.20 or newer
 
 ### Build and Install
@@ -24,13 +25,9 @@ $ make install PREFIX=$HOME/.local
 # The binary will be available as 'simple-secrets' in your PATH
 ```
 
-
 ## 2. First Run & Initialization
 
 On first run, `simple-secrets` will automatically initialize your secrets store in `~/.simple-secrets` and create a default admin user. The admin token will be printed to the console—store it securely!
-
-> **🛡️ Data Protection**: The system includes protection against accidental re-initialization. If critical files like `master.key` or `secrets.json` exist but `users.json` is missing, first-run setup will be blocked to prevent making existing secrets inaccessible. If you need to recover from this state, restore `users.json` from backup or manually recreate your user configuration.
-
 
 ## 3. Store a Secret
 
@@ -45,7 +42,6 @@ $ simple-secrets add api_key abc123xyz --token <your-token>
 Secret "api_key" stored.
 ```
 
-
 ## 4. Retrieve a Secret
 
 Get the value for a key:
@@ -54,7 +50,6 @@ Get the value for a key:
 $ simple-secrets get db_password --token <your-token>
 s3cr3tP@ssw0rd
 ```
-
 
 ## 5. List All Secret Keys
 
@@ -66,7 +61,6 @@ api_key
 db_password
 ```
 
-
 ## 6. Delete a Secret
 
 Remove a secret by key:
@@ -75,7 +69,6 @@ Remove a secret by key:
 $ simple-secrets delete api_key --token <your-token>
 Secret "api_key" deleted.
 ```
-
 
 ## 7. Rotate the Master Key
 
@@ -91,13 +84,12 @@ Proceed? (type 'yes'): yes
 Rotation complete. Backup created under ~/.simple-secrets/backups/
 ```
 
-
 ## 8. Advanced: Custom Backup Directory
 
 Specify a backup location during rotation:
 
 ```sh
-$ simple-secrets rotate master-key --backup-dir /tmp/secrets-backup --token <admin-token>
+simple-secrets rotate master-key --backup-dir /tmp/secrets-backup --token <admin-token>
 ```
 
 ## 9. Database Backup Management
@@ -266,6 +258,7 @@ New token: <new-secure-token>
 ```
 
 **Use Cases for Disable/Enable:**
+
 - **Secret Rotation Planning**: Disable secrets before updating dependent systems
 - **Security Incidents**: Quickly disable compromised tokens without deleting users
 - **Maintenance Windows**: Temporarily hide secrets during system updates
@@ -317,6 +310,7 @@ Authenticate using:
 ### Available Commands Summary
 
 **Core Operations:**
+
 - `put` / `add` - Store secrets
 - `get` - Retrieve secrets
 - `list` - List keys, backups, users, or disabled secrets
@@ -325,13 +319,16 @@ Authenticate using:
 - `enable` - Re-enable disabled secrets
 
 **User Management:**
+
 - `create-user` - Create admin/reader users
 - `rotate token` - Rotate authentication tokens
 
 **Backup & Restore:**
+
 - `rotate master-key` - Rotate encryption key with backup
 - `restore secret` - Restore individual secrets
 - `restore database` / `restore-database` - Restore entire database
 
 **Utilities:**
+
 - `completion` - Generate shell autocompletion scripts
