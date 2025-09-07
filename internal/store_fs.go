@@ -17,10 +17,15 @@ package internal
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
+	"time"
 )
+
+const disabledPrefix = "__DISABLED_"
 
 type SecretsStore struct {
 	KeyPath     string
@@ -140,7 +145,9 @@ func (s *SecretsStore) Get(key string) (string, error) {
 func (s *SecretsStore) ListKeys() []string {
 	keys := make([]string, 0, len(s.secrets))
 	for k := range s.secrets {
-		keys = append(keys, k)
+		if !strings.HasPrefix(k, disabledPrefix) {
+			keys = append(keys, k)
+		}
 	}
 	sort.Strings(keys)
 	return keys
@@ -165,6 +172,68 @@ func (s *SecretsStore) DecryptBackup(encryptedData string) (string, error) {
 		return "", err
 	}
 	return string(decrypted), nil
+}
+
+// DisableSecret marks a secret as disabled by adding a special prefix
+func (s *SecretsStore) DisableSecret(key string) error {
+	enc, ok := s.secrets[key]
+	if !ok {
+		return ErrNotFound
+	}
+
+	// Create backup before disabling
+	s.backupSecret(key, enc)
+
+	// Mark as disabled by adding prefix and current timestamp
+	disabledKey := fmt.Sprintf("%s%d_%s", disabledPrefix, time.Now().Unix(), key)
+	s.secrets[disabledKey] = enc
+	delete(s.secrets, key)
+
+	return s.saveSecrets()
+}
+
+// EnableSecret re-enables a previously disabled secret
+func (s *SecretsStore) EnableSecret(key string) error {
+	// Find the disabled version
+	var disabledKey string
+	var found bool
+
+	for k := range s.secrets {
+		if strings.HasSuffix(k, "_"+key) && strings.HasPrefix(k, disabledPrefix) {
+			disabledKey = k
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		return fmt.Errorf("disabled secret '%s' not found", key)
+	}
+
+	// Move back to original key
+	s.secrets[key] = s.secrets[disabledKey]
+	delete(s.secrets, disabledKey)
+
+	return s.saveSecrets()
+}
+
+// ListDisabledSecrets returns a list of disabled secret keys
+func (s *SecretsStore) ListDisabledSecrets() []string {
+	var disabled []string
+	for k := range s.secrets {
+		if strings.HasPrefix(k, disabledPrefix) {
+			// Extract original key name: __DISABLED_<timestamp>_<key>
+			// Remove prefix first
+			withoutPrefix := strings.TrimPrefix(k, disabledPrefix)
+			// Find first underscore (separates timestamp from key)
+			if idx := strings.Index(withoutPrefix, "_"); idx != -1 {
+				originalKey := withoutPrefix[idx+1:]
+				disabled = append(disabled, originalKey)
+			}
+		}
+	}
+	sort.Strings(disabled)
+	return disabled
 }
 
 var ErrNotFound = os.ErrNotExist
