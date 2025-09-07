@@ -50,7 +50,7 @@ A lightweight secrets manager for Ansible and GitOps workflows. `simple-secrets`
 
 ```sh
 # Clone the repo
-$ git clone https://github.com/ishuley/simple-secrets-cli.git
+$ git clone https://github.com/ianshuley/simple-secrets-cli.git
 $ cd simple-secrets-cli
 
 # Build the CLI

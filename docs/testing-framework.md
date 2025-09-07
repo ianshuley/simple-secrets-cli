@@ -1,4 +1,4 @@
-Let's conduct a comprehensive, production-grade testing campaign for this application. Use this structured checklist as your testing framework, but feel free to expand beyond it with any additional tests you can perform as an AI agent. I want to test the crap out of this thing.
+Let's conduct a comprehensive, production-grade testing campaign for this application. Use this structured checklist as your testing framework, but feel free to expand beyond it with any additional tests you can perform as an AI agent. I want to test the crap out of this thing. You should be inferring as much about the semantic testing process described here and applying it to things I haven't thought of as though that directive is iteself a task on the following checklist.
 
 I want you to execute:
 
