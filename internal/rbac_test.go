@@ -82,8 +82,7 @@ func TestLoadUsersList_MultipleAdminsAllowed(t *testing.T) {
 }
 
 func TestResolveToken_Order(t *testing.T) {
-	os.Setenv("SIMPLE_SECRETS_TOKEN", "envtoken")
-	defer os.Unsetenv("SIMPLE_SECRETS_TOKEN")
+	t.Setenv("SIMPLE_SECRETS_TOKEN", "envtoken")
 	// CLI flag wins
 	tok, err := ResolveToken("flagtoken")
 	if err != nil || tok != "flagtoken" {
