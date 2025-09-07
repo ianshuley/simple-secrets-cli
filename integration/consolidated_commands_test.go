@@ -1,11 +1,7 @@
 /*
 Copyright © 2025 Ian Shuley
 
-	Licensed under the Apache License, Version 2.0 (t		t.Run(tc.name, func(t *testing.T) {
-				cmd := exec.Command(cliBin, tc.args...)
-				cmd.Env = append(testEnv(tmp), "SIMPLE_SECRETS_TOKEN="+token)
-				out, err := cmd.CombinedOutput()License");
-
+Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
