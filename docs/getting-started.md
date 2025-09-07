@@ -29,6 +29,8 @@ $ make install PREFIX=$HOME/.local
 
 On first run, `simple-secrets` will automatically initialize your secrets store in `~/.simple-secrets` and create a default admin user. The admin token will be printed to the console—store it securely!
 
+> **🛡️ Data Protection**: The system includes protection against accidental re-initialization. If critical files like `master.key` or `secrets.json` exist but `users.json` is missing, first-run setup will be blocked to prevent making existing secrets inaccessible. If you need to recover from this state, restore `users.json` from backup or manually recreate your user configuration.
+
 
 ## 3. Store a Secret
 

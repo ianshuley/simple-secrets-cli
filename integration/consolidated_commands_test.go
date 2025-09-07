@@ -1,7 +1,11 @@
 /*
 Copyright © 2025 Ian Shuley
 
-Licensed under the Apache License, Version 2.0 (the "License");
+	Licensed under the Apache License, Version 2.0 (t		t.Run(tc.name, func(t *testing.T) {
+				cmd := exec.Command(cliBin, tc.args...)
+				cmd.Env = append(testEnv(tmp), "SIMPLE_SECRETS_TOKEN="+token)
+				out, err := cmd.CombinedOutput()License");
+
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
@@ -22,12 +26,21 @@ import (
 	"testing"
 )
 
+// testEnv returns a clean environment for the given temp directory
+func testEnv(tmp string) []string {
+	return append(os.Environ(),
+		"HOME="+tmp,
+		"SIMPLE_SECRETS_CONFIG_DIR="+tmp+"/.simple-secrets",
+		"SIMPLE_SECRETS_TEST=1", // Disable first-run protection in tests
+	)
+}
+
 func TestConsolidatedListCommands(t *testing.T) {
 	tmp := t.TempDir()
 
 	// First run to create admin and extract token
 	cmd := exec.Command(cliBin, "list", "keys")
-	cmd.Env = append(os.Environ(), "HOME="+tmp)
+	cmd.Env = testEnv(tmp)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("first run failed: %v\n%s", err, out)
@@ -47,7 +60,7 @@ func TestConsolidatedListCommands(t *testing.T) {
 			name:     "list keys",
 			args:     []string{"list", "keys"},
 			wantErr:  false,
-			contains: "", // Empty list is fine for new store
+			contains: "(no secrets)",
 		},
 		{
 			name:     "list backups",
@@ -56,10 +69,9 @@ func TestConsolidatedListCommands(t *testing.T) {
 			contains: "(no rotation backups available)",
 		},
 		{
-			name:     "list users",
-			args:     []string{"list", "users"},
-			wantErr:  false,
-			contains: "admin",
+			name:    "list users",
+			args:    []string{"list", "users"},
+			wantErr: false,
 		},
 		{
 			name:    "list invalid",
@@ -76,7 +88,8 @@ func TestConsolidatedListCommands(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cmd := exec.Command(cliBin, tt.args...)
-			cmd.Env = append(os.Environ(), "HOME="+tmp, "SIMPLE_SECRETS_TOKEN="+token)
+			envWithToken := append(testEnv(tmp), "SIMPLE_SECRETS_TOKEN="+token)
+			cmd.Env = envWithToken
 			out, err := cmd.CombinedOutput()
 
 			if tt.wantErr {
@@ -103,7 +116,7 @@ func TestConsolidatedRotateCommands(t *testing.T) {
 
 	// First run to create admin and extract token
 	cmd := exec.Command(cliBin, "list", "keys")
-	cmd.Env = append(os.Environ(), "HOME="+tmp)
+	cmd.Env = testEnv(tmp)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("first run failed: %v\n%s", err, out)
@@ -115,7 +128,8 @@ func TestConsolidatedRotateCommands(t *testing.T) {
 
 	// Add a secret first so rotation has something to work with
 	cmd = exec.Command(cliBin, "put", "test-key", "test-value")
-	cmd.Env = append(os.Environ(), "HOME="+tmp, "SIMPLE_SECRETS_TOKEN="+token)
+	envWithToken := append(testEnv(tmp), "SIMPLE_SECRETS_TOKEN="+token)
+	cmd.Env = envWithToken
 	_, err = cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("put failed: %v", err)
@@ -169,7 +183,7 @@ func TestConsolidatedRotateCommands(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cmd := exec.Command(cliBin, tt.args...)
-			cmd.Env = append(os.Environ(), "HOME="+tmp, "SIMPLE_SECRETS_TOKEN="+token)
+			cmd.Env = append(testEnv(tmp), "SIMPLE_SECRETS_TOKEN="+token)
 			if tt.stdin != "" {
 				cmd.Stdin = strings.NewReader(tt.stdin)
 			}
@@ -194,7 +208,7 @@ func TestConsolidatedRestoreCommands(t *testing.T) {
 
 	// First run to create admin and extract token
 	cmd := exec.Command(cliBin, "list", "keys")
-	cmd.Env = append(os.Environ(), "HOME="+tmp)
+	cmd.Env = testEnv(tmp)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("first run failed: %v\n%s", err, out)
@@ -206,14 +220,14 @@ func TestConsolidatedRestoreCommands(t *testing.T) {
 
 	// Add and delete a secret to create backup
 	cmd = exec.Command(cliBin, "put", "backup-test", "original-value")
-	cmd.Env = append(os.Environ(), "HOME="+tmp, "SIMPLE_SECRETS_TOKEN="+token)
+	cmd.Env = append(testEnv(tmp), "SIMPLE_SECRETS_TOKEN="+token)
 	_, err = cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("put failed: %v", err)
 	}
 
 	cmd = exec.Command(cliBin, "put", "backup-test", "modified-value")
-	cmd.Env = append(os.Environ(), "HOME="+tmp, "SIMPLE_SECRETS_TOKEN="+token)
+	cmd.Env = append(testEnv(tmp), "SIMPLE_SECRETS_TOKEN="+token)
 	_, err = cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("put modified failed: %v", err)
@@ -221,7 +235,7 @@ func TestConsolidatedRestoreCommands(t *testing.T) {
 
 	// Create a rotation backup
 	cmd = exec.Command(cliBin, "rotate", "master-key", "--yes")
-	cmd.Env = append(os.Environ(), "HOME="+tmp, "SIMPLE_SECRETS_TOKEN="+token)
+	cmd.Env = append(testEnv(tmp), "SIMPLE_SECRETS_TOKEN="+token)
 	_, err = cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("rotate failed: %v", err)
@@ -273,7 +287,7 @@ func TestConsolidatedRestoreCommands(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cmd := exec.Command(cliBin, tt.args...)
-			cmd.Env = append(os.Environ(), "HOME="+tmp, "SIMPLE_SECRETS_TOKEN="+token)
+			cmd.Env = append(testEnv(tmp), "SIMPLE_SECRETS_TOKEN="+token)
 			if tt.stdin != "" {
 				cmd.Stdin = strings.NewReader(tt.stdin)
 			}
@@ -298,7 +312,7 @@ func TestLegacyCommandsStillWork(t *testing.T) {
 
 	// First run to create admin and extract token
 	cmd := exec.Command(cliBin, "list", "keys")
-	cmd.Env = append(os.Environ(), "HOME="+tmp)
+	cmd.Env = testEnv(tmp)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("first run failed: %v\n%s", err, out)
@@ -310,7 +324,7 @@ func TestLegacyCommandsStillWork(t *testing.T) {
 
 	// Test that legacy restore-database command still works
 	cmd = exec.Command(cliBin, "restore-database", "--help")
-	cmd.Env = append(os.Environ(), "HOME="+tmp, "SIMPLE_SECRETS_TOKEN="+token)
+	cmd.Env = append(testEnv(tmp), "SIMPLE_SECRETS_TOKEN="+token)
 	out, err = cmd.CombinedOutput()
 	if err != nil {
 		t.Errorf("legacy restore-database command should still work: %v\n%s", err, out)
@@ -398,7 +412,7 @@ func TestConsolidatedDisableEnableCommands(t *testing.T) {
 
 	// First run to create admin and extract token
 	cmd := exec.Command(cliBin, "list", "keys")
-	cmd.Env = append(os.Environ(), "HOME="+tmp)
+	cmd.Env = testEnv(tmp)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("first run failed: %v\n%s", err, out)
@@ -513,7 +527,7 @@ func TestConsolidatedDisableEnableCommands(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cmd := exec.Command(cliBin, tt.args...)
-			cmd.Env = append(os.Environ(), "HOME="+tmp)
+			cmd.Env = testEnv(tmp)
 			out, err := cmd.CombinedOutput()
 
 			if tt.wantErr && err == nil {

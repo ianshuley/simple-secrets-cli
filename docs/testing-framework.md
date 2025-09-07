@@ -94,6 +94,29 @@ Focus especially on:
 
 **Critical**: Save admin token for subsequent tests!
 
+### ⚠️ **First-Run Behavior Note**
+
+> **Important**: The system automatically creates a default admin user and token on first run. Just run ANY command that goes through authentication (like `put`, `get`, `list keys`, `create-user`, etc.) and the system will:
+>
+> 1. Detect it's a first run (no `users.json` exists)
+> 2. Automatically create a default admin user
+> 3. Generate and display a secure token
+> 4. Print instructions on how to use the token
+>
+> **Common Testing Mistake**: Getting confused about initialization order. ALL commands that require RBAC will trigger first-run setup if needed, including `create-user`. The first-run message will appear, then you can use the generated token for subsequent commands.
+
+### 🛡️ **First-Run Protection**
+
+> **Security Enhancement**: The system now includes protection against accidental first-run initialization that could make existing secrets inaccessible.
+>
+> **Test the Protection**:
+>
+> - Create scenario: `mkdir test-dir && echo "fake-key" > test-dir/master.key`
+> - Run command: `./simple-secrets list keys` (should fail with protection error)
+> - Verify message mentions restoring from backup rather than running first-run
+>
+> **Why This Matters**: Prevents data loss if someone accidentally deletes only `users.json` but leaves encrypted secrets and keys, which would become inaccessible if first-run created new encryption keys.
+
 ---
 
 ## 3️⃣ **Authentication & Authorization**

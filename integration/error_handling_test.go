@@ -28,7 +28,7 @@ func TestErrorHandling(t *testing.T) {
 
 	// First run to create admin and extract token
 	cmd := exec.Command(cliBin, "list", "keys")
-	cmd.Env = append(os.Environ(), "HOME="+tmp)
+	cmd.Env = testEnv(tmp)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("first run failed: %v\n%s", err, out)
@@ -95,42 +95,42 @@ func TestErrorHandling(t *testing.T) {
 		{
 			name:         "list invalid subcommand",
 			args:         []string{"list", "invalid"},
-			env:          append(os.Environ(), "HOME="+tmp, "SIMPLE_SECRETS_TOKEN="+token),
+			env:          append(testEnv(tmp), "SIMPLE_SECRETS_TOKEN="+token),
 			wantErr:      true,
 			errorMessage: "unknown list type",
 		},
 		{
 			name:         "rotate invalid subcommand",
 			args:         []string{"rotate", "invalid"},
-			env:          append(os.Environ(), "HOME="+tmp, "SIMPLE_SECRETS_TOKEN="+token),
+			env:          append(testEnv(tmp), "SIMPLE_SECRETS_TOKEN="+token),
 			wantErr:      true,
 			errorMessage: "unknown rotate type",
 		},
 		{
 			name:         "restore invalid subcommand",
 			args:         []string{"restore", "invalid"},
-			env:          append(os.Environ(), "HOME="+tmp, "SIMPLE_SECRETS_TOKEN="+token),
+			env:          append(testEnv(tmp), "SIMPLE_SECRETS_TOKEN="+token),
 			wantErr:      true,
 			errorMessage: "unknown restore type",
 		},
 		{
 			name:         "get non-existent secret",
 			args:         []string{"get", "nonexistent"},
-			env:          append(os.Environ(), "HOME="+tmp, "SIMPLE_SECRETS_TOKEN="+token),
+			env:          append(testEnv(tmp), "SIMPLE_SECRETS_TOKEN="+token),
 			wantErr:      true,
 			errorMessage: "not found",
 		},
 		{
 			name:         "delete non-existent secret",
 			args:         []string{"delete", "nonexistent"},
-			env:          append(os.Environ(), "HOME="+tmp, "SIMPLE_SECRETS_TOKEN="+token),
+			env:          append(testEnv(tmp), "SIMPLE_SECRETS_TOKEN="+token),
 			wantErr:      true,
 			errorMessage: "file does not exist",
 		},
 		{
 			name:         "restore non-existent secret",
 			args:         []string{"restore", "secret", "nonexistent"},
-			env:          append(os.Environ(), "HOME="+tmp, "SIMPLE_SECRETS_TOKEN="+token),
+			env:          append(testEnv(tmp), "SIMPLE_SECRETS_TOKEN="+token),
 			wantErr:      true,
 			errorMessage: "could not read backup",
 		},
@@ -166,7 +166,7 @@ func TestRBACEnforcement(t *testing.T) {
 
 	// First run to create admin and extract token
 	cmd := exec.Command(cliBin, "list", "keys")
-	cmd.Env = append(os.Environ(), "HOME="+tmp)
+	cmd.Env = testEnv(tmp)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("first run failed: %v\n%s", err, out)
@@ -296,7 +296,7 @@ func TestCommandInputValidation(t *testing.T) {
 
 	// First run to create admin and extract token
 	cmd := exec.Command(cliBin, "list", "keys")
-	cmd.Env = append(os.Environ(), "HOME="+tmp)
+	cmd.Env = testEnv(tmp)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("first run failed: %v\n%s", err, out)
@@ -358,7 +358,7 @@ func TestCommandInputValidation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cmd := exec.Command(cliBin, tt.args...)
-			cmd.Env = append(os.Environ(), "HOME="+tmp, "SIMPLE_SECRETS_TOKEN="+token)
+			cmd.Env = append(testEnv(tmp), "SIMPLE_SECRETS_TOKEN="+token)
 			out, err := cmd.CombinedOutput()
 
 			if tt.wantErr {
@@ -385,7 +385,7 @@ func TestWorkflowIntegration(t *testing.T) {
 
 	// First run to create admin and extract token
 	cmd := exec.Command(cliBin, "list", "keys")
-	cmd.Env = append(os.Environ(), "HOME="+tmp)
+	cmd.Env = testEnv(tmp)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("first run failed: %v\n%s", err, out)
@@ -396,7 +396,7 @@ func TestWorkflowIntegration(t *testing.T) {
 	}
 
 	// Test complete workflow: add secret -> rotate -> restore -> verify
-	env := append(os.Environ(), "HOME="+tmp, "SIMPLE_SECRETS_TOKEN="+token)
+	env := append(testEnv(tmp), "SIMPLE_SECRETS_TOKEN="+token)
 
 	// 1. Add a secret
 	cmd = exec.Command(cliBin, "put", "workflow-test", "original-value")
@@ -491,7 +491,7 @@ func TestEdgeCases(t *testing.T) {
 
 	// First run to create admin and extract token
 	cmd := exec.Command(cliBin, "list", "keys")
-	cmd.Env = append(os.Environ(), "HOME="+tmp)
+	cmd.Env = testEnv(tmp)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("first run failed: %v\n%s", err, out)
@@ -501,7 +501,7 @@ func TestEdgeCases(t *testing.T) {
 		t.Fatalf("could not extract admin token from output: %s", out)
 	}
 
-	env := append(os.Environ(), "HOME="+tmp, "SIMPLE_SECRETS_TOKEN="+token)
+	env := append(testEnv(tmp), "SIMPLE_SECRETS_TOKEN="+token)
 
 	// Test empty key name
 	cmd = exec.Command(cliBin, "put", "", "value")

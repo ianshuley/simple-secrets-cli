@@ -36,11 +36,10 @@ type SecretsStore struct {
 
 // LoadSecretsStore: create ~/.simple-secrets, load key + secrets
 func LoadSecretsStore() (*SecretsStore, error) {
-	home, err := os.UserHomeDir()
+	dir, err := getConfigDirectory()
 	if err != nil {
 		return nil, err
 	}
-	dir := filepath.Join(home, ".simple-secrets")
 	_ = os.MkdirAll(dir, 0700)
 
 	s := &SecretsStore{
@@ -56,6 +55,20 @@ func LoadSecretsStore() (*SecretsStore, error) {
 		return nil, err
 	}
 	return s, nil
+}
+
+// getConfigDirectory returns the configuration directory, respecting test overrides
+func getConfigDirectory() (string, error) {
+	// Check for test override first
+	if testDir := os.Getenv("SIMPLE_SECRETS_CONFIG_DIR"); testDir != "" {
+		return testDir, nil
+	}
+
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(home, ".simple-secrets"), nil
 }
 
 func (s *SecretsStore) loadSecrets() error {
@@ -246,8 +259,8 @@ func (s *SecretsStore) createBackupDirectory() {
 
 // getBackupDirectory returns the path to the backup directory
 func (s *SecretsStore) getBackupDirectory() string {
-	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".simple-secrets", "backups")
+	configDir, _ := getConfigDirectory()
+	return filepath.Join(configDir, "backups")
 }
 
 // getBackupPath returns the full path for a secret's backup file
