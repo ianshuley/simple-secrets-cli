@@ -8,6 +8,6 @@ TODO: Add a disable command to the CLI for tokens and secrets to make building t
 
 TODO: Run my `docs/testing-framework.md` Copilot workflow again
 
-TODO: Figure out appropriate license, make it public
+TODO: Make repository public (Apache 2.0 license already configured)
 
 TODO: Start on API
