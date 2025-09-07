@@ -240,12 +240,12 @@ func (s *SecretsStore) EnableSecret(key string) error {
 // ListDisabledSecrets returns a list of disabled secret keys
 func (s *SecretsStore) ListDisabledSecrets() []string {
 	disabledMap := s.buildDisabledSecretsMap()
-	
+
 	disabled := make([]string, 0, len(disabledMap))
 	for originalKey := range disabledMap {
 		disabled = append(disabled, originalKey)
 	}
-	
+
 	sort.Strings(disabled)
 	return disabled
 }
