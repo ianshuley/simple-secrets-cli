@@ -1,16 +1,7 @@
 /*
 Copyright © 2025 Ian Shuley
 
-	Licensed under the Apache License, Versio	t.Run("BlocksWhenSecretsJsonExists", func(t *testing.T) {
-			// Setup: create only secrets.json to simulate partial installation
-			secretsPath := filepath.Join(configDir, "secrets.json")
-			os.WriteFile(secretsPath, []byte(`{"encrypted":"fake-encrypted-data"}`), 0600)
-			defer os.Remove(secretsPath)
-
-			// Try to run a command that would trigger first-run
-			cmd := exec.Command(binaryPath, "list", "keys")
-			cmd.Env = firstRunTestEnv(testDir)e "License");
-
+Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
