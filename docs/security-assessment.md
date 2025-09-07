@@ -4,11 +4,100 @@
 
 **Status**: ✅ ALL CRITICAL SECURITY ISSUES RESOLVED
 
-Two critical security vulnerabilities were identified during comprehensive testing and have been successfully fixed with proper validation tests.
+Multiple critical security vulnerabilities were identified during comprehensive AI agent testing and have been successfully fixed with proper validation tests.
 
 ---
 
-## 🔥 Critical Issue #1: Empty Token Authentication Bypass (RESOLVED)
+## 🔥 Critical Issue #1: Master Key Rotation Atomicity (RESOLVED)
+
+### **Vulnerability Description**
+Master key rotation operations could be interrupted during the write process, leaving the system in a corrupted state where neither the old nor new key could decrypt secrets.
+
+### **Impact Assessment**
+- **Severity**: CRITICAL
+- **Attack Vector**: Process interruption (SIGKILL, power loss, system crash) during rotation
+- **Affected Operations**: Master key rotation
+- **Data Loss Risk**: Complete loss of all encrypted secrets if rotation interrupted at the wrong time
+
+### **Root Cause**
+The rotation process directly overwrote the master key file without using atomic operations, creating a window where the file could be in an inconsistent state.
+
+### **Fix Implementation**
+Implemented atomic file operations using temporary files and atomic renames:
+```go
+// 1) Write new data to temporary files
+tmpKey := s.KeyPath + ".tmp"
+tmpSecrets := s.SecretsPath + ".tmp"
+
+// 2) Atomic swap using os.Rename (atomic on most filesystems)
+if err := os.Rename(tmpKey, s.KeyPath); err != nil {
+    // cleanup temp files on failure
+}
+if err := os.Rename(tmpSecrets, s.SecretsPath); err != nil {
+    // rollback and cleanup on failure
+}
+```
+
+### **Files Modified**
+- `internal/rotate.go` - Added atomic file swap logic
+- `internal/key_file.go` - Enhanced writeMasterKeyToPath for consistency
+
+### **Validation**
+✅ Process interruption during rotation no longer corrupts the system
+✅ Secrets remain accessible with the original key if rotation fails
+✅ All temporary files properly cleaned up on failure
+
+---
+
+## 🔥 Critical Issue #2: Input Validation Vulnerabilities (RESOLVED)
+
+### **Vulnerability Description**
+Secret key names were not properly validated, allowing injection of null bytes, control characters, and path traversal sequences that could cause security issues.
+
+### **Impact Assessment**
+- **Severity**: HIGH
+- **Attack Vectors**:
+  - Null byte injection: `./simple-secrets put "test\x00malicious" "value"`
+  - Control character injection: `./simple-secrets put "test\x01evil" "value"`
+  - Path traversal: `./simple-secrets put "../../../etc/passwd" "value"`
+- **Potential Impact**: Key name collisions, file system access, data corruption
+
+### **Root Cause**
+The `put` command did not validate key names beyond checking for empty strings.
+
+### **Fix Implementation**
+Added comprehensive input validation in `cmd/put.go`:
+```go
+// Check for null bytes
+if strings.Contains(key, "\x00") {
+    return fmt.Errorf("key name cannot contain null bytes")
+}
+
+// Check for control characters (except \t, \n, \r)
+for _, r := range key {
+    if r < 0x20 && r != 0x09 && r != 0x0A && r != 0x0D {
+        return fmt.Errorf("key name cannot contain control characters")
+    }
+}
+
+// Check for path traversal attempts
+if strings.Contains(key, "..") || strings.Contains(key, "/") || strings.Contains(key, "\\") {
+    return fmt.Errorf("key name cannot contain path separators or path traversal sequences")
+}
+```
+
+### **Files Modified**
+- `cmd/put.go` - Added comprehensive key name validation
+
+### **Validation**
+✅ Null byte injection attempts rejected
+✅ Control character injection attempts rejected
+✅ Path traversal attempts rejected
+✅ Safe characters (tabs, newlines, printable characters) still allowed
+
+---
+
+## 🔥 Critical Issue #3: Empty Token Authentication Bypass (RESOLVED)
 
 ### **Vulnerability Description**
 Commands were accepting explicitly empty tokens (`--token ""`) instead of properly rejecting them, bypassing authentication controls.

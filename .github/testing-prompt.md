@@ -152,6 +152,17 @@ Focus especially on:
 - [ ] **Very long key name**: 500+ character key name
 - [ ] **Reserved characters**: Keys with `/`, `\`, quotes, etc.
 
+### 🚨 **Security: Input Validation (Fixed Vulnerabilities)**
+
+- [ ] **Null byte injection**: `./simple-secrets put $'test\x00key' "value"` → should fail with "cannot contain null bytes"
+- [ ] **Control character injection**: `./simple-secrets put $'test\x01key' "value"` → should fail with "cannot contain control characters"
+- [ ] **Path traversal**: `./simple-secrets put "test/path" "value"` → should fail with "cannot contain path separators"
+- [ ] **Path traversal dots**: `./simple-secrets put "test..traversal" "value"` → should fail with "cannot contain path traversal sequences"
+- [ ] **Backslash separator**: `./simple-secrets put "test\\key" "value"` → should fail with "cannot contain path separators"
+- [ ] **Tab character allowed**: `./simple-secrets put $'test\tkey' "value"` → should succeed (tabs are allowed)
+- [ ] **Newline allowed**: `./simple-secrets put $'test\nkey' "value"` → should succeed (newlines are allowed)
+- [ ] **Carriage return allowed**: `./simple-secrets put $'test\rkey' "value"` → should succeed (CR is allowed)
+
 ---
 
 ## 5️⃣ **User Management & RBAC**
@@ -210,9 +221,18 @@ Focus especially on:
 - [ ] **🚨 BACKUP ACCESSIBILITY**: Can restore secrets from backup with old key
 
 ### Automated Rotation
+
 - [ ] **Auto rotation**: `./simple-secrets rotate master-key --yes` → no prompts
 - [ ] **Custom backup dir**: `./simple-secrets rotate master-key --yes --backup-dir /tmp/test-backup`
 - [ ] **Verify custom location**: Backup created in specified directory
+
+### 🚨 **CRITICAL: Atomic Operation Testing (Fixed Vulnerability)**
+
+- [ ] **Interruption resistance**: Start rotation in background, kill process during rotation → system remains accessible
+- [ ] **Temp file cleanup**: Verify no .tmp files remain after interrupted rotation
+- [ ] **State consistency**: After interruption, secrets still accessible with original key
+- [ ] **No partial corruption**: Master key file not corrupted during interruption
+- [ ] **Backup integrity**: Backup creation is atomic and not corrupted by interruption
 
 ### 🔍 **CRITICAL: Multiple Rotation Test**
 - [ ] **Rotate again**: Perform second master key rotation
