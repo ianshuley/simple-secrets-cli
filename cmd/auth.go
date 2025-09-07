@@ -17,23 +17,10 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 	"simple-secrets/internal"
 
 	"github.com/spf13/cobra"
 )
-
-// PrintFirstRunMessage prints a clear message for first-run admin creation.
-func PrintFirstRunMessage() {
-	fmt.Println("\nFirst run detected. Default admin user created.")
-	fmt.Println("To use your new token, re-run this command in one of these ways:")
-	fmt.Println("  --token <your-token> (as a flag)")
-	fmt.Println("  SIMPLE_SECRETS_TOKEN=<your-token> ./simple-secrets ... (as an env var)")
-	fmt.Println("  or place it in ~/.simple-secrets/config.json as { \"token\": \"<your-token>\" }")
-	fmt.Println("(The token was printed above. Store it securely; it will not be shown again.)")
-	fmt.Println("\nIf creating config.json manually, ensure it has secure permissions:")
-	fmt.Println("  chmod 600 ~/.simple-secrets/config.json")
-}
 
 // RBACGuardWithCmd loads users, checks first run, resolves token, and returns (user, store, error)
 func RBACGuardWithCmd(needWrite bool, cmd *cobra.Command) (*internal.User, *internal.UserStore, error) {
@@ -84,7 +71,7 @@ func authenticateUser(cmd *cobra.Command) (*internal.User, *internal.UserStore, 
 		return nil, nil, err
 	}
 	if firstRun {
-		return nil, nil, nil // First run detected
+		return nil, nil, nil // First run message already printed
 	}
 
 	token, err := resolveTokenFromCommand(cmd)
@@ -130,24 +117,5 @@ func authorizeAccess(user *internal.User, store *internal.UserStore, needWrite b
 	if needWrite && !user.Can("write", store.Permissions()) {
 		return fmt.Errorf("permission denied: need 'write'")
 	}
-	return nil
-}
-
-// atomicWriteFile writes data to a file atomically using a temporary file and rename
-func atomicWriteFile(path string, data []byte, perm os.FileMode) error {
-	tmpPath := path + ".tmp"
-
-	// Write to temporary file first
-	if err := os.WriteFile(tmpPath, data, perm); err != nil {
-		return fmt.Errorf("failed to write temporary file: %w", err)
-	}
-
-	// Atomic rename to final location
-	if err := os.Rename(tmpPath, path); err != nil {
-		// Clean up temp file on failure
-		_ = os.Remove(tmpPath)
-		return fmt.Errorf("failed to atomically update file: %w", err)
-	}
-
 	return nil
 }

@@ -366,7 +366,7 @@ func saveUsersList(usersPath string, users []*internal.User) error {
 		return fmt.Errorf("failed to marshal users: %w", err)
 	}
 
-	return atomicWriteFile(usersPath, data, 0600)
+	return internal.AtomicWriteFile(usersPath, data, 0600)
 }
 
 // printTokenRotationSuccess displays the success message and instructions

@@ -214,7 +214,7 @@ func persistNewUser(newUser *internal.User) error {
 		return err
 	}
 
-	return atomicWriteFile(usersPath, data, 0600)
+	return internal.AtomicWriteFile(usersPath, data, 0600)
 }
 
 // printUserCreationSuccess displays the success message with the new token
