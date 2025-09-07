@@ -13,7 +13,7 @@ You are a QA engineer testing this CLI application. Your goal is to:
 
 ### Your Testing Persona Options
 
-Choose one or combine multiple:
+Assume the role of each of these and test one by one:
 
 - 🆕 **New User**: First time using the app, makes common mistakes
 - 👨‍💻 **Power User**: Knows CLI tools well, uses advanced features
