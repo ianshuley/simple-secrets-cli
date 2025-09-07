@@ -18,6 +18,7 @@ package main
 import (
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -37,6 +38,39 @@ func TestErrorHandling(t *testing.T) {
 		t.Fatalf("could not extract admin token from output: %s", out)
 	}
 
+	// Create a separate temp directory for "no token" test where no config exists
+	noTokenTmp := t.TempDir()
+	// Copy users.json and roles.json to the no-token directory so it's not a first run, but don't copy config.json
+	simpleSecretsDir := filepath.Join(noTokenTmp, ".simple-secrets")
+	err = os.MkdirAll(simpleSecretsDir, 0755)
+	if err != nil {
+		t.Fatalf("failed to create .simple-secrets dir: %v", err)
+	}
+
+	// Copy users.json
+	srcUsersFile := filepath.Join(tmp, ".simple-secrets", "users.json")
+	dstUsersFile := filepath.Join(simpleSecretsDir, "users.json")
+	usersData, err := os.ReadFile(srcUsersFile)
+	if err != nil {
+		t.Fatalf("failed to read users.json: %v", err)
+	}
+	err = os.WriteFile(dstUsersFile, usersData, 0600)
+	if err != nil {
+		t.Fatalf("failed to write users.json: %v", err)
+	}
+
+	// Copy roles.json
+	srcRolesFile := filepath.Join(tmp, ".simple-secrets", "roles.json")
+	dstRolesFile := filepath.Join(simpleSecretsDir, "roles.json")
+	rolesData, err := os.ReadFile(srcRolesFile)
+	if err != nil {
+		t.Fatalf("failed to read roles.json: %v", err)
+	}
+	err = os.WriteFile(dstRolesFile, rolesData, 0600)
+	if err != nil {
+		t.Fatalf("failed to write roles.json: %v", err)
+	}
+
 	tests := []struct {
 		name         string
 		args         []string
@@ -54,9 +88,9 @@ func TestErrorHandling(t *testing.T) {
 		{
 			name:         "no token provided",
 			args:         []string{"list", "keys"},
-			env:          append(os.Environ(), "HOME="+tmp),
+			env:          []string{"HOME=" + noTokenTmp}, // Clean environment with only HOME set
 			wantErr:      true,
-			errorMessage: "authentication required",
+			errorMessage: "provide a token via",
 		},
 		{
 			name:         "list invalid subcommand",
