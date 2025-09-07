@@ -18,7 +18,6 @@ package cmd
 import (
 	"fmt"
 	"simple-secrets/internal"
-	"time"
 
 	"github.com/spf13/cobra"
 )
@@ -202,10 +201,7 @@ func validateSecretDisableAccess() (*internal.User, *internal.UserStore, error) 
 
 // executeTokenDisable marks a token as disabled
 func executeTokenDisable(context *TokenDisableContext) error {
-	now := time.Now()
-	context.TargetUser.TokenHash = ""        // Clear the token hash to disable
-	context.TargetUser.TokenRotatedAt = &now // Update timestamp
-
+	context.TargetUser.DisableToken()
 	return saveUsersList(context.UsersPath, context.Users)
 }
 

@@ -125,6 +125,13 @@ func (u *User) Can(perm string, perms RolePermissions) bool {
 	return perms.Has(u.Role, perm)
 }
 
+// DisableToken disables the user's token by clearing the token hash and updating the timestamp
+func (u *User) DisableToken() {
+	u.TokenHash = ""
+	now := time.Now()
+	u.TokenRotatedAt = &now
+}
+
 // LoadUsers loads users and roles. Returns (store, firstRun, error).
 func LoadUsers() (*UserStore, bool, error) {
 	usersPath, rolesPath, err := resolveConfigPaths()
