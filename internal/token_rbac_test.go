@@ -22,8 +22,8 @@ import (
 
 func TestTokenResolutionOrder(t *testing.T) {
 	dir := t.TempDir()
-	os.Setenv("HOME", dir)
-	defer os.Unsetenv("HOME")
+	t.Setenv("HOME", dir)
+	t.Setenv("SIMPLE_SECRETS_CONFIG_DIR", dir+"/.simple-secrets")
 	os.Unsetenv("SIMPLE_SECRETS_TOKEN")
 
 	// Write config file

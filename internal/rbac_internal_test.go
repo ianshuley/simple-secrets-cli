@@ -195,10 +195,9 @@ func TestHandleFirstRun(t *testing.T) {
 	// handleFirstRun logic is embedded in various commands, test via LoadUsers with missing files
 	tmp := t.TempDir()
 
-	// Set HOME to temp directory
-	oldHome := os.Getenv("HOME")
-	defer os.Setenv("HOME", oldHome)
-	os.Setenv("HOME", tmp)
+	// Set environment variables for isolated testing
+	t.Setenv("HOME", tmp)
+	t.Setenv("SIMPLE_SECRETS_CONFIG_DIR", tmp+"/.simple-secrets")
 
 	// Call LoadUsers which should trigger first run setup
 	store, firstRun, err := LoadUsers()

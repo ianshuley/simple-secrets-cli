@@ -81,7 +81,7 @@ func TestErrorHandling(t *testing.T) {
 		{
 			name:         "invalid token",
 			args:         []string{"list", "keys"},
-			env:          append(os.Environ(), "HOME="+tmp, "SIMPLE_SECRETS_TOKEN=invalid"),
+			env:          append(testEnv(tmp), "SIMPLE_SECRETS_TOKEN=invalid"),
 			wantErr:      true,
 			errorMessage: "invalid token",
 		},
@@ -178,7 +178,7 @@ func TestRBACEnforcement(t *testing.T) {
 
 	// Create a reader user
 	cmd = exec.Command(cliBin, "create-user", "reader", "reader")
-	cmd.Env = append(os.Environ(), "HOME="+tmp, "SIMPLE_SECRETS_TOKEN="+adminToken)
+	cmd.Env = append(testEnv(tmp), "SIMPLE_SECRETS_TOKEN="+adminToken)
 	out, err = cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("create reader user failed: %v\n%s", err, out)
@@ -265,7 +265,7 @@ func TestRBACEnforcement(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cmd := exec.Command(cliBin, tt.args...)
-			cmd.Env = append(os.Environ(), "HOME="+tmp, "SIMPLE_SECRETS_TOKEN="+tt.token)
+			cmd.Env = append(testEnv(tmp), "SIMPLE_SECRETS_TOKEN="+tt.token)
 			out, err := cmd.CombinedOutput()
 
 			if tt.wantErr {

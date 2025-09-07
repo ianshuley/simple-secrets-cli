@@ -24,6 +24,7 @@ func newTempStore(t *testing.T) *SecretsStore {
 	t.Helper()
 	tmp := t.TempDir()
 	t.Setenv("HOME", tmp)
+	t.Setenv("SIMPLE_SECRETS_CONFIG_DIR", tmp+"/.simple-secrets")
 	s, err := LoadSecretsStore()
 	if err != nil {
 		t.Fatalf("LoadSecretsStore: %v", err)

@@ -193,7 +193,7 @@ func validateFirstRunEligibility() error {
 
 	for _, file := range existingFiles {
 		if _, err := os.Stat(file); err == nil {
-			return fmt.Errorf("existing simple-secrets installation detected (found %s). Cannot create new admin user when installation already exists", filepath.Base(file))
+			return fmt.Errorf("existing simple-secrets installation detected (found %s). Cannot create new admin user when installation already exists. If this is unexpected, restore it from backup or manually investigate", filepath.Base(file))
 		}
 	}
 

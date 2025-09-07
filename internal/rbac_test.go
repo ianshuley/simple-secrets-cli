@@ -113,8 +113,8 @@ func TestRBAC_Permissions(t *testing.T) {
 
 func TestFirstRunCreatesDefaultAdmin(t *testing.T) {
 	dir := t.TempDir()
-	os.Setenv("HOME", dir)
-	defer os.Unsetenv("HOME")
+	t.Setenv("HOME", dir)
+	t.Setenv("SIMPLE_SECRETS_CONFIG_DIR", dir+"/.simple-secrets")
 	os.RemoveAll(dir + "/.simple-secrets")
 	_, firstRun, err := LoadUsers()
 	if err != nil {

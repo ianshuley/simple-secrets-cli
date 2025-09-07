@@ -1,7 +1,16 @@
 /*
 Copyright © 2025 Ian Shuley
 
-Licensed under the Apache License, Version 2.0 (the "License");
+	Licensed under the Apache License, Versio	t.Run("BlocksWhenSecretsJsonExists", func(t *testing.T) {
+			// Setup: create only secrets.json to simulate partial installation
+			secretsPath := filepath.Join(configDir, "secrets.json")
+			os.WriteFile(secretsPath, []byte(`{"encrypted":"fake-encrypted-data"}`), 0600)
+			defer os.Remove(secretsPath)
+
+			// Try to run a command that would trigger first-run
+			cmd := exec.Command(binaryPath, "list", "keys")
+			cmd.Env = firstRunTestEnv(testDir)e "License");
+
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
@@ -23,6 +32,15 @@ import (
 	"testing"
 )
 
+// firstRunTestEnv returns environment for testing first-run protection (without test mode disabled)
+func firstRunTestEnv(tmp string) []string {
+	return append(os.Environ(),
+		"HOME="+tmp,
+		"SIMPLE_SECRETS_CONFIG_DIR="+tmp+"/.simple-secrets",
+		// Note: No SIMPLE_SECRETS_TEST=1 so first-run protection is active
+	)
+}
+
 func TestFirstRunProtectionIntegration(t *testing.T) {
 	// Create isolated test directory
 	testDir := t.TempDir()
@@ -40,7 +58,7 @@ func TestFirstRunProtectionIntegration(t *testing.T) {
 
 		// Try to run a command that would trigger first-run
 		cmd := exec.Command(binaryPath, "list", "keys")
-		cmd.Env = append(os.Environ(), "HOME="+testDir)
+		cmd.Env = firstRunTestEnv(testDir)
 		output, err := cmd.CombinedOutput()
 
 		// Should fail with protection error
@@ -63,6 +81,10 @@ func TestFirstRunProtectionIntegration(t *testing.T) {
 	})
 
 	t.Run("BlocksWhenSecretsJsonExists", func(t *testing.T) {
+		// Clean up any files from previous tests
+		os.RemoveAll(configDir)
+		os.MkdirAll(configDir, 0700)
+
 		// Setup: create only secrets.json to simulate partial installation
 		secretsPath := filepath.Join(configDir, "secrets.json")
 		os.WriteFile(secretsPath, []byte(`{"secrets":[]}`), 0600)
@@ -70,7 +92,7 @@ func TestFirstRunProtectionIntegration(t *testing.T) {
 
 		// Try to run a command that would trigger first-run
 		cmd := exec.Command(binaryPath, "list", "keys")
-		cmd.Env = append(os.Environ(), "HOME="+testDir)
+		cmd.Env = firstRunTestEnv(testDir)
 		output, err := cmd.CombinedOutput()
 
 		// Should fail with protection error
@@ -94,7 +116,7 @@ func TestFirstRunProtectionIntegration(t *testing.T) {
 
 		// Try to run a command that should trigger clean first-run
 		cmd := exec.Command(binaryPath, "list", "keys")
-		cmd.Env = append(os.Environ(), "HOME="+testDir)
+		cmd.Env = firstRunTestEnv(testDir)
 		output, _ := cmd.CombinedOutput()
 
 		// Should succeed with first-run message (though it will exit 1 due to no token)
@@ -130,7 +152,7 @@ func TestFirstRunProtectionIntegration(t *testing.T) {
 
 		// Try to run a command that would trigger first-run
 		cmd := exec.Command(binaryPath, "create-user", "test", "admin")
-		cmd.Env = append(os.Environ(), "HOME="+testDir)
+		cmd.Env = firstRunTestEnv(testDir)
 		output, err := cmd.CombinedOutput()
 
 		// Should fail with protection error

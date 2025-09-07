@@ -25,9 +25,8 @@ import (
 func TestFirstRunProtection_BlocksWhenMasterKeyExists(t *testing.T) {
 	// Setup temp environment
 	tmpDir := t.TempDir()
-	origHome := os.Getenv("HOME")
-	os.Setenv("HOME", tmpDir)
-	defer os.Setenv("HOME", origHome)
+	t.Setenv("HOME", tmpDir)
+	t.Setenv("SIMPLE_SECRETS_CONFIG_DIR", tmpDir+"/.simple-secrets")
 
 	configDir := filepath.Join(tmpDir, ".simple-secrets")
 	os.MkdirAll(configDir, 0700)
@@ -60,9 +59,8 @@ func TestFirstRunProtection_BlocksWhenMasterKeyExists(t *testing.T) {
 func TestFirstRunProtection_BlocksWhenSecretsJsonExists(t *testing.T) {
 	// Setup temp environment
 	tmpDir := t.TempDir()
-	origHome := os.Getenv("HOME")
-	os.Setenv("HOME", tmpDir)
-	defer os.Setenv("HOME", origHome)
+	t.Setenv("HOME", tmpDir)
+	t.Setenv("SIMPLE_SECRETS_CONFIG_DIR", tmpDir+"/.simple-secrets")
 
 	configDir := filepath.Join(tmpDir, ".simple-secrets")
 	os.MkdirAll(configDir, 0700)
@@ -95,9 +93,8 @@ func TestFirstRunProtection_BlocksWhenSecretsJsonExists(t *testing.T) {
 func TestFirstRunProtection_AllowsCleanFirstRun(t *testing.T) {
 	// Setup temp environment
 	tmpDir := t.TempDir()
-	origHome := os.Getenv("HOME")
-	os.Setenv("HOME", tmpDir)
-	defer os.Setenv("HOME", origHome)
+	t.Setenv("HOME", tmpDir)
+	t.Setenv("SIMPLE_SECRETS_CONFIG_DIR", tmpDir+"/.simple-secrets")
 
 	// No existing files - should allow first-run
 	store, firstRun, err := LoadUsers()
@@ -128,9 +125,8 @@ func TestFirstRunProtection_AllowsCleanFirstRun(t *testing.T) {
 func TestFirstRunProtection_AllowsWhenOnlyConfigJsonExists(t *testing.T) {
 	// Setup temp environment
 	tmpDir := t.TempDir()
-	origHome := os.Getenv("HOME")
-	os.Setenv("HOME", tmpDir)
-	defer os.Setenv("HOME", origHome)
+	t.Setenv("HOME", tmpDir)
+	t.Setenv("SIMPLE_SECRETS_CONFIG_DIR", tmpDir+"/.simple-secrets")
 
 	configDir := filepath.Join(tmpDir, ".simple-secrets")
 	os.MkdirAll(configDir, 0700)
@@ -158,9 +154,8 @@ func TestFirstRunProtection_AllowsWhenOnlyConfigJsonExists(t *testing.T) {
 func TestFirstRunProtection_AllowsNormalOperationWithAllFiles(t *testing.T) {
 	// Setup temp environment
 	tmpDir := t.TempDir()
-	origHome := os.Getenv("HOME")
-	os.Setenv("HOME", tmpDir)
-	defer os.Setenv("HOME", origHome)
+	t.Setenv("HOME", tmpDir)
+	t.Setenv("SIMPLE_SECRETS_CONFIG_DIR", tmpDir+"/.simple-secrets")
 
 	// Create complete installation first
 	store, firstRun, err := LoadUsers()

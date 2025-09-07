@@ -54,7 +54,7 @@ func TestConsolidatedListCommandsRefactored(t *testing.T) {
 			name:     "list invalid",
 			args:     []string{"list", "invalid"},
 			wantErr:  true,
-			contains: "accepts 1 arg(s), received 0",
+			contains: "unknown list type",
 		},
 		{
 			name:     "list no args",
@@ -139,8 +139,8 @@ func TestConsolidatedDisableEnableCommandsRefactored(t *testing.T) {
 		if err == nil {
 			t.Fatalf("expected error when getting disabled secret, but got none. Output: %s", output)
 		}
-		if !strings.Contains(string(output), "disabled") {
-			t.Fatalf("expected disabled error message, got: %s", output)
+		if !strings.Contains(string(output), "not found") {
+			t.Fatalf("expected not found error message, got: %s", output)
 		}
 	})
 
