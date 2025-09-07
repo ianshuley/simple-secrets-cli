@@ -327,7 +327,7 @@ func ensureConfigDirectory(usersPath string) error {
 }
 
 // writeConfigFileSecurely marshals and writes any config data to JSON with secure permissions
-func writeConfigFileSecurely(path string, data interface{}) error {
+func writeConfigFileSecurely(path string, data any) error {
 	encoded, err := marshalConfigData(data)
 	if err != nil {
 		return err
@@ -350,7 +350,7 @@ func writeFileAtomically(path string, data []byte) error {
 }
 
 // readConfigFile reads and unmarshals a JSON config file
-func readConfigFile(path string, target interface{}) error {
+func readConfigFile(path string, target any) error {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return err
