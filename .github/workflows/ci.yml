@@ -35,6 +35,16 @@ jobs:
     - name: Build
       run: make build
 
+    - name: Test version system
+      run: |
+        ./simple-secrets version
+        ./simple-secrets version --short
+        # Verify version contains build info
+        ./simple-secrets version | grep -q "Git Commit:"
+        ./simple-secrets version | grep -q "Built:"
+        ./simple-secrets version | grep -q "Go Version:"
+        ./simple-secrets version | grep -q "Platform:"
+
     - name: Run linting (if available)
       run: |
         if command -v golangci-lint &> /dev/null; then

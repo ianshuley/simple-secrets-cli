@@ -22,6 +22,36 @@ make clean
 make purge
 ```
 
+## Version Information
+
+Check the version and build information:
+
+```sh
+# Show full version information
+simple-secrets version
+
+# Show short version only
+simple-secrets version --short
+```
+
+### Version Format
+
+- **Release versions**: `v1.0.0`, `v1.2.3-beta.1`
+- **Development builds**: `dev-abc1234` (includes git commit hash)
+
+### Build Targets
+
+```sh
+# Development build (includes git commit)
+make dev
+
+# Release build with specific version
+make release VERSION=v1.0.0
+
+# Default build with current version
+make build
+```
+
 The binary will be available as `simple-secrets` in your PATH after install.
 
 # simple-secrets

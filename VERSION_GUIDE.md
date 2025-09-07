@@ -10,7 +10,7 @@ make dev          # Build with git commit info (dev-abc1234)
 ### 1. Choose Version Number
 Ask yourself:
 - **Breaking changes?** → Bump MAJOR (v1.x.x → v2.0.0)
-- **New features?** → Bump MINOR (v1.0.x → v1.1.0)  
+- **New features?** → Bump MINOR (v1.0.x → v1.1.0)
 - **Bug fixes only?** → Bump PATCH (v1.0.0 → v1.0.1)
 
 ### 2. Build and Test
@@ -32,7 +32,7 @@ git push origin vX.Y.Z
 make release VERSION=v1.0.0
 ```
 
-### Bug Fix Release  
+### Bug Fix Release
 ```bash
 make release VERSION=v1.0.1
 ```
