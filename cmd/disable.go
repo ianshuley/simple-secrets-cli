@@ -155,7 +155,7 @@ func prepareSecretDisableContext(key string) (*SecretDisableContext, error) {
 
 	// Check if secret exists
 	if _, err := store.Get(key); err != nil {
-		return nil, fmt.Errorf("secret '%s' not found", key)
+		return nil, fmt.Errorf("secret not found")
 	}
 
 	return &SecretDisableContext{

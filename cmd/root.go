@@ -39,6 +39,7 @@ import (
 	"fmt"
 	"os"
 	"simple-secrets/internal"
+	"simple-secrets/pkg/version"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -88,11 +89,21 @@ func init() {
 
 	// Add setup flag for manual triggering of first-run experience
 	rootCmd.Flags().Bool("setup", false, "trigger the interactive setup walkthrough")
+
+	// Add standard version flags that users expect
+	rootCmd.Flags().BoolP("version", "v", false, "show version information")
 }
 
 // handleRootCommand is called when simple-secrets is run without any subcommands
 func handleRootCommand(cmd *cobra.Command, args []string) {
+	versionFlag, _ := cmd.Flags().GetBool("version")
 	setupFlag, _ := cmd.Flags().GetBool("setup")
+
+	// Handle version flag first (highest priority)
+	if versionFlag {
+		fmt.Println(version.BuildInfo())
+		return
+	}
 
 	if setupFlag {
 		// Manual setup requested - let the walkthrough determine the state

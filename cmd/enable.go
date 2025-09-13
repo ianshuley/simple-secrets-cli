@@ -92,7 +92,7 @@ func prepareSecretEnableContext(key string) (*SecretEnableContext, error) {
 	found := slices.Contains(disabledSecrets, key)
 
 	if !found {
-		return nil, fmt.Errorf("disabled secret '%s' not found", key)
+		return nil, fmt.Errorf("disabled secret not found")
 	}
 
 	return &SecretEnableContext{

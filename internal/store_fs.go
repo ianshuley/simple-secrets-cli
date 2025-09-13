@@ -267,7 +267,7 @@ func (s *SecretsStore) EnableSecret(key string) error {
 
 	disabledKey, found := disabledMap[key]
 	if !found {
-		return fmt.Errorf("disabled secret '%s' not found", key)
+		return fmt.Errorf("disabled secret not found")
 	}
 
 	// Move back to original key
