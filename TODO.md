@@ -20,11 +20,9 @@
 **Priority:** HIGH - This affects data integrity under concurrent access patterns.
 
 
-
 ## Add clipboard flag
 
 I'd like to add a --copy flag that pipes whatever information is being retrieved to the clipboard instead of to the console.
-
 
 
 ## Platform Command
