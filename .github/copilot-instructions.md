@@ -213,7 +213,9 @@ This repository includes comprehensive AI-driven testing and validation framewor
 "Run the opus testing framework focusing on the security auditor persona"
 "Use opus methodology to test the backup/restore user experience"
 "Execute the complete opus framework with all personas and challenges"
-```#### `.testing-framework.md` - Systematic Manual Testing
+```
+
+#### `.testing-framework.md` - Systematic Manual Testing
 **Purpose**: AI systematically executes comprehensive manual testing checklist for semantic correctness and real-world functionality validation
 **When to use**:
 - User requests "run testing framework", "execute testing framework", or "manual testing"
