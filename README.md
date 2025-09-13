@@ -272,6 +272,24 @@ make release VERSION=v1.0.0
 make clean
 ```
 
+## Shell Completion
+
+Enable shell autocompletion for better CLI experience:
+
+```bash
+# Bash completion
+simple-secrets completion bash > /etc/bash_completion.d/simple-secrets
+
+# Zsh completion
+simple-secrets completion zsh > "${fpath[1]}/_simple-secrets"
+
+# Fish completion
+simple-secrets completion fish > ~/.config/fish/completions/simple-secrets.fish
+
+# PowerShell completion
+simple-secrets completion powershell > simple-secrets.ps1
+```
+
 ## Security Considerations
 
 - **Master key protection**: The `master.key` file contains your encryption key. Protect it like a private key.
