@@ -204,31 +204,34 @@ This repository includes comprehensive AI-driven testing and validation framewor
 - Security-focused adversarial testing
 - User experience and intuition validation
 - Pattern recognition and behavioral exploration
+- AI-specific testing advantages (natural language exploitation, sequence prediction)
+- Gamified testing challenges and iterative cycles
+- Compound failure scenarios and interaction bug discovery
 
 **Example Usage**:
 ```
 "Run the opus testing framework focusing on the security auditor persona"
 "Use opus methodology to test the backup/restore user experience"
-```
-
-#### `.testing-framework.md` - Systematic Functional Testing
-**Purpose**: AI simulates rigorous human testing for semantic correctness and comprehensive functionality validation
+"Execute the complete opus framework with all personas and challenges"
+```#### `.testing-framework.md` - Systematic Manual Testing
+**Purpose**: AI systematically executes comprehensive manual testing checklist for semantic correctness and real-world functionality validation
 **When to use**:
-- User requests "run testing framework" or "validate functionality"
-- Need systematic regression testing
-- Want comprehensive coverage of all features and edge cases
+- User requests "run testing framework", "execute testing framework", or "manual testing"
+- Need systematic manual validation of CLI behavior and real-world scenarios
+- Want comprehensive coverage of all features through actual command execution
 
 **Key Features**:
-- Systematic test coverage of all major functionality
-- Regression testing protocols
-- Error handling validation
-- Performance and reliability testing
-- Integration testing scenarios
+- Systematic manual testing checklist covering all functionality
+- Build and installation testing procedures
+- CLI command execution and verification
+- Error handling and edge case validation
+- Performance and reliability testing under real conditions
+- State consistency and integration validation
 
 **Example Usage**:
 ```
-"Execute the testing framework to validate all CRUD operations"
-"Run full testing framework before merge"
+"Execute the testing framework to validate all functionality manually"
+"Run the manual testing checklist before merge"
 ```
 
 #### `.copilot-consistency-checklist.md` - Documentation Synchronization
@@ -275,11 +278,9 @@ This repository includes comprehensive AI-driven testing and validation framewor
 
 **When User Requests Testing**:
 - "run opus testing" → Use `.opus-testing-framework.md`
-- "test functionality" or "run tests" → Use `.testing-framework.md`
+- "test functionality", "run testing framework", or "manual testing" → Use `.testing-framework.md`
 - "consistency check" → Use `.copilot-consistency-checklist.md`
-- "pre-merge" or "ready to merge" → Use `.pre-merge-checklist.md`
-
-**Framework Integration**:
+- "pre-merge" or "ready to merge" → Use `.pre-merge-checklist.md`**Framework Integration**:
 - Each framework file cross-references the others appropriately
 - Use frameworks in combination for comprehensive validation
 - Report results from each framework clearly
@@ -293,16 +294,14 @@ User: "I've added a new CLI command, can you validate it's ready to merge?"
 AI Response:
 1. Execute .pre-merge-checklist.md (which includes):
    - .opus-testing-framework.md (persona-based testing)
-   - .testing-framework.md (systematic validation)
+   - .testing-framework.md (systematic manual testing checklist)
    - .copilot-consistency-checklist.md (documentation sync)
    - SOLID principles review
    - Cross-reference validation
 
 2. Report clear pass/fail for each phase
 3. Provide go/no-go merge recommendation
-```
-
-### Framework Maintenance
+```### Framework Maintenance
 
 - **Keep frameworks synchronized**: Changes to one should be reflected in cross-references
 - **Update examples**: Ensure all framework files have current, relevant examples
