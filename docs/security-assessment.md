@@ -97,7 +97,45 @@ if strings.Contains(key, "..") || strings.Contains(key, "/") || strings.Contains
 
 ---
 
-## 🔥 Critical Issue #3: Empty Token Authentication Bypass (RESOLVED)
+## 🔥 Critical Issue #4: Secret Existence Enumeration (RESOLVED)
+
+### **Vulnerability Description**
+Error messages revealed whether specific secrets exist by including the secret name in "not found" errors, allowing attackers to enumerate existing secret names.
+
+### **Impact Assessment**
+- **Severity**: MEDIUM-HIGH
+- **Attack Vector**: Authentication with valid credentials followed by systematic probing
+- **Information Leak**: Attackers could discover secret naming patterns and existing secret keys
+- **Example**: `Error: secret 'production-api-key' not found` vs `Error: secret 'random-name' not found`
+
+### **Root Cause**
+Error messages in get, disable, and enable commands included the specific secret name in the error message, revealing whether the secret exists.
+
+### **Fix Implementation**
+Replaced specific error messages with generic ones across all commands:
+```go
+// Before (information leaking):
+return fmt.Errorf("secret '%s' not found", secretName)
+
+// After (secure):
+return fmt.Errorf("secret not found")
+```
+
+### **Files Modified**
+- `cmd/get.go` - Generic error for secret retrieval
+- `cmd/disable.go` - Generic error for secret disabling
+- `cmd/enable.go` - Generic error for secret enabling
+- `internal/store_fs.go` - Generic error for store operations
+
+### **Validation**
+✅ No secret names leaked in error messages
+✅ Consistent "secret not found" responses for all non-existent secrets
+✅ Error behavior uniform regardless of secret existence
+✅ All existing functionality preserved
+
+---
+
+## 🔥 Critical Issue #5: Improved Master Key Error Messages (RESOLVED)
 
 ### **Vulnerability Description**
 Commands were accepting explicitly empty tokens (`--token ""`) instead of properly rejecting them, bypassing authentication controls.
@@ -236,7 +274,11 @@ Test files were created but encountered environment conflicts during implementat
 
 | Vulnerability | Risk Level | Status | Mitigation |
 |---------------|------------|---------|------------|
+| Master Key Rotation Atomicity | CRITICAL | ✅ RESOLVED | Atomic file operations with temp files |
+| Input Validation | HIGH | ✅ RESOLVED | Comprehensive key name validation |
 | Empty Token Bypass | CRITICAL | ✅ RESOLVED | CLI flag validation in all commands |
+| Secret Existence Enumeration | MEDIUM-HIGH | ✅ RESOLVED | Generic error messages prevent information leaks |
+| Master Key Corruption Messages | LOW | ✅ RESOLVED | Helpful recovery guidance in error messages |
 | Directory Permissions | CRITICAL | ✅ RESOLVED | 0755 → 0700 permission fix |
 | Information Disclosure | HIGH | ✅ MITIGATED | Secure file permissions + user guidance |
 

@@ -97,6 +97,10 @@ Focus especially on:
 #### Version Command Testing
 
 - [ ] `./simple-secrets version --help` - shows version command help
+- [ ] `./simple-secrets version` - shows full version info
+- [ ] `./simple-secrets version --short` - shows short version only
+- [ ] `./simple-secrets --version` - shows full version info (flag)
+- [ ] `./simple-secrets -v` - shows full version info (short flag)
 - [ ] Version appears in main help: `./simple-secrets --help | grep version`
 - [ ] All version info is non-empty (no "unknown" values in normal builds)
 
@@ -253,8 +257,8 @@ Focus especially on:
 - [ ] **Disable secret**: `./simple-secrets disable secret disable-test` → success message
 - [ ] **List excludes disabled**: `./simple-secrets list keys` → should not show `disable-test`, should show `other-key`
 - [ ] **List disabled shows secret**: `./simple-secrets list disabled` → should show `disable-test` with 🚫 indicator
-- [ ] **Get disabled fails**: `./simple-secrets get disable-test` → exit code 1, "not found"
-- [ ] **Delete disabled fails**: `./simple-secrets delete disable-test` → exit code 1, "not found"
+- [ ] **Get disabled fails**: `./simple-secrets get disable-test` → exit code 1, "secret not found"
+- [ ] **Delete disabled fails**: `./simple-secrets delete disable-test` → exit code 1, "secret not found"
 - [ ] **Enable secret**: `./simple-secrets enable secret disable-test` → success message
 - [ ] **List includes enabled**: `./simple-secrets list keys` → should show both keys
 - [ ] **Get enabled works**: `./simple-secrets get disable-test` → returns "test-value" (preserved)
@@ -631,7 +635,7 @@ export TEST_TOKEN="<admin-token-from-setup>"
 - [ ] **Disable one**: `./simple-secrets disable secret test-secret-2` → success message
 - [ ] **List excludes disabled**: `./simple-secrets list keys` → shows test-secret-1, test-secret-3 only
 - [ ] **List disabled**: `./simple-secrets list disabled` → shows test-secret-2 with 🚫 icon
-- [ ] **Get disabled fails**: `./simple-secrets get test-secret-2` → "not found" error
+- [ ] **Get disabled fails**: `./simple-secrets get test-secret-2` → "secret not found" error
 - [ ] **Enable secret**: `./simple-secrets enable secret test-secret-2` → success message
 - [ ] **List includes enabled**: `./simple-secrets list keys` → shows all 3 secrets again
 - [ ] **Value preserved**: `./simple-secrets get test-secret-2` → returns "value-2"

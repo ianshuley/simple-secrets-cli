@@ -36,7 +36,8 @@ var versionCmd = &cobra.Command{
 	• Platform information`,
 	Example: `  simple-secrets version           # Show full version info
   simple-secrets version --short   # Show short version only
-  simple-secrets --version         # Show full version info (flag)`,
+  simple-secrets --version         # Show full version info (flag)
+  simple-secrets -v               # Show full version info (short flag)`,
 	Run: func(cmd *cobra.Command, args []string) {
 		if showShort {
 			fmt.Println(version.Short())

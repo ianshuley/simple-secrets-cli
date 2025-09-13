@@ -99,6 +99,8 @@ Check the version and build information:
 ```bash
 # Show full version information
 simple-secrets version
+simple-secrets --version  # Standard flag
+simple-secrets -v         # Short flag
 
 # Show short version only
 simple-secrets version --short
