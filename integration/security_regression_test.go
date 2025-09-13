@@ -56,7 +56,7 @@ func TestEmptyTokenBypassVulnerability(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cmd := exec.Command(cliBin, tt.args...)
-			cmd.Env = append(os.Environ(), "HOME="+tmp)
+			cmd.Env = testEnv(tmp)
 			out, err := cmd.CombinedOutput()
 
 			if tt.wantErr {
@@ -77,7 +77,7 @@ func TestDirectoryPermissionsVulnerability(t *testing.T) {
 	tmp := t.TempDir()
 
 	cmd := exec.Command(cliBin, "list", "keys")
-	cmd.Env = append(os.Environ(), "HOME="+tmp)
+	cmd.Env = testEnv(tmp)
 	_, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("first run failed: %v", err)
@@ -102,7 +102,7 @@ func TestInputValidationVulnerabilities(t *testing.T) {
 
 	// First run to create admin
 	cmd := exec.Command(cliBin, "list", "keys")
-	cmd.Env = append(os.Environ(), "HOME="+tmp)
+	cmd.Env = testEnv(tmp)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("first run failed: %v", err)
@@ -158,7 +158,7 @@ func TestInputValidationVulnerabilities(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cmd := exec.Command(cliBin, "--token", token, "put", tt.key, "testvalue")
-			cmd.Env = append(os.Environ(), "HOME="+tmp)
+			cmd.Env = testEnv(tmp)
 			out, err := cmd.CombinedOutput()
 
 			if tt.wantErr {

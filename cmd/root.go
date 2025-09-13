@@ -16,7 +16,11 @@ limitations under the License.
 package cmd
 
 import (
+	"fmt"
 	"os"
+	"simple-secrets/internal"
+	"simple-secrets/pkg/version"
+	"strings"
 
 	"github.com/spf13/cobra"
 )
@@ -37,14 +41,16 @@ Features:
 	• CLI user management (create-user, list users, token rotation)
 	• Self-service token rotation for enhanced security
 	• Individual secret backup/restore functionality
+	• Secret lifecycle management (disable/enable secrets)
+	• Token disable/enable for security management
 	• Token-based authentication (flag, env, or config file)
 
 All secrets are encrypted and stored locally in ~/.simple-secrets/.
 
+🚀 First run? Use --setup or any authentication command to get started.
+
 See 'simple-secrets --help' or the README for more info.`,
-	// Uncomment the following line if your bare application
-	// has an action associated with it:
-	// Run: func(cmd *cobra.Command, args []string) { },
+	Run: handleRootCommand,
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -59,4 +65,169 @@ func Execute() {
 func init() {
 	// Persistent token flag for all commands
 	rootCmd.PersistentFlags().StringVar(&TokenFlag, "token", "", "authentication token (overrides env/config)")
+
+	// Add setup flag for manual triggering of first-run experience
+	rootCmd.Flags().Bool("setup", false, "run first-time setup")
+
+	// Add standard version flags that users expect
+	rootCmd.Flags().BoolP("version", "v", false, "show version information")
+}
+
+// handleRootCommand is called when simple-secrets is run without any subcommands
+func handleRootCommand(cmd *cobra.Command, args []string) {
+	versionFlag, _ := cmd.Flags().GetBool("version")
+	setupFlag, _ := cmd.Flags().GetBool("setup")
+
+	// Handle version flag first (highest priority)
+	if versionFlag {
+		fmt.Println(version.BuildInfo())
+		return
+	}
+
+	if setupFlag {
+		runExplicitSetup()
+		return
+	}
+
+	// Check if this is a fresh install and offer automatic setup
+	if needsInitialization() {
+		offerAutomaticSetup()
+		return
+	}
+
+	// Normal case: show help
+	cmd.Help()
+}
+
+// needsInitialization checks if this is a fresh installation
+func needsInitialization() bool {
+	eligible, err := internal.IsFirstRunEligible()
+	if err != nil {
+		return false // If there's an error (like protection), it's not a fresh install
+	}
+	return eligible
+}
+
+// runExplicitSetup handles the --setup flag (user explicitly wants to set up)
+func runExplicitSetup() {
+	isActualFirstRun, err := internal.IsFirstRunEligible()
+	if err != nil {
+		// Error case (broken state/protection error)
+		displayFirstRunProtectionError(err)
+		return
+	}
+
+	if !isActualFirstRun {
+		// Existing installation (users.json exists)
+		displayExistingInstallationInfo()
+		return
+	}
+
+	// Clean environment, eligible for setup
+	performFirstTimeSetup()
+}
+
+// offerAutomaticSetup handles when we detect a fresh installation automatically
+func offerAutomaticSetup() {
+	fmt.Println("\n🔐 Welcome to simple-secrets!")
+	fmt.Println("\nFirst time setup required.")
+	fmt.Println("Ready to create your admin user and authentication token.")
+	fmt.Println("\nOptions:")
+	fmt.Println("  • Run: ./simple-secrets --setup")
+	fmt.Println("  • Or press Enter to continue with setup now")
+	fmt.Println("\nSetup will create encrypted storage in ~/.simple-secrets/")
+
+	fmt.Print("\nContinue with setup? [Y/n]: ")
+
+	var response string
+	fmt.Scanln(&response)
+
+	if userDeclinedSetup(response) {
+		fmt.Println("\nSetup cancelled. Run './simple-secrets --setup' when ready.")
+		return
+	}
+
+	performFirstTimeSetup()
+}
+
+// userDeclinedSetup checks if user declined the setup prompt
+func userDeclinedSetup(response string) bool {
+	return response == "n" || response == "N" || response == "no" || response == "NO"
+}
+
+// displayFirstRunProtectionError shows protection error with helpful guidance
+func displayFirstRunProtectionError(err error) {
+	fmt.Println("\n🔐 Welcome to simple-secrets!")
+	fmt.Printf("\n❌ Setup cannot proceed: %v\n", err)
+	fmt.Println("\nIf you're seeing a protection error, you may have a partial installation.")
+	fmt.Println("Try running: ./simple-secrets restore-database --help")
+}
+
+// displayExistingInstallationInfo shows info for existing installations
+func displayExistingInstallationInfo() {
+	fmt.Println("\n🔐 simple-secrets Setup")
+	fmt.Println("\n✅ You already have simple-secrets set up!")
+	fmt.Println("\n📋 What simple-secrets does:")
+	fmt.Println("  • Securely stores your secrets with AES-256-GCM encryption")
+	fmt.Println("  • Provides token-based authentication for secure access")
+	fmt.Println("  • Supports role-based permissions (admin/reader)")
+	fmt.Println("  • Stores everything locally in ~/.simple-secrets/")
+
+	fmt.Println("\n💡 Quick Reference:")
+	fmt.Println("  • Store a secret:     ./simple-secrets put --token <token> key value")
+	fmt.Println("  • Retrieve a secret:  ./simple-secrets get --token <token> key")
+	fmt.Println("  • List secrets:       ./simple-secrets list --token <token> keys")
+	fmt.Println("  • Create new user:    ./simple-secrets create-user --token <token> username role")
+	fmt.Println("  • List users:         ./simple-secrets list --token <token> users")
+
+	fmt.Println("\n🔑 Need your token? If you've lost it, you can:")
+	fmt.Println("  • Create a new user with: ./simple-secrets create-user <username> <role>")
+	fmt.Println("  • Or rotate an existing token: ./simple-secrets rotate token <username>")
+	fmt.Println("  • Nuclear option: Back up ~/.simple-secrets/, delete it, and start fresh")
+
+	fmt.Println("\n💡 Pro tip: Set the environment variable to avoid typing --token each time:")
+	fmt.Println("  export SIMPLE_SECRETS_TOKEN=<your-token>")
+}
+
+// performFirstTimeSetup handles the actual first-time setup process
+func performFirstTimeSetup() {
+	fmt.Println("\n🔐 Welcome to simple-secrets!")
+	fmt.Println("\nSimple-secrets setup")
+	fmt.Println("Creating admin user and generating authentication token.")
+	fmt.Println("Store the token securely - it will not be shown again.")
+
+	fmt.Println("\nProceed? [Y/n]")
+
+	var response string
+	fmt.Scanln(&response)
+
+	if userDeclinedSetup(response) {
+		fmt.Println("Setup cancelled.")
+		return
+	}
+
+	fmt.Println("\nCreating admin user...")
+
+	// Use the clean first-run setup function that returns the token
+	_, token, err := internal.PerformFirstRunSetupWithToken()
+	if err != nil {
+		fmt.Printf("\n❌ Setup failed: %v\n", err)
+		return
+	}
+
+	fmt.Println("Setup complete.")
+
+	fmt.Println("\nUsage:")
+	fmt.Println("  ./simple-secrets put --token <TOKEN> key value")
+	fmt.Println("  ./simple-secrets get --token <TOKEN> key")
+	fmt.Println("  ./simple-secrets list --token <TOKEN> keys")
+
+	fmt.Println("\nOr set environment variable:")
+	fmt.Println("  export SIMPLE_SECRETS_TOKEN=<TOKEN>")
+
+	// Display the token clearly
+	fmt.Println("\n" + strings.Repeat("=", 50))
+	fmt.Printf("TOKEN: %s\n", token)
+	fmt.Println(strings.Repeat("=", 50))
+	fmt.Println("Save this token securely. It will not be shown again.")
 }

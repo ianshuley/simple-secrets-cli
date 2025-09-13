@@ -18,6 +18,7 @@ package cmd
 import (
 	"fmt"
 	"sort"
+	"strconv"
 	"time"
 
 	"simple-secrets/internal"
@@ -27,15 +28,17 @@ import (
 
 // listNewCmd represents the new consolidated list command
 var listCmd = &cobra.Command{
-	Use:   "list [keys|backups|users]",
-	Short: "List secrets, backups, or users",
+	Use:   "list [keys|backups|users|disabled]",
+	Short: "List secrets, backups, users, or disabled secrets",
 	Long: `List different types of data in the system:
-  • keys    - List all stored secret keys
-  • backups - List available rotation backups
-  • users   - List all users in the system`,
+  • keys     - List all stored secret keys
+  • backups  - List available rotation backups
+  • users    - List all users in the system
+  • disabled - List all disabled secrets`,
 	Example: `  simple-secrets list keys
   simple-secrets list backups
-  simple-secrets list users`,
+  simple-secrets list users
+  simple-secrets list disabled`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Check if token flag was explicitly set to empty string
@@ -50,8 +53,10 @@ var listCmd = &cobra.Command{
 			return listBackups()
 		case "users":
 			return listUsers()
+		case "disabled":
+			return listDisabledSecrets()
 		default:
-			return fmt.Errorf("unknown list type: %s. Use 'keys', 'backups', or 'users'", args[0])
+			return fmt.Errorf("unknown list type: %s. Use 'keys', 'backups', 'users', or 'disabled'", args[0])
 		}
 	},
 }
@@ -77,7 +82,9 @@ func listKeys() error {
 		return nil
 	}
 	for _, k := range keys {
-		fmt.Println(k)
+		// Escape special characters to prevent multiline display issues
+		escaped := safeDisplayFormat(k)
+		fmt.Println(escaped)
 	}
 	return nil
 }
@@ -171,6 +178,37 @@ func listUsers() error {
 	return nil
 }
 
+func listDisabledSecrets() error {
+	user, _, err := RBACGuard(false, TokenFlag)
+	if err != nil {
+		return err
+	}
+	if user == nil {
+		return nil
+	}
+
+	store, err := internal.LoadSecretsStore()
+	if err != nil {
+		return err
+	}
+
+	disabledSecrets := store.ListDisabledSecrets()
+	if len(disabledSecrets) == 0 {
+		fmt.Println("No disabled secrets found.")
+		return nil
+	}
+
+	fmt.Printf("Disabled secrets (%d):\n", len(disabledSecrets))
+	for _, key := range disabledSecrets {
+		escaped := safeDisplayFormat(key)
+		fmt.Printf("  🚫 %s\n", escaped)
+	}
+	fmt.Println()
+	fmt.Println("Use 'enable secret <key>' to re-enable a disabled secret.")
+
+	return nil
+}
+
 func init() {
 	rootCmd.AddCommand(listCmd)
 }
@@ -180,4 +218,8 @@ func getTokenRotationDisplay(tokenRotatedAt *time.Time) string {
 		return "Unknown (legacy user)"
 	}
 	return tokenRotatedAt.Format("2006-01-02 15:04:05")
+}
+
+func safeDisplayFormat(key string) string {
+	return strconv.Quote(key)
 }

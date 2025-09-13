@@ -47,6 +47,11 @@ func HashToken(token string) string {
 
 // DefaultUserConfigPath exports defaultUserConfigPath for CLI use.
 func DefaultUserConfigPath(filename string) (string, error) {
+	// Check for test override first
+	if testDir := os.Getenv("SIMPLE_SECRETS_CONFIG_DIR"); testDir != "" {
+		return filepath.Join(testDir, filename), nil
+	}
+
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", fmt.Errorf("find home dir: %w", err)
@@ -120,6 +125,89 @@ func (u *User) Can(perm string, perms RolePermissions) bool {
 	return perms.Has(u.Role, perm)
 }
 
+// DisableToken disables the user's token by clearing the token hash and updating the timestamp
+func (u *User) DisableToken() {
+	u.TokenHash = ""
+	now := time.Now()
+	u.TokenRotatedAt = &now
+}
+
+// IsFirstRunEligible checks if this is a fresh installation eligible for first-run setup
+// This is a read-only check that doesn't trigger any setup or create files
+func IsFirstRunEligible() (bool, error) {
+	usersPath, err := DefaultUserConfigPath("users.json")
+	if err != nil {
+		return false, err
+	}
+
+	// Check if users.json exists
+	if _, err := os.Stat(usersPath); !os.IsNotExist(err) {
+		return false, nil // users.json exists = not first run
+	}
+
+	// Users.json doesn't exist, check if this is a clean environment
+	if err := validateFirstRunEligibility(); err != nil {
+		return false, err // Broken state - not eligible for first run
+	}
+
+	return true, nil // Clean environment - eligible for first run
+}
+
+// PerformFirstRunSetup executes the first-run setup process
+// Should only be called after confirming IsFirstRunEligible() returns true
+func PerformFirstRunSetup() (*UserStore, error) {
+	usersPath, rolesPath, err := resolveConfigPaths()
+	if err != nil {
+		return nil, err
+	}
+
+	// Verify we're still eligible (double-check in case of race conditions)
+	if err := validateFirstRunEligibility(); err != nil {
+		return nil, err
+	}
+
+	// Verify users.json still doesn't exist
+	if _, err := os.Stat(usersPath); !os.IsNotExist(err) {
+		return nil, fmt.Errorf("users.json was created by another process")
+	}
+
+	fmt.Println("users.json not found – creating default admin user...")
+	store, firstRun, err := createDefaultUserFile(usersPath, rolesPath)
+	if err != nil {
+		return nil, err
+	}
+	if !firstRun {
+		return nil, fmt.Errorf("unexpected: first run setup did not complete properly")
+	}
+	return store, nil
+}
+
+// PerformFirstRunSetupWithToken executes the first-run setup process and returns the admin token
+// Should only be called after confirming IsFirstRunEligible() returns true
+func PerformFirstRunSetupWithToken() (*UserStore, string, error) {
+	usersPath, rolesPath, err := resolveConfigPaths()
+	if err != nil {
+		return nil, "", err
+	}
+
+	// Verify we're still eligible (double-check in case of race conditions)
+	if err := validateFirstRunEligibility(); err != nil {
+		return nil, "", err
+	}
+
+	// Verify users.json still doesn't exist
+	if _, err := os.Stat(usersPath); !os.IsNotExist(err) {
+		return nil, "", fmt.Errorf("users.json was created by another process")
+	}
+
+	fmt.Println("users.json not found – creating default admin user...")
+	store, token, err := createDefaultUserFileWithToken(usersPath, rolesPath)
+	if err != nil {
+		return nil, "", err
+	}
+	return store, token, nil
+}
+
 // LoadUsers loads users and roles. Returns (store, firstRun, error).
 func LoadUsers() (*UserStore, bool, error) {
 	usersPath, rolesPath, err := resolveConfigPaths()
@@ -129,6 +217,10 @@ func LoadUsers() (*UserStore, bool, error) {
 
 	users, err := loadUsers(usersPath)
 	if os.IsNotExist(err) {
+		// Check first-run eligibility
+		if err := validateFirstRunEligibility(); err != nil {
+			return nil, false, err
+		}
 		return handleFirstRun(usersPath, rolesPath)
 	}
 	if err != nil {
@@ -160,8 +252,44 @@ func resolveConfigPaths() (string, string, error) {
 
 // handleFirstRun manages the first-run scenario when users.json doesn't exist
 func handleFirstRun(usersPath, rolesPath string) (*UserStore, bool, error) {
-	fmt.Println("users.json not found – creating default admin user...")
+	fmt.Println("First run detected - creating default admin user...")
+	fmt.Println("⚠️  This will generate an authentication token. Have your password manager ready.")
+	fmt.Println("\nProceed? [Y/n]")
+
+	var response string
+	fmt.Scanln(&response)
+
+	if response == "n" || response == "N" || response == "no" || response == "NO" {
+		fmt.Println("Setup cancelled. Run any command again when ready.")
+		return nil, false, fmt.Errorf("setup cancelled by user")
+	}
+
 	return createDefaultUserFile(usersPath, rolesPath)
+} // validateFirstRunEligibility ensures we only run first-run setup in truly clean environments
+func validateFirstRunEligibility() error {
+	// Get the config directory from paths
+	usersPath, rolesPath, err := resolveConfigPaths()
+	if err != nil {
+		return err
+	}
+	configDir := filepath.Dir(usersPath)
+
+	// Check for existing files that would indicate this is NOT a first run
+	// Note: users.json is not checked here since this function is only called when users.json doesn't exist
+	existingFiles := []string{
+		rolesPath,                                // roles.json
+		filepath.Join(configDir, "master.key"),   // encryption key
+		filepath.Join(configDir, "secrets.json"), // secrets store
+		filepath.Join(configDir, "backups"),      // backup directory
+	}
+
+	for _, file := range existingFiles {
+		if _, err := os.Stat(file); err == nil {
+			return fmt.Errorf("existing simple-secrets installation detected (found %s). Cannot create new admin user when installation already exists. If this is unexpected, restore it from backup or manually investigate", filepath.Base(file))
+		}
+	}
+
+	return nil
 }
 
 // createUserStore constructs a UserStore with the given users and permissions
@@ -271,6 +399,38 @@ func createDefaultUserFile(usersPath, rolesPath string) (*UserStore, bool, error
 
 	store := createUserStore(users, permissions)
 	return store, true, nil
+}
+
+// createDefaultUserFileWithToken creates the default admin user and returns the token without printing
+func createDefaultUserFileWithToken(usersPath, rolesPath string) (*UserStore, string, error) {
+	token, user, err := generateDefaultAdmin()
+	if err != nil {
+		return nil, "", err
+	}
+
+	defaultRoles := createDefaultRoles()
+
+	if err := writeConfigFiles(usersPath, rolesPath, []*User{user}, defaultRoles); err != nil {
+		return nil, "", err
+	}
+
+	// Don't print the token here - return it instead
+	fmt.Printf("\n✅ Created default admin user!\n")
+	fmt.Printf("   Username: admin\n")
+
+	// Load the users from the specific path that was just created
+	users, err := loadUsers(usersPath)
+	if err != nil {
+		return nil, "", err
+	}
+
+	permissions, err := loadRoles(rolesPath)
+	if err != nil {
+		return nil, "", err
+	}
+
+	store := createUserStore(users, permissions)
+	return store, token, nil
 }
 
 // generateDefaultAdmin creates a new admin user with a secure token

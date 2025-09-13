@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches: [ '*' ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '^1.21'
+
+    - name: Cache Go modules
+      uses: actions/cache@v3
+      with:
+        path: ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+
+    - name: Install dependencies
+      run: go mod download
+
+    - name: Run tests
+      run: make test
+
+    - name: Build
+      run: make build
+
+    - name: Test version system
+      run: |
+        ./simple-secrets version
+        ./simple-secrets version --short
+        # Verify version contains build info
+        ./simple-secrets version | grep -q "Git Commit:"
+        ./simple-secrets version | grep -q "Built:"
+        ./simple-secrets version | grep -q "Go Version:"
+        ./simple-secrets version | grep -q "Platform:"
+
+    - name: Run linting (if available)
+      run: |
+        if command -v golangci-lint &> /dev/null; then
+          golangci-lint run
+        else
+          echo "golangci-lint not available, skipping linting"
+        fi
+      continue-on-error: true

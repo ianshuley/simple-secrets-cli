@@ -22,18 +22,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// PrintFirstRunMessage prints a clear message for first-run admin creation.
-func PrintFirstRunMessage() {
-	fmt.Println("\nFirst run detected. Default admin user created.")
-	fmt.Println("To use your new token, re-run this command in one of these ways:")
-	fmt.Println("  --token <your-token> (as a flag)")
-	fmt.Println("  SIMPLE_SECRETS_TOKEN=<your-token> ./simple-secrets ... (as an env var)")
-	fmt.Println("  or place it in ~/.simple-secrets/config.json as { \"token\": \"<your-token>\" }")
-	fmt.Println("(The token was printed above. Store it securely; it will not be shown again.)")
-	fmt.Println("\nIf creating config.json manually, ensure it has secure permissions:")
-	fmt.Println("  chmod 600 ~/.simple-secrets/config.json")
-}
-
 // RBACGuardWithCmd loads users, checks first run, resolves token, and returns (user, store, error)
 func RBACGuardWithCmd(needWrite bool, cmd *cobra.Command) (*internal.User, *internal.UserStore, error) {
 	user, store, err := authenticateUser(cmd)
@@ -83,7 +71,7 @@ func authenticateUser(cmd *cobra.Command) (*internal.User, *internal.UserStore, 
 		return nil, nil, err
 	}
 	if firstRun {
-		return nil, nil, nil // First run detected
+		return nil, nil, nil // First run message already printed
 	}
 
 	token, err := resolveTokenFromCommand(cmd)

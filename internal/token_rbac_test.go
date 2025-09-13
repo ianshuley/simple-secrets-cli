@@ -22,8 +22,8 @@ import (
 
 func TestTokenResolutionOrder(t *testing.T) {
 	dir := t.TempDir()
-	os.Setenv("HOME", dir)
-	defer os.Unsetenv("HOME")
+	t.Setenv("HOME", dir)
+	t.Setenv("SIMPLE_SECRETS_CONFIG_DIR", dir+"/.simple-secrets")
 	os.Unsetenv("SIMPLE_SECRETS_TOKEN")
 
 	// Write config file
@@ -32,11 +32,13 @@ func TestTokenResolutionOrder(t *testing.T) {
 	os.WriteFile(configPath, []byte(`{"token":"fromconfig"}`), 0600)
 
 	// Env var wins over config
-	os.Setenv("SIMPLE_SECRETS_TOKEN", "fromenv")
+	t.Setenv("SIMPLE_SECRETS_TOKEN", "fromenv")
 	tok, err := ResolveToken("")
 	if err != nil || tok != "fromenv" {
 		t.Fatalf("env should win: got %q, err %v", tok, err)
 	}
+
+	// Unset for next test within same function
 	os.Unsetenv("SIMPLE_SECRETS_TOKEN")
 
 	// Config wins if no env
@@ -54,8 +56,8 @@ func TestTokenResolutionOrder(t *testing.T) {
 
 func TestTokenResolutionErrors(t *testing.T) {
 	dir := t.TempDir()
-	os.Setenv("HOME", dir)
-	defer os.Unsetenv("HOME")
+	t.Setenv("HOME", dir)
+	t.Setenv("SIMPLE_SECRETS_CONFIG_DIR", dir+"/.simple-secrets")
 	os.Unsetenv("SIMPLE_SECRETS_TOKEN")
 	// No config, no env, no flag
 	_, err := ResolveToken("")

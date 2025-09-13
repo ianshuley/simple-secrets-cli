@@ -1,11 +1,28 @@
-TODO: Add `platform` command teasing what's coming next: The Simple Secrets Platform is coming soon! Visit https://simple-secrets.io to join the waitlist or learn more
+# TODO List
 
-TODO: Refactor repo into a CLI-only repo
+## CRITICAL - Fix Concurrency Race Condition
 
-TODO: Add a disable command to the CLI for tokens and secrets to make building the password expiration feature in the ui easier later
+**Problem:** Opus AI testing framework discovered a race condition when multiple operations execute simultaneously.
 
-TODO: Run my `docs/testing-framework.md` Copilot workflow again
+**Details:** Under high concurrency (multiple goroutines performing operations like put/get/rotate simultaneously), the system exhibits non-deterministic behavior that could lead to data corruption or inconsistent state.
 
-TODO: Make repository public (Apache 2.0 license already configured)
+**Root Cause:** Likely shared state access without proper synchronization in core operations.
 
-TODO: Start on API
+**Impact:** Could affect production deployments under heavy load or when automation tools perform parallel operations.
+
+**Investigation Needed:**
+
+- Identify which shared resources lack proper locking (secrets store, user store, file operations)
+- Add appropriate mutexes or use Go's sync package for critical sections
+- Test with high-concurrency scenarios to validate fix
+- Consider atomic file operations vs in-memory locking strategies
+
+**Priority:** HIGH - This affects data integrity under concurrent access patterns.
+
+## Platform Command
+
+Add `platform` command teasing what's coming next: The Simple Secrets Platform is coming soon! Visit <https://simple-secrets.io> to join the waitlist or learn more
+
+## API Development
+
+Start on API

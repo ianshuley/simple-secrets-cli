@@ -17,10 +17,15 @@ package internal
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
+	"time"
 )
+
+const disabledPrefix = "__DISABLED_"
 
 type SecretsStore struct {
 	KeyPath     string
@@ -31,11 +36,10 @@ type SecretsStore struct {
 
 // LoadSecretsStore: create ~/.simple-secrets, load key + secrets
 func LoadSecretsStore() (*SecretsStore, error) {
-	home, err := os.UserHomeDir()
+	dir, err := getConfigDirectory()
 	if err != nil {
 		return nil, err
 	}
-	dir := filepath.Join(home, ".simple-secrets")
 	_ = os.MkdirAll(dir, 0700)
 
 	s := &SecretsStore{
@@ -53,6 +57,20 @@ func LoadSecretsStore() (*SecretsStore, error) {
 	return s, nil
 }
 
+// getConfigDirectory returns the configuration directory, respecting test overrides
+func getConfigDirectory() (string, error) {
+	// Check for test override first
+	if testDir := os.Getenv("SIMPLE_SECRETS_CONFIG_DIR"); testDir != "" {
+		return testDir, nil
+	}
+
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(home, ".simple-secrets"), nil
+}
+
 func (s *SecretsStore) loadSecrets() error {
 	if _, err := os.Stat(s.SecretsPath); os.IsNotExist(err) {
 		s.secrets = make(map[string]string)
@@ -62,7 +80,17 @@ func (s *SecretsStore) loadSecrets() error {
 	if err != nil {
 		return err
 	}
-	return json.Unmarshal(b, &s.secrets)
+
+	if err := json.Unmarshal(b, &s.secrets); err != nil {
+		return fmt.Errorf("secrets database appears to be corrupted (JSON parse error: %v)\n\n"+
+			"🔧 Recovery options:\n"+
+			"  • Restore from backup: ./simple-secrets restore-database\n"+
+			"  • List available backups: ./simple-secrets list backups\n"+
+			"  • Emergency contact: check ~/.simple-secrets/backups/ directory\n\n"+
+			"⚠️  Do not delete ~/.simple-secrets/ - your backups contain recoverable data!", err)
+	}
+
+	return nil
 }
 
 func (s *SecretsStore) saveSecrets() error {
@@ -140,7 +168,9 @@ func (s *SecretsStore) Get(key string) (string, error) {
 func (s *SecretsStore) ListKeys() []string {
 	keys := make([]string, 0, len(s.secrets))
 	for k := range s.secrets {
-		keys = append(keys, k)
+		if !strings.HasPrefix(k, disabledPrefix) {
+			keys = append(keys, k)
+		}
 	}
 	sort.Strings(keys)
 	return keys
@@ -167,6 +197,109 @@ func (s *SecretsStore) DecryptBackup(encryptedData string) (string, error) {
 	return string(decrypted), nil
 }
 
+// DisableSecret marks a secret as disabled by adding a special prefix
+func (s *SecretsStore) DisableSecret(key string) error {
+	enc, ok := s.secrets[key]
+	if !ok {
+		return ErrNotFound
+	}
+
+	// Create backup before disabling
+	s.backupSecret(key, enc)
+
+	// Mark as disabled using JSON encoding to handle keys with special characters
+	timestamp := time.Now().UnixNano()
+	keyData := map[string]interface{}{
+		"timestamp": timestamp,
+		"key":       key,
+	}
+	keyJSON, _ := json.Marshal(keyData)
+	disabledKey := disabledPrefix + string(keyJSON)
+
+	s.secrets[disabledKey] = enc
+	delete(s.secrets, key)
+
+	return s.saveSecrets()
+}
+
+// buildDisabledSecretsMap creates a map from original key names to their disabled key names
+func (s *SecretsStore) buildDisabledSecretsMap() map[string]string {
+	disabledMap := make(map[string]string)
+	for disabledKey := range s.secrets {
+		if originalKey := s.extractOriginalKeyFromDisabled(disabledKey); originalKey != "" {
+			disabledMap[originalKey] = disabledKey
+		}
+	}
+	return disabledMap
+}
+
+func (s *SecretsStore) extractOriginalKeyFromDisabled(disabledKey string) string {
+	jsonData, isDisabled := strings.CutPrefix(disabledKey, disabledPrefix)
+	if !isDisabled {
+		return ""
+	}
+
+	if originalKey := s.parseJsonFormat(jsonData); originalKey != "" {
+		return originalKey
+	}
+
+	return s.parseLegacyFormat(jsonData)
+}
+
+func (s *SecretsStore) parseJsonFormat(jsonData string) string {
+	var keyData map[string]interface{}
+	if err := json.Unmarshal([]byte(jsonData), &keyData); err != nil {
+		return ""
+	}
+
+	originalKey, ok := keyData["key"].(string)
+	if !ok {
+		return ""
+	}
+
+	return originalKey
+}
+
+func (s *SecretsStore) parseLegacyFormat(data string) string {
+	const notFound = -1
+	underscorePosition := strings.Index(data, "_")
+	if underscorePosition == notFound {
+		return ""
+	}
+	positionAfterUnderscore := underscorePosition + 1
+	return data[positionAfterUnderscore:]
+}
+
+// EnableSecret re-enables a previously disabled secret
+func (s *SecretsStore) EnableSecret(key string) error {
+	// Build a map of original keys to their disabled keys for efficient lookup
+	disabledMap := s.buildDisabledSecretsMap()
+
+	disabledKey, found := disabledMap[key]
+	if !found {
+		return fmt.Errorf("disabled secret not found")
+	}
+
+	// Move back to original key
+	s.secrets[key] = s.secrets[disabledKey]
+	delete(s.secrets, disabledKey)
+
+	return s.saveSecrets()
+}
+
+// ListDisabledSecrets returns a list of disabled secret keys
+func (s *SecretsStore) ListDisabledSecrets() []string {
+	disabledMap := s.buildDisabledSecretsMap()
+
+	disabled := make([]string, 0, len(disabledMap))
+	for originalKey := range disabledMap {
+		disabled = append(disabled, originalKey)
+	}
+
+	sort.Strings(disabled)
+	return disabled
+}
+
 var ErrNotFound = os.ErrNotExist
 
 // createBackupDirectory ensures the backup directory exists with secure permissions
@@ -177,8 +310,8 @@ func (s *SecretsStore) createBackupDirectory() {
 
 // getBackupDirectory returns the path to the backup directory
 func (s *SecretsStore) getBackupDirectory() string {
-	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".simple-secrets", "backups")
+	configDir, _ := getConfigDirectory()
+	return filepath.Join(configDir, "backups")
 }
 
 // getBackupPath returns the full path for a secret's backup file

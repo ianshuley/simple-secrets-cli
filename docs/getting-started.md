@@ -5,6 +5,7 @@ This guide will help you install, initialize, and use `simple-secrets` to secure
 ## 1. Installation
 
 ### Prerequisites
+
 - Go 1.20 or newer
 
 ### Build and Install
@@ -24,11 +25,9 @@ $ make install PREFIX=$HOME/.local
 # The binary will be available as 'simple-secrets' in your PATH
 ```
 
-
 ## 2. First Run & Initialization
 
 On first run, `simple-secrets` will automatically initialize your secrets store in `~/.simple-secrets` and create a default admin user. The admin token will be printed to the console—store it securely!
-
 
 ## 3. Store a Secret
 
@@ -43,7 +42,6 @@ $ simple-secrets add api_key abc123xyz --token <your-token>
 Secret "api_key" stored.
 ```
 
-
 ## 4. Retrieve a Secret
 
 Get the value for a key:
@@ -52,7 +50,6 @@ Get the value for a key:
 $ simple-secrets get db_password --token <your-token>
 s3cr3tP@ssw0rd
 ```
-
 
 ## 5. List All Secret Keys
 
@@ -64,7 +61,6 @@ api_key
 db_password
 ```
 
-
 ## 6. Delete a Secret
 
 Remove a secret by key:
@@ -73,7 +69,6 @@ Remove a secret by key:
 $ simple-secrets delete api_key --token <your-token>
 Secret "api_key" deleted.
 ```
-
 
 ## 7. Rotate the Master Key
 
@@ -89,13 +84,12 @@ Proceed? (type 'yes'): yes
 Rotation complete. Backup created under ~/.simple-secrets/backups/
 ```
 
-
 ## 8. Advanced: Custom Backup Directory
 
 Specify a backup location during rotation:
 
 ```sh
-$ simple-secrets rotate master-key --backup-dir /tmp/secrets-backup --token <admin-token>
+simple-secrets rotate master-key --backup-dir /tmp/secrets-backup --token <admin-token>
 ```
 
 ## 9. Database Backup Management
@@ -206,6 +200,70 @@ $ simple-secrets restore secret db_password --token <admin-token>
 Secret "db_password" restored from backup.
 ```
 
+## 14. Secret Lifecycle Management
+
+### Disable Secrets
+
+Temporarily hide secrets from normal operations without deleting them:
+
+```sh
+# Disable a secret (admin only)
+$ simple-secrets disable secret sensitive_key --token <admin-token>
+✅ Secret 'sensitive_key' has been disabled
+• The secret is hidden from normal operations
+• Use 'enable secret' to re-enable this secret
+
+# Verify secret is hidden from normal list
+$ simple-secrets list keys --token <token>
+# (sensitive_key will not appear)
+
+# List disabled secrets specifically
+$ simple-secrets list disabled --token <token>
+Disabled secrets (1):
+  🚫 sensitive_key
+
+Use 'enable secret <key>' to re-enable a disabled secret.
+```
+
+### Enable Secrets
+
+Re-enable previously disabled secrets:
+
+```sh
+# Re-enable a disabled secret
+$ simple-secrets enable secret sensitive_key --token <admin-token>
+✅ Secret 'sensitive_key' has been re-enabled
+• The secret is now available for normal operations
+
+# Verify secret value is preserved
+$ simple-secrets get sensitive_key --token <token>
+# (original value returned intact)
+```
+
+### Disable User Tokens
+
+Disable user authentication tokens for security purposes:
+
+```sh
+# Disable a user's token (admin only)
+$ simple-secrets disable token alice --token <admin-token>
+✅ Token disabled for user 'alice'
+• The user can no longer authenticate with their current token
+• Use 'rotate token' to generate a new token for this user
+
+# Generate new token for user (recovery method)
+$ simple-secrets rotate token alice --token <admin-token>
+Token rotated for user "alice".
+New token: <new-secure-token>
+```
+
+**Use Cases for Disable/Enable:**
+
+- **Secret Rotation Planning**: Disable secrets before updating dependent systems
+- **Security Incidents**: Quickly disable compromised tokens without deleting users
+- **Maintenance Windows**: Temporarily hide secrets during system updates
+- **Audit Compliance**: Demonstrate controlled access to sensitive secrets
+
 ## 15. Shell Completion
 
 Enable shell autocompletion for better CLI experience:
@@ -240,31 +298,28 @@ Authenticate using:
 - Always keep backups safe and rotate keys regularly.
 - Database restores create pre-restore backups for safety.
 
-## Next Steps
-
-- Integrate with Ansible or GitOps workflows
-- Explore key protection backends (passphrase, keyring, KMS)
-- Set up regular key rotation schedule
-- Use shell completion for better CLI experience
-- See CLI help: `simple-secrets --help`
-- View all available commands: `simple-secrets completion --help`
-
 ### Available Commands Summary
 
 **Core Operations:**
+
 - `put` / `add` - Store secrets
 - `get` - Retrieve secrets
-- `list` - List keys, backups, or users
+- `list` - List keys, backups, users, or disabled secrets
 - `delete` - Remove secrets
+- `disable` - Disable secrets or user tokens
+- `enable` - Re-enable disabled secrets
 
 **User Management:**
+
 - `create-user` - Create admin/reader users
 - `rotate token` - Rotate authentication tokens
 
 **Backup & Restore:**
+
 - `rotate master-key` - Rotate encryption key with backup
 - `restore secret` - Restore individual secrets
 - `restore database` / `restore-database` - Restore entire database
 
 **Utilities:**
+
 - `completion` - Generate shell autocompletion scripts

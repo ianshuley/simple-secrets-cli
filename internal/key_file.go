@@ -18,6 +18,7 @@ package internal
 import (
 	"crypto/rand"
 	"encoding/base64"
+	"fmt"
 	"os"
 )
 
@@ -42,7 +43,7 @@ func (s *SecretsStore) loadOrCreateKey() error {
 
 	key, err := base64.StdEncoding.DecodeString(string(data))
 	if err != nil {
-		return err
+		return fmt.Errorf("master key file appears corrupted - try restoring from backup or removing ~/.simple-secrets/ to start fresh: %w", err)
 	}
 
 	s.masterKey = key
