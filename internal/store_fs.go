@@ -80,7 +80,17 @@ func (s *SecretsStore) loadSecrets() error {
 	if err != nil {
 		return err
 	}
-	return json.Unmarshal(b, &s.secrets)
+
+	if err := json.Unmarshal(b, &s.secrets); err != nil {
+		return fmt.Errorf("secrets database appears to be corrupted (JSON parse error: %v)\n\n"+
+			"🔧 Recovery options:\n"+
+			"  • Restore from backup: ./simple-secrets restore-database\n"+
+			"  • List available backups: ./simple-secrets list backups\n"+
+			"  • Emergency contact: check ~/.simple-secrets/backups/ directory\n\n"+
+			"⚠️  Do not delete ~/.simple-secrets/ - your backups contain recoverable data!", err)
+	}
+
+	return nil
 }
 
 func (s *SecretsStore) saveSecrets() error {
