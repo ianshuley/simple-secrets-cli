@@ -53,6 +53,26 @@ make purge
 
 ## Quick Start
 
+### Interactive Setup (Recommended)
+
+For new users, `simple-secrets` provides an interactive setup walkthrough:
+
+```bash
+# Run without arguments for interactive setup
+simple-secrets
+
+# Or explicitly trigger the setup anytime
+simple-secrets --setup
+```
+
+The interactive walkthrough will:
+- Guide you through first-time setup
+- Create your admin user automatically
+- Display your authentication token prominently
+- Provide clear next steps and usage examples
+
+### Manual First Run
+
 ```bash
 # First run creates an admin user
 simple-secrets list keys
