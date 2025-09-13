@@ -252,11 +252,20 @@ func resolveConfigPaths() (string, string, error) {
 
 // handleFirstRun manages the first-run scenario when users.json doesn't exist
 func handleFirstRun(usersPath, rolesPath string) (*UserStore, bool, error) {
-	fmt.Println("users.json not found – creating default admin user...")
-	return createDefaultUserFile(usersPath, rolesPath)
-}
+	fmt.Println("First run detected - creating default admin user...")
+	fmt.Println("⚠️  This will generate an authentication token. Have your password manager ready.")
+	fmt.Println("\nProceed? [Y/n]")
 
-// validateFirstRunEligibility ensures we only run first-run setup in truly clean environments
+	var response string
+	fmt.Scanln(&response)
+
+	if response == "n" || response == "N" || response == "no" || response == "NO" {
+		fmt.Println("Setup cancelled. Run any command again when ready.")
+		return nil, false, fmt.Errorf("setup cancelled by user")
+	}
+
+	return createDefaultUserFile(usersPath, rolesPath)
+} // validateFirstRunEligibility ensures we only run first-run setup in truly clean environments
 func validateFirstRunEligibility() error {
 	// Get the config directory from paths
 	usersPath, rolesPath, err := resolveConfigPaths()

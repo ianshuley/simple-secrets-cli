@@ -47,8 +47,7 @@ Features:
 
 All secrets are encrypted and stored locally in ~/.simple-secrets/.
 
-🚀 New to simple-secrets? Run without arguments for an interactive setup walkthrough,
-   or use --setup to trigger it anytime.
+🚀 First run? Use --setup or any authentication command to get started.
 
 See 'simple-secrets --help' or the README for more info.`,
 	Run: handleRootCommand,
@@ -68,7 +67,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&TokenFlag, "token", "", "authentication token (overrides env/config)")
 
 	// Add setup flag for manual triggering of first-run experience
-	rootCmd.Flags().Bool("setup", false, "trigger the interactive setup walkthrough")
+	rootCmd.Flags().Bool("setup", false, "run first-time setup")
 
 	// Add standard version flags that users expect
 	rootCmd.Flags().BoolP("version", "v", false, "show version information")
@@ -86,7 +85,7 @@ func handleRootCommand(cmd *cobra.Command, args []string) {
 	}
 
 	if setupFlag {
-		// Manual setup requested - let the walkthrough determine the state
+		// Manual setup requested - let the setup determine the state
 		runFirstRunWalkthrough(false) // false = not necessarily a first run
 		return
 	}
@@ -111,7 +110,7 @@ func isFirstRun() bool {
 	return eligible
 }
 
-// runFirstRunWalkthrough provides an interactive guide for new users
+// runFirstRunWalkthrough provides setup for new users
 func runFirstRunWalkthrough(knownFirstRun bool) {
 	var isActualFirstRun bool
 	var err error
@@ -136,7 +135,7 @@ func runFirstRunWalkthrough(knownFirstRun bool) {
 
 	if !isActualFirstRun {
 		// This is an existing installation, show different message
-		fmt.Println("\n🔐 simple-secrets Setup Walkthrough")
+		fmt.Println("\n🔐 simple-secrets Setup")
 		fmt.Println("\n✅ You already have simple-secrets set up!")
 		fmt.Println("\n📋 What simple-secrets does:")
 		fmt.Println("  • Securely stores your secrets with AES-256-GCM encryption")
@@ -163,71 +162,42 @@ func runFirstRunWalkthrough(knownFirstRun bool) {
 
 	// This is a true first run
 	fmt.Println("\n�🔐 Welcome to simple-secrets!")
-	fmt.Println("\nIt looks like this is your first time using simple-secrets.")
-	fmt.Println("Let me help you get started with a quick setup.")
+	fmt.Println("\nSimple-secrets setup")
+	fmt.Println("Creating admin user and generating authentication token.")
+	fmt.Println("Store the token securely - it will not be shown again.")
 
-	fmt.Println("\n📋 What simple-secrets does:")
-	fmt.Println("  • Securely stores your secrets with AES-256-GCM encryption")
-	fmt.Println("  • Provides token-based authentication for secure access")
-	fmt.Println("  • Supports role-based permissions (admin/reader)")
-	fmt.Println("  • Stores everything locally in ~/.simple-secrets/")
-
-	fmt.Println("\n🚀 Ready to get started? [y/N]")
+	fmt.Println("\nProceed? [Y/n]")
 
 	var response string
 	fmt.Scanln(&response)
 
-	if response != "y" && response != "Y" && response != "yes" && response != "YES" {
-		fmt.Println("\nNo problem! You can run this setup anytime with:")
-		fmt.Println("  ./simple-secrets --setup")
-		fmt.Println("\nOr trigger setup by running any command that requires authentication:")
-		fmt.Println("  ./simple-secrets list keys")
-		fmt.Println("  ./simple-secrets put mykey myvalue")
-		fmt.Println("(These commands will first set up simple-secrets, then you can re-run them with your token)")
+	if response == "n" || response == "N" || response == "no" || response == "NO" {
+		fmt.Println("Setup cancelled.")
 		return
 	}
 
-	fmt.Println("\n⚡ Initializing simple-secrets...")
-	fmt.Println("\nI'll create your first admin user now. This will generate a secure token")
-	fmt.Println("that you'll use to authenticate with simple-secrets.")
+	fmt.Println("\nCreating admin user...")
 
 	// Use the clean first-run setup function that returns the token
-	userStore, token, err := internal.PerformFirstRunSetupWithToken()
+	_, token, err := internal.PerformFirstRunSetupWithToken()
 	if err != nil {
 		fmt.Printf("\n❌ Setup failed: %v\n", err)
 		return
 	}
 
-	fmt.Println("\n🎉 Setup complete!")
+	fmt.Println("Setup complete.")
 
-	fmt.Println("\n📖 Next steps:")
-	fmt.Println("  1. Save your token somewhere secure (password manager recommended)")
-	fmt.Println("  2. Try storing your first secret:")
-	fmt.Println("     ./simple-secrets put --token <your-token> mykey myvalue")
-	fmt.Println("  3. Retrieve it back:")
-	fmt.Println("     ./simple-secrets get --token <your-token> mykey")
-	fmt.Println("  4. List all your secrets:")
-	fmt.Println("     ./simple-secrets list --token <your-token> keys")
+	fmt.Println("\nUsage:")
+	fmt.Println("  ./simple-secrets put --token <TOKEN> key value")
+	fmt.Println("  ./simple-secrets get --token <TOKEN> key")
+	fmt.Println("  ./simple-secrets list --token <TOKEN> keys")
 
-	fmt.Println("\n💡 Pro tip: Set the environment variable to avoid typing --token each time:")
-	fmt.Println("  export SIMPLE_SECRETS_TOKEN=<your-token>")
+	fmt.Println("\nOr set environment variable:")
+	fmt.Println("  export SIMPLE_SECRETS_TOKEN=<TOKEN>")
 
-	// Show user count to confirm setup
-	users := userStore.Users()
-	fmt.Printf("\n📊 Current users: %d (you are the admin)\n", len(users))
-
-	// Display the token prominently at the end
-	fmt.Println("\n" + strings.Repeat("=", 60))
-	fmt.Println("🔑 YOUR AUTHENTICATION TOKEN")
-	fmt.Println(strings.Repeat("=", 60))
-	fmt.Printf("   %s\n", token)
-	fmt.Println(strings.Repeat("=", 60))
-	fmt.Println("⚠️  IMPORTANT: Copy this token now - it will not be shown again!")
-	fmt.Println("🔒 Store it securely in your password manager or config file.")
-	fmt.Println("")
-	fmt.Println("To use it:")
-	fmt.Println("  • Flag: --token " + token)
-	fmt.Println("  • Environment: export SIMPLE_SECRETS_TOKEN=" + token)
-	fmt.Println("  • Config file: ~/.simple-secrets/config.json")
-	fmt.Println(strings.Repeat("=", 60))
+	// Display the token clearly
+	fmt.Println("\n" + strings.Repeat("=", 50))
+	fmt.Printf("TOKEN: %s\n", token)
+	fmt.Println(strings.Repeat("=", 50))
+	fmt.Println("Save this token securely. It will not be shown again.")
 }
