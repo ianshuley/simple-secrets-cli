@@ -189,9 +189,10 @@ func runFirstRunWalkthrough(knownFirstRun bool) {
 	if response != "y" && response != "Y" && response != "yes" && response != "YES" {
 		fmt.Println("\nNo problem! You can run this setup anytime with:")
 		fmt.Println("  ./simple-secrets --setup")
-		fmt.Println("\nOr jump straight in by running any command that requires authentication:")
+		fmt.Println("\nOr trigger setup by running any command that requires authentication:")
 		fmt.Println("  ./simple-secrets list keys")
 		fmt.Println("  ./simple-secrets put mykey myvalue")
+		fmt.Println("(These commands will first set up simple-secrets, then you can re-run them with your token)")
 		return
 	}
 
