@@ -112,11 +112,11 @@ func TestFirstRunProtectionIntegration(t *testing.T) {
 
 		// Should succeed with first-run message (though it will exit 1 due to no token)
 		outputStr := string(output)
-		if !strings.Contains(outputStr, "users.json not found – creating default admin user") {
+		if !strings.Contains(outputStr, "First run detected - creating default admin user") {
 			t.Fatalf("expected first-run creation message, got: %s", outputStr)
 		}
 
-		if !strings.Contains(outputStr, "Created default admin user") {
+		if !strings.Contains(outputStr, "✅ Created default admin user") {
 			t.Fatalf("expected admin creation confirmation, got: %s", outputStr)
 		}
 
