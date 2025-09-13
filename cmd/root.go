@@ -2,28 +2,8 @@
 Copyright © 2025 Ian Shuley
 
 Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance w		f		f		fmt.P		fmt.Println("\n🔑 Need your token? If you've lost it, you can:")
-
-		fmt.Println("  • Create a new user with: ./simple-secrets create-user <username> <role>")
-		fmt.Println("  • Or rotate an existing token: ./simple-secrets rotate token <username>")
-		fmt.Println("  • Nuclear option: Back up ~/.simple-secrets/, delete it, and start fresh")tln("\n🔑 Need your token? If you've lost it, you can:")
-		fmt.Println("  • Create a new user with: ./simple-secrets create-user <username> <role>")
-		fmt.Println("  • Or rotate an existing token: ./simple-secrets rotate token <username>")
-		fmt.Println("  • Nuclear option: Back up ~/.simple-secrets/, delete it, and start fresh")
-
-		fmt.Println("\n💡 Pro tip: Set the environment variable to avoid typing --token each time:")
-		fmt.Println("  export SIMPLE_SECRETS_TOKEN=<your-token>")
-		returntln("\n🔑 Need your token? If you've lost it, you can:")
-		fmt.Println("  • Create a new user with: ./simple-secrets create-user <username> <role>")
-		fmt.Println("  • Or rotate an existing token: ./simple-secrets rotate token <username>")
-		fmt.Println("  • Nuclear option: Back up ~/.simple-secrets/, delete it, and start fresh")Println("\n🔑 Need your token? If you've lost it, you can:")
-		fmt.Println("  • Create a new user with: ./simple-secrets create-user <username> <role>")
-		fmt.Println("  • Or rotate an existing token: ./simple-secrets rotate token <username>")
-		fmt.Println("  • Nuclear option: Back up ~/.simple-secrets/, delete it, and start fresh") the License.
-		fmt.Println("\n🔑 Need your token? If you've lost it, you can:")
-		fmt.Println("  • Create a new user with: ./simple-secrets create-user <username> <role>")
-		fmt.Println("  • Or rotate an existing token: ./simple-secrets rotate token <username>")
-		fmt.Println("  • Nuclear option: Back up ~/.simple-secrets/, delete it, and start fresh") may obtain a copy of the License at
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
 
 	http://www.apache.org/licenses/LICENSE-2.0
 
