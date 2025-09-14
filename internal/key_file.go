@@ -55,8 +55,8 @@ func (s *SecretsStore) writeMasterKey(newKey []byte) error {
 	return writeMasterKeyToPath(s.KeyPath, newKey)
 }
 
-// writeMasterKeyToPath writes a master key to the specified path.
+// writeMasterKeyToPath writes a master key to the specified path atomically.
 func writeMasterKeyToPath(path string, key []byte) error {
 	enc := base64.StdEncoding.EncodeToString(key)
-	return os.WriteFile(path, []byte(enc), 0600)
+	return AtomicWriteFile(path, []byte(enc), 0600)
 }

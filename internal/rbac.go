@@ -26,16 +26,20 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"sync"
 	"time"
 )
 
 type UserStore struct {
 	users       []*User
 	permissions RolePermissions
+	mu          sync.RWMutex // protects users slice and permissions
 }
 
 // Users returns the list of users (for first-run detection)
 func (us *UserStore) Users() []*User {
+	us.mu.RLock()
+	defer us.mu.RUnlock()
 	return us.users
 }
 
@@ -305,6 +309,9 @@ func (us *UserStore) Lookup(token string) (*User, error) {
 		return nil, errors.New("empty token")
 	}
 	tokenHash := HashToken(token)
+
+	us.mu.RLock()
+	defer us.mu.RUnlock()
 	for _, u := range us.users {
 		if subtle.ConstantTimeCompare([]byte(tokenHash), []byte(u.TokenHash)) == 1 {
 			return u, nil
@@ -314,6 +321,8 @@ func (us *UserStore) Lookup(token string) (*User, error) {
 }
 
 func (us *UserStore) Permissions() RolePermissions {
+	us.mu.RLock()
+	defer us.mu.RUnlock()
 	return us.permissions
 }
 
@@ -474,11 +483,11 @@ func writeConfigFiles(usersPath, rolesPath string, users []*User, roles RolePerm
 		return err
 	}
 
-	if err := writeUsersFile(usersPath, users); err != nil {
+	if err := writeConfigFileSecurely(usersPath, users); err != nil {
 		return err
 	}
 
-	return writeRolesFile(rolesPath, roles)
+	return writeConfigFileSecurely(rolesPath, roles)
 }
 
 // ensureConfigDirectory creates the configuration directory if it doesn't exist
@@ -492,7 +501,7 @@ func writeConfigFileSecurely(path string, data any) error {
 	if err != nil {
 		return err
 	}
-	return writeFileAtomically(path, encoded)
+	return AtomicWriteFile(path, encoded, 0600)
 }
 
 // marshalConfigData converts config data to formatted JSON
@@ -504,11 +513,6 @@ func marshalConfigData(data any) ([]byte, error) {
 	return encoded, nil
 }
 
-// writeFileAtomically writes data to a file with secure permissions
-func writeFileAtomically(path string, data []byte) error {
-	return os.WriteFile(path, data, 0600)
-}
-
 // readConfigFile reads and unmarshals a JSON config file
 func readConfigFile(path string, target any) error {
 	data, err := os.ReadFile(path)
@@ -516,16 +520,6 @@ func readConfigFile(path string, target any) error {
 		return err
 	}
 	return json.Unmarshal(data, target)
-}
-
-// writeUsersFile marshals and writes the users list to JSON
-func writeUsersFile(usersPath string, users []*User) error {
-	return writeConfigFileSecurely(usersPath, users)
-}
-
-// writeRolesFile marshals and writes the roles to JSON
-func writeRolesFile(rolesPath string, roles RolePermissions) error {
-	return writeConfigFileSecurely(rolesPath, roles)
 }
 
 // printFirstRunSuccess displays the success message with the new admin token

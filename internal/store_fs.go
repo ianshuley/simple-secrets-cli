@@ -22,6 +22,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -32,6 +33,7 @@ type SecretsStore struct {
 	SecretsPath string
 	masterKey   []byte
 	secrets     map[string]string // key -> base64(ciphertext)
+	mu          sync.RWMutex      // protects secrets map and masterKey
 }
 
 // LoadSecretsStore: create ~/.simple-secrets, load key + secrets
@@ -73,7 +75,9 @@ func getConfigDirectory() (string, error) {
 
 func (s *SecretsStore) loadSecrets() error {
 	if _, err := os.Stat(s.SecretsPath); os.IsNotExist(err) {
+		s.mu.Lock()
 		s.secrets = make(map[string]string)
+		s.mu.Unlock()
 		return nil
 	}
 	b, err := os.ReadFile(s.SecretsPath)
@@ -81,7 +85,8 @@ func (s *SecretsStore) loadSecrets() error {
 		return err
 	}
 
-	if err := json.Unmarshal(b, &s.secrets); err != nil {
+	var secrets map[string]string
+	if err := json.Unmarshal(b, &secrets); err != nil {
 		return fmt.Errorf("secrets database appears to be corrupted (JSON parse error: %v)\n\n"+
 			"🔧 Recovery options:\n"+
 			"  • Restore from backup: ./simple-secrets restore-database\n"+
@@ -90,10 +95,14 @@ func (s *SecretsStore) loadSecrets() error {
 			"⚠️  Do not delete ~/.simple-secrets/ - your backups contain recoverable data!", err)
 	}
 
+	s.mu.Lock()
+	s.secrets = secrets
+	s.mu.Unlock()
 	return nil
 }
 
-func (s *SecretsStore) saveSecrets() error {
+// saveSecretsLocked saves secrets to disk, assumes caller holds lock
+func (s *SecretsStore) saveSecretsLocked() error {
 	b, err := json.MarshalIndent(s.secrets, "", "  ")
 	if err != nil {
 		return err
@@ -113,14 +122,23 @@ func (s *SecretsStore) backupSecret(key, encryptedValue string) {
 }
 
 func (s *SecretsStore) Put(key, value string) error {
-	encryptedValue, err := encrypt(s.masterKey, []byte(value))
+	// Encrypt outside the lock to minimize lock time
+	s.mu.RLock()
+	masterKey := s.masterKey
+	s.mu.RUnlock()
+
+	encryptedValue, err := encrypt(masterKey, []byte(value))
 	if err != nil {
 		return err
 	}
 
+	s.mu.Lock()
 	s.ensureBackupExists(key, encryptedValue)
 	s.secrets[key] = encryptedValue
-	return s.saveSecrets()
+	err = s.saveSecretsLocked() // saveSecrets but assumes lock held
+	s.mu.Unlock()
+
+	return err
 }
 
 // ensureBackupExists creates a backup for the secret using the appropriate strategy
@@ -154,11 +172,15 @@ func (s *SecretsStore) determineBackupStrategy(key string) *BackupStrategy {
 }
 
 func (s *SecretsStore) Get(key string) (string, error) {
+	s.mu.RLock()
 	enc, ok := s.secrets[key]
+	masterKey := s.masterKey // Copy for use outside lock
+	s.mu.RUnlock()
+
 	if !ok {
 		return "", ErrNotFound
 	}
-	pt, err := decrypt(s.masterKey, enc)
+	pt, err := decrypt(masterKey, enc)
 	if err != nil {
 		return "", err
 	}
@@ -166,17 +188,23 @@ func (s *SecretsStore) Get(key string) (string, error) {
 }
 
 func (s *SecretsStore) ListKeys() []string {
+	s.mu.RLock()
 	keys := make([]string, 0, len(s.secrets))
 	for k := range s.secrets {
 		if !strings.HasPrefix(k, disabledPrefix) {
 			keys = append(keys, k)
 		}
 	}
+	s.mu.RUnlock()
+
 	sort.Strings(keys)
 	return keys
 }
 
 func (s *SecretsStore) Delete(key string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	prevEnc, ok := s.secrets[key]
 	if !ok {
 		return ErrNotFound
@@ -185,7 +213,7 @@ func (s *SecretsStore) Delete(key string) error {
 	s.backupSecret(key, prevEnc)
 
 	delete(s.secrets, key)
-	return s.saveSecrets()
+	return s.saveSecretsLocked()
 }
 
 // DecryptBackup decrypts a backup file's encrypted content
@@ -199,6 +227,9 @@ func (s *SecretsStore) DecryptBackup(encryptedData string) (string, error) {
 
 // DisableSecret marks a secret as disabled by adding a special prefix
 func (s *SecretsStore) DisableSecret(key string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	enc, ok := s.secrets[key]
 	if !ok {
 		return ErrNotFound
@@ -219,10 +250,11 @@ func (s *SecretsStore) DisableSecret(key string) error {
 	s.secrets[disabledKey] = enc
 	delete(s.secrets, key)
 
-	return s.saveSecrets()
+	return s.saveSecretsLocked()
 }
 
 // buildDisabledSecretsMap creates a map from original key names to their disabled key names
+// Assumes caller holds appropriate lock
 func (s *SecretsStore) buildDisabledSecretsMap() map[string]string {
 	disabledMap := make(map[string]string)
 	for disabledKey := range s.secrets {
@@ -272,6 +304,9 @@ func (s *SecretsStore) parseLegacyFormat(data string) string {
 
 // EnableSecret re-enables a previously disabled secret
 func (s *SecretsStore) EnableSecret(key string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	// Build a map of original keys to their disabled keys for efficient lookup
 	disabledMap := s.buildDisabledSecretsMap()
 
@@ -284,12 +319,14 @@ func (s *SecretsStore) EnableSecret(key string) error {
 	s.secrets[key] = s.secrets[disabledKey]
 	delete(s.secrets, disabledKey)
 
-	return s.saveSecrets()
+	return s.saveSecretsLocked()
 }
 
 // ListDisabledSecrets returns a list of disabled secret keys
 func (s *SecretsStore) ListDisabledSecrets() []string {
+	s.mu.RLock()
 	disabledMap := s.buildDisabledSecretsMap()
+	s.mu.RUnlock()
 
 	disabled := make([]string, 0, len(disabledMap))
 	for originalKey := range disabledMap {

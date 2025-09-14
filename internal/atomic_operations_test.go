@@ -16,6 +16,7 @@ limitations under the License.
 package internal
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -196,16 +197,8 @@ func TestAtomicOperationPermissions(t *testing.T) {
 // TestAtomicOperationConcurrency tests that concurrent atomic operations don't interfere
 func TestAtomicOperationConcurrency(t *testing.T) {
 	tmpDir := t.TempDir()
-	masterKeyPath := filepath.Join(tmpDir, "master.key")
 
-	// Create original file
-	originalKey := []byte("original-key")
-	err := os.WriteFile(masterKeyPath, originalKey, 0600)
-	if err != nil {
-		t.Fatalf("Failed to create test file: %v", err)
-	}
-
-	// Run concurrent atomic operations
+	// Run concurrent atomic operations on separate files
 	done := make(chan bool, 3)
 	errors := make(chan error, 3)
 
@@ -213,14 +206,37 @@ func TestAtomicOperationConcurrency(t *testing.T) {
 		go func(id int) {
 			defer func() { done <- true }()
 
+			// Each goroutine works on its own file
+			masterKeyPath := filepath.Join(tmpDir, fmt.Sprintf("master-%d.key", id))
+
+			// Create original file
+			originalKey := []byte(fmt.Sprintf("original-key-%d", id))
+			err := os.WriteFile(masterKeyPath, originalKey, 0600)
+			if err != nil {
+				errors <- fmt.Errorf("goroutine %d: failed to create test file: %w", id, err)
+				return
+			}
+
 			for j := 0; j < 10; j++ {
-				key := []byte("key-from-goroutine-" + string(rune('0'+id)) + "-iteration-" + string(rune('0'+j)))
+				key := []byte(fmt.Sprintf("key-from-goroutine-%d-iteration-%d", id, j))
 				err := writeMasterKeyToPath(masterKeyPath, key)
 				if err != nil {
-					errors <- err
+					errors <- fmt.Errorf("goroutine %d: %w", id, err)
 					return
 				}
 				time.Sleep(time.Millisecond) // Small delay to increase chance of race conditions
+			}
+
+			// Verify final file is in a valid state (can be read)
+			finalKey, err := os.ReadFile(masterKeyPath)
+			if err != nil {
+				errors <- fmt.Errorf("goroutine %d: failed to read final key: %w", id, err)
+				return
+			}
+
+			if len(finalKey) == 0 {
+				errors <- fmt.Errorf("goroutine %d: final key is empty, indicating possible corruption", id)
+				return
 			}
 		}(i)
 	}
@@ -237,25 +253,15 @@ func TestAtomicOperationConcurrency(t *testing.T) {
 		}
 	}
 
-	// Verify file is in a valid state (can be read)
-	finalKey, err := os.ReadFile(masterKeyPath)
-	if err != nil {
-		t.Fatalf("Failed to read final key: %v", err)
-	}
-
-	if len(finalKey) == 0 {
-		t.Error("Final key is empty, indicating possible corruption")
-	}
-
-	// Verify no temp files remain
+	// Verify no temp files remain in the entire tmpDir
 	files, err := os.ReadDir(tmpDir)
 	if err != nil {
-		t.Fatalf("Failed to read directory: %v", err)
+		t.Fatalf("Failed to read tmpDir: %v", err)
 	}
 
 	for _, file := range files {
 		if filepath.Ext(file.Name()) == ".tmp" {
-			t.Errorf("Temporary file %s was not cleaned up after concurrent operations", file.Name())
+			t.Errorf("Temporary file left behind: %s", file.Name())
 		}
 	}
 }
