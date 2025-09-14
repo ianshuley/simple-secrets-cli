@@ -19,6 +19,36 @@
 
 **Priority:** HIGH - This affects data integrity under concurrent access patterns.
 
+
+
+---
+
+## Platform Integration Readiness (Pre-v2.0 API)
+
+### Interface Abstraction Layer
+
+- [ ] **SecretsManager interface**: Create `pkg/interfaces/secrets.go` with core operations interface
+- [ ] **UserManager interface**: Abstract user management operations for platform use
+- [ ] **StorageBackend interface**: Abstract storage layer (filesystem, S3, database future)
+- [ ] **Context integration**: Add `context.Context` to all core operations for cancellation
+- [ ] **Dependency injection**: Allow injection of storage backend implementations
+
+### Business Logic Extraction
+
+- [ ] **Extract CLI-coupled logic**: Move business logic from `cmd/` package to core packages
+- [ ] **Configuration abstraction**: Create injectable `Config` struct for storage paths
+- [ ] **Service layer**: Create service layer that CLI and future API can both consume
+- [ ] **Error abstraction**: Standardize error types for consistent API responses
+
+### Testing Infrastructure for Platform
+
+- [ ] **Interface mock generation**: Create mocks for testing different storage backends
+- [ ] **Integration test abstractions**: Test interfaces work with multiple implementations
+- [ ] **API testing preparation**: Design test patterns that will work for future HTTP API
+
+---
+
+
 ---
 
 ## Add Clipboard Flag
@@ -72,8 +102,7 @@ Add `platform` command teasing what's coming next: The Simple Secrets Platform i
 - [ ] **Common workflows**: Document and test typical user journeys
 - [ ] **Edge case documentation**: Document known limitations and workarounds
 
----
 
-## API Development
+## API Development (v2.0)
 
-Start on API
+Start on API development using abstracted interfaces
