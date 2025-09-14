@@ -337,6 +337,29 @@ func (s *SecretsStore) ListDisabledSecrets() []string {
 	return disabled
 }
 
+// IsEnabled checks if a secret is enabled (not disabled)
+func (s *SecretsStore) IsEnabled(key string) bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	// Check if the key exists in enabled state
+	_, exists := s.secrets[key]
+	return exists
+}
+
+// CreateBackup creates a backup of the current secrets and master key
+func (s *SecretsStore) CreateBackup(backupDir string) error {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if backupDir == "" {
+		ts := time.Now().Format("20060102-150405")
+		backupDir = filepath.Join(filepath.Dir(s.KeyPath), "backups", "manual-"+ts)
+	}
+
+	return s.backupCurrent(backupDir)
+}
+
 var ErrNotFound = os.ErrNotExist
 
 // createBackupDirectory ensures the backup directory exists with secure permissions

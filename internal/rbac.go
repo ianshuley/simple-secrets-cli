@@ -23,6 +23,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"slices"
@@ -326,6 +327,121 @@ func (us *UserStore) Permissions() RolePermissions {
 	return us.permissions
 }
 
+// CreateUser adds a new user to the store and returns a generated token
+func (us *UserStore) CreateUser(username, role string) (string, error) {
+	us.mu.Lock()
+	defer us.mu.Unlock()
+
+	// Check for duplicate username
+	for _, u := range us.users {
+		if u.Username == username {
+			return "", fmt.Errorf("user %q already exists", username)
+		}
+	}
+
+	// Parse role string
+	var userRole Role
+	switch role {
+	case "admin":
+		userRole = RoleAdmin
+	case "reader":
+		userRole = RoleReader
+	default:
+		return "", fmt.Errorf("invalid role %q: must be 'admin' or 'reader'", role)
+	}
+
+	// Generate secure token
+	token, err := generateSecureToken()
+	if err != nil {
+		return "", fmt.Errorf("failed to generate token: %w", err)
+	}
+
+	tokenHash := HashToken(token)
+	now := time.Now()
+
+	newUser := &User{
+		Username:       username,
+		TokenHash:      tokenHash,
+		Role:           userRole,
+		TokenRotatedAt: &now,
+	}
+
+	us.users = append(us.users, newUser)
+	return token, nil
+}
+
+// DeleteUser removes a user from the store
+func (us *UserStore) DeleteUser(username string) error {
+	us.mu.Lock()
+	defer us.mu.Unlock()
+
+	for i, u := range us.users {
+		if u.Username == username {
+			// Prevent deleting the last admin user
+			if u.Role == RoleAdmin && us.countAdminUsers() <= 1 {
+				return fmt.Errorf("cannot delete the last admin user")
+			}
+
+			// Remove user from slice
+			us.users = slices.Delete(us.users, i, i+1)
+			return nil
+		}
+	}
+
+	return fmt.Errorf("user %q not found", username)
+}
+
+// UpdateUserRole changes a user's role
+func (us *UserStore) UpdateUserRole(username, newRole string) error {
+	us.mu.Lock()
+	defer us.mu.Unlock()
+
+	// Parse role string
+	var role Role
+	switch newRole {
+	case "admin":
+		role = RoleAdmin
+	case "reader":
+		role = RoleReader
+	default:
+		return fmt.Errorf("invalid role %q: must be 'admin' or 'reader'", newRole)
+	}
+
+	for _, u := range us.users {
+		if u.Username == username {
+			// Prevent changing the last admin user to a non-admin role
+			if u.Role == RoleAdmin && role != RoleAdmin && us.countAdminUsers() <= 1 {
+				return fmt.Errorf("cannot change role of the last admin user")
+			}
+
+			u.Role = role
+			return nil
+		}
+	}
+
+	return fmt.Errorf("user %q not found", username)
+}
+
+// generateSecureToken creates a cryptographically secure random token
+func generateSecureToken() (string, error) {
+	tokenBytes := make([]byte, 20)
+	if _, err := io.ReadFull(rand.Reader, tokenBytes); err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(tokenBytes), nil
+}
+
+// countAdminUsers returns the number of admin users (helper for validation)
+func (us *UserStore) countAdminUsers() int {
+	count := 0
+	for _, u := range us.users {
+		if u.Role == RoleAdmin {
+			count++
+		}
+	}
+	return count
+}
+
 func loadUsers(path string) ([]*User, error) {
 	var users []*User
 	if err := readConfigFile(path, &users); err != nil {
@@ -458,15 +574,6 @@ func generateDefaultAdmin() (string, *User, error) {
 	}
 
 	return token, user, nil
-}
-
-// generateSecureToken creates a cryptographically secure random token
-func generateSecureToken() (string, error) {
-	rawToken := make([]byte, 20)
-	if _, err := rand.Read(rawToken); err != nil {
-		return "", err
-	}
-	return base64.RawURLEncoding.EncodeToString(rawToken), nil
 }
 
 // createDefaultRoles returns the default role permissions structure

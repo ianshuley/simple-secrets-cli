@@ -1,37 +1,6 @@
 # TODO List
 
-## CRITICAL - Fix Concurrency Race Condition
-
-**Problem:** Opus AI testing framework discovered a race condition when multiple operations execute simultaneously.
-
-**Details:** Under high concurrency (multiple goroutines performing operations like put/get/rotate simultaneously), the system exhibits non-deterministic behavior that could lead to data corruption or inconsistent state.
-
-**Root Cause:** Likely shared state access without proper synchronization in core operations.
-
-**Impact:** Could affect production deployments under heavy load or when automation tools perform parallel operations.
-
-**Investigation Needed:**
-
-- Identify which shared resources lack proper locking (secrets store, user store, file operations)
-- Add appropriate mutexes or use Go's sync package for critical sections
-- Test with high-concurrency scenarios to validate fix
-- Consider atomic file operations vs in-memory locking strategies
-
-**Priority:** HIGH - This affects data integrity under concurrent access patterns.
-
-
-
----
-
-## Platform Integration Readiness (Pre-v2.0 API)
-
-### Interface Abstraction Layer
-
-- [ ] **SecretsManager interface**: Create `pkg/interfaces/secrets.go` with core operations interface
-- [ ] **UserManager interface**: Abstract user management operations for platform use
-- [ ] **StorageBackend interface**: Abstract storage layer (filesystem, S3, database future)
-- [ ] **Context integration**: Add `context.Context` to all core operations for cancellation
-- [ ] **Dependency injection**: Allow injection of storage backend implementations
+## Platform Integration Readiness (Future v2.0 API Development)
 
 ### Business Logic Extraction
 
@@ -40,13 +9,12 @@
 - [ ] **Service layer**: Create service layer that CLI and future API can both consume
 - [ ] **Error abstraction**: Standardize error types for consistent API responses
 
-### Testing Infrastructure for Platform
+### Advanced Features
 
-- [ ] **Interface mock generation**: Create mocks for testing different storage backends
-- [ ] **Integration test abstractions**: Test interfaces work with multiple implementations
+- [ ] **Context integration**: Add `context.Context` to all core operations for cancellation
+- [ ] **Dependency injection**: Allow injection of storage backend implementations
+- [ ] **Alternative storage backends**: S3, database implementations of StorageBackend interface
 - [ ] **API testing preparation**: Design test patterns that will work for future HTTP API
-
----
 
 
 ---
