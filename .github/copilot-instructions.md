@@ -191,7 +191,7 @@ This repository includes comprehensive AI-driven testing and validation framewor
 
 ### Framework Files Overview
 
-#### `.opus-testing-framework.md` - Persona-Based Testing
+#### `.persona-based-testing-guide.md` - Persona-Based Testing
 **Purpose**: AI simulates different user personas testing their perception and experience with the application
 **When to use**:
 - User requests "run opus testing" or "test different personas"
@@ -279,7 +279,7 @@ This repository includes comprehensive AI-driven testing and validation framewor
 3. **Post-Change Phase**: Always use `.copilot-consistency-checklist.md` to sync documentation
 
 **When User Requests Testing**:
-- "run opus testing" → Use `.opus-testing-framework.md`
+- "run opus testing" → Use `.persona-based-testing-guide.md`
 - "test functionality", "run testing framework", or "manual testing" → Use `.testing-framework.md`
 - "consistency check" → Use `.copilot-consistency-checklist.md`
 - "pre-merge" or "ready to merge" → Use `.pre-merge-checklist.md`**Framework Integration**:
@@ -295,7 +295,7 @@ User: "I've added a new CLI command, can you validate it's ready to merge?"
 
 AI Response:
 1. Execute .pre-merge-checklist.md (which includes):
-   - .opus-testing-framework.md (persona-based testing)
+   - .persona-based-testing-guide.md (persona-based testing)
    - .testing-framework.md (systematic manual testing checklist)
    - .copilot-consistency-checklist.md (documentation sync)
    - SOLID principles review
