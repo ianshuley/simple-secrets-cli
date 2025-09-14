@@ -54,6 +54,7 @@ func (s *SecretsStore) backupCurrent(dir string) error {
 }
 
 // decryptAllSecrets decrypts all stored secrets using the current master key
+// Assumes caller holds appropriate lock
 func (s *SecretsStore) decryptAllSecrets() (map[string][]byte, error) {
 	plaintexts := make(map[string][]byte, len(s.secrets))
 	for k, enc := range s.secrets {
@@ -130,6 +131,9 @@ func (s *SecretsStore) validateBackupIntegrity(backupPath string) bool {
 // RotateMasterKey creates a backup, generates a new key,
 // re-encrypts all secrets, and persists both key + secrets.
 func (s *SecretsStore) RotateMasterKey(backupDir string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	// 1) Backup
 	if backupDir == "" {
 		ts := time.Now().Format("20060102-150405")
