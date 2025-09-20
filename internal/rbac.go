@@ -258,6 +258,31 @@ func LoadUsers() (*UserStore, bool, string, error) {
 	return store, false, "", nil
 }
 
+// LoadUsersForAuth loads users for authentication purposes without triggering first-run setup.
+// Returns (store, error). If users.json doesn't exist, returns a context-aware auth error.
+func LoadUsersForAuth() (*UserStore, error) {
+	usersPath, rolesPath, err := resolveConfigPaths()
+	if err != nil {
+		return nil, err
+	}
+
+	users, err := loadUsers(usersPath)
+	if os.IsNotExist(err) {
+		return nil, fmt.Errorf("authentication failed: invalid token or no users configured")
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	permissions, err := loadRoles(rolesPath)
+	if err != nil {
+		return nil, fmt.Errorf("load roles.json: %w", err)
+	}
+
+	store := createUserStore(users, permissions)
+	return store, nil
+}
+
 // resolveConfigPaths determines the file paths for users.json and roles.json
 func resolveConfigPaths() (string, string, error) {
 	usersPath, err := DefaultUserConfigPath("users.json")

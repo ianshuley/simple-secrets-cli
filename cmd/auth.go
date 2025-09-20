@@ -41,11 +41,17 @@ func RBACGuard(needWrite bool, cmd *cobra.Command) (*internal.User, *internal.Us
 
 // AuthenticateWithToken handles authentication for commands with custom token parsing (like put)
 func AuthenticateWithToken(needWrite bool, token string) (*internal.User, *internal.UserStore, error) {
+	// First check if this is a first-run scenario
 	userStore, firstRun, firstRunToken, err := internal.LoadUsers()
 	if err != nil {
-		return nil, nil, err
-	}
-	if firstRun {
+		// If LoadUsers fails, try the auth-specific path
+		authStore, authErr := internal.LoadUsersForAuth()
+		if authErr != nil {
+			return nil, nil, authErr
+		}
+		userStore = authStore
+		firstRun = false
+	} else if firstRun {
 		PrintFirstRunMessage()
 		PrintTokenAtEnd(firstRunToken)
 		return nil, nil, nil
@@ -92,7 +98,12 @@ func authenticateUser(cmd *cobra.Command) (*internal.User, *internal.UserStore, 
 func loadUsersWithFirstRunCheck() (*internal.UserStore, bool, error) {
 	userStore, firstRun, token, err := internal.LoadUsers()
 	if err != nil {
-		return nil, false, err
+		// If LoadUsers fails, try the auth-specific path
+		authStore, authErr := internal.LoadUsersForAuth()
+		if authErr != nil {
+			return nil, false, authErr
+		}
+		return authStore, false, nil
 	}
 	if firstRun {
 		PrintFirstRunMessage()
