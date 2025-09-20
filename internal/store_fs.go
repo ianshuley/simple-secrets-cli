@@ -279,7 +279,7 @@ func (s *SecretsStore) extractOriginalKeyFromDisabled(disabledKey string) string
 }
 
 func (s *SecretsStore) parseJsonFormat(jsonData string) string {
-	var keyData map[string]interface{}
+	var keyData map[string]any
 	if err := json.Unmarshal([]byte(jsonData), &keyData); err != nil {
 		return ""
 	}
