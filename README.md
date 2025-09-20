@@ -82,8 +82,8 @@ simple-secrets list keys
 # Then use the token for actual operations:
 simple-secrets list keys --token YOUR_ADMIN_TOKEN
 
-# Store a secret
-simple-secrets put api-key "sk-1234567890abcdef" --token YOUR_ADMIN_TOKEN
+# Store a secret (values with dashes work naturally in quotes)
+simple-secrets put api-key "--prod-key-abc123" --token YOUR_ADMIN_TOKEN
 
 # Retrieve a secret
 simple-secrets get api-key --token YOUR_ADMIN_TOKEN
@@ -165,6 +165,26 @@ simple-secrets delete KEY
 simple-secrets disable secret KEY
 simple-secrets enable secret KEY
 simple-secrets list disabled
+```
+
+#### Working with Complex Values
+
+Values starting with dashes or containing special characters work naturally with quotes:
+
+```bash
+# API keys starting with dashes
+simple-secrets put api-key "--prod-key-abc123"
+
+# Multi-line content like SSH keys
+simple-secrets put ssh-key "-----BEGIN RSA PRIVATE KEY-----
+MIIEpAIBAAKCAQEA...
+-----END RSA PRIVATE KEY-----"
+
+# JSON configuration
+simple-secrets put config '{"database": {"host": "localhost", "port": 5432}}'
+
+# From files
+simple-secrets put ssl-cert "$(cat /path/to/certificate.pem)"
 ```
 
 ### User Management

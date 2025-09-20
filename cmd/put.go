@@ -29,107 +29,211 @@ import (
 var putCmd = &cobra.Command{
 	Use:                   "put [key] [value]",
 	Short:                 "Store a secret securely.",
-	Long:                  "Store a secret value under a key. Overwrites if the key exists. Backs up previous value.\n\nTo store values starting with dashes (like SSH keys), use -- to terminate flags:\nsimple-secrets put --token <token> ssh-key -- \"-----BEGIN RSA PRIVATE KEY-----\\n...\"",
-	Example:               "simple-secrets put db_password s3cr3tP@ssw0rd\nsimple-secrets put --token <token> ssh-key -- \"-----BEGIN RSA PRIVATE KEY-----\\n...\"",
-	Args:                  cobra.ExactArgs(2),
+	Long:                  "Store a secret value under a key. Overwrites if the key exists. Backs up previous value.\n\nUse quotes for values with spaces or special characters.",
+	Example:               "simple-secrets put db_password s3cr3tP@ssw0rd\nsimple-secrets put db_url \"postgresql://user:pass@localhost:5432/db\"",
 	DisableFlagsInUseLine: true,
-	FParseErrWhitelist:    cobra.FParseErrWhitelist{UnknownFlags: true},
+	DisableFlagParsing:    true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// Check if token flag was explicitly set to empty string
-		if flag := cmd.Flag("token"); flag != nil && flag.Changed && TokenFlag == "" {
-			return fmt.Errorf("authentication required: token cannot be empty")
-		}
-
-		// RBAC: write access
-		user, _, err := RBACGuard(true, TokenFlag)
-		if err != nil {
-			return err
-		}
-		if user == nil {
-			return nil
-		}
-
-		// Initialize the secrets store
-		store, err := internal.LoadSecretsStore()
+		parsedArgs, err := parsePutArguments(cmd, args)
 		if err != nil {
 			return err
 		}
 
-		key := args[0]
-		value := args[1]
-
-		// Security: Check for indicators of truncated input
-		// Note: Unix systems truncate command arguments at null bytes before they reach Go
-		// This is system-level behavior, not a bug in our application
-
-		// Enhanced validation against suspicious patterns that could indicate truncation
-		if strings.HasSuffix(key, "\x00") {
-			return fmt.Errorf("key name cannot end with null bytes")
+		if parsedArgs == nil {
+			return nil // Help was shown
 		}
 
-		// Check for common attack patterns where truncation might be attempted
-		suspiciousPatterns := []string{"admin", "root", "key", "secret", "token", "pass"}
-		for _, pattern := range suspiciousPatterns {
-			if key == pattern {
-				// This could be a truncated key like "admin\x00reallylongname" -> "admin"
-				// Ask for confirmation for potentially dangerous keys
-				fmt.Fprintf(os.Stderr, "Warning: Key name '%s' could be the result of null byte truncation.\n", key)
-				fmt.Fprintf(os.Stderr, "If you intended to use a longer key name, please verify the input.\n")
-			}
-		}
-
-		// Validate key name
-		if strings.TrimSpace(key) == "" {
-			return fmt.Errorf("key name cannot be empty")
-		}
-
-		// Check for null bytes and other problematic characters
-		if strings.Contains(key, "\x00") {
-			return fmt.Errorf("key name cannot contain null bytes")
-		}
-
-		// Check for control characters (0x00-0x1F except \t, \n, \r)
-		for _, r := range key {
-			if r < 0x20 && r != 0x09 && r != 0x0A && r != 0x0D {
-				return fmt.Errorf("key name cannot contain control characters")
-			}
-		}
-
-		// Check for path traversal attempts
-		if strings.Contains(key, "..") || strings.Contains(key, "/") || strings.Contains(key, "\\") {
-			return fmt.Errorf("key name cannot contain path separators or path traversal sequences")
-		}
-
-		// Backup previous value if it exists
-		prev, err := store.Get(key)
-		if err == nil {
-			// Only backup if key existed
-			home, err := os.UserHomeDir()
-			if err == nil {
-				backupDir := filepath.Join(home, ".simple-secrets", "backups")
-				_ = os.MkdirAll(backupDir, 0700)
-				backupPath := filepath.Join(backupDir, key+".bak")
-				_ = os.WriteFile(backupPath, []byte(prev), 0600)
-			}
-		}
-
-		// Save secret (encrypted)
-		if err := store.Put(key, value); err != nil {
-			return err
-		}
-
-		fmt.Printf("Secret %q stored.\n", key)
-		return nil
+		return executePutCommand(parsedArgs)
 	},
 }
 
+type putArguments struct {
+	key   string
+	value string
+	token string
+}
+
+func parsePutArguments(cmd *cobra.Command, args []string) (*putArguments, error) {
+	var token string
+	filteredArgs := extractArgumentsAndFlags(args, &token)
+
+	if shouldShowHelp(args) {
+		return nil, cmd.Help()
+	}
+
+	key, value, err := validatePutArguments(filteredArgs)
+	if err != nil {
+		return nil, err
+	}
+
+	return &putArguments{
+		key:   key,
+		value: value,
+		token: determineAuthToken(token),
+	}, nil
+}
+
+func extractArgumentsAndFlags(args []string, token *string) []string {
+	filteredArgs := []string{}
+	for i := 0; i < len(args); i++ {
+		if args[i] == "--token" && i+1 < len(args) {
+			*token = args[i+1]
+			i++ // skip the token value
+			continue
+		}
+		filteredArgs = append(filteredArgs, args[i])
+	}
+	return filteredArgs
+}
+
+func shouldShowHelp(args []string) bool {
+	for _, arg := range args {
+		if arg == "--help" || arg == "-h" {
+			return true
+		}
+	}
+	return false
+}
+
+func validatePutArguments(filteredArgs []string) (string, string, error) {
+	if len(filteredArgs) != 2 {
+		return "", "", fmt.Errorf("requires exactly 2 arguments [key] [value], got %d", len(filteredArgs))
+	}
+	return filteredArgs[0], filteredArgs[1], nil
+}
+
+func determineAuthToken(parsedToken string) string {
+	if parsedToken != "" {
+		return parsedToken
+	}
+	return TokenFlag
+}
+
+func executePutCommand(args *putArguments) error {
+	user, err := authenticatePutUser(args.token)
+	if err != nil {
+		return err
+	}
+	if user == nil {
+		return nil
+	}
+
+	if err := validatePutKeyName(args.key); err != nil {
+		return err
+	}
+
+	store, err := internal.LoadSecretsStore()
+	if err != nil {
+		return err
+	}
+
+	backupExistingSecret(store, args.key)
+
+	if err := store.Put(args.key, args.value); err != nil {
+		return err
+	}
+
+	fmt.Printf("Secret %q stored.\n", args.key)
+	return nil
+}
+
+func authenticatePutUser(token string) (*internal.User, error) {
+	user, _, err := RBACGuard(true, token)
+	return user, err
+}
+
+func validatePutKeyName(key string) error {
+	if err := checkForNullByteIssues(key); err != nil {
+		return err
+	}
+
+	if err := validateKeyBasicRules(key); err != nil {
+		return err
+	}
+
+	return validateKeySecurityRules(key)
+}
+
+func checkForNullByteIssues(key string) error {
+	if strings.HasSuffix(key, "\x00") {
+		return fmt.Errorf("key name cannot end with null bytes")
+	}
+
+	if strings.Contains(key, "\x00") {
+		return fmt.Errorf("key name cannot contain null bytes")
+	}
+
+	warnAboutSuspiciousKeys(key)
+	return nil
+}
+
+func warnAboutSuspiciousKeys(key string) {
+	suspiciousPatterns := []string{"admin", "root", "key", "secret", "token", "pass"}
+	for _, pattern := range suspiciousPatterns {
+		if key == pattern {
+			fmt.Fprintf(os.Stderr, "Warning: Key name '%s' could be the result of null byte truncation.\n", key)
+			fmt.Fprintf(os.Stderr, "If you intended to use a longer key name, please verify the input.\n")
+			return
+		}
+	}
+}
+
+func validateKeyBasicRules(key string) error {
+	if strings.TrimSpace(key) == "" {
+		return fmt.Errorf("key name cannot be empty")
+	}
+	return nil
+}
+
+func validateKeySecurityRules(key string) error {
+	if err := checkForControlCharacters(key); err != nil {
+		return err
+	}
+
+	return checkForPathTraversal(key)
+}
+
+func checkForControlCharacters(key string) error {
+	for _, r := range key {
+		if r < 0x20 && r != 0x09 && r != 0x0A && r != 0x0D {
+			return fmt.Errorf("key name cannot contain control characters")
+		}
+	}
+	return nil
+}
+
+func checkForPathTraversal(key string) error {
+	if strings.Contains(key, "..") || strings.Contains(key, "/") || strings.Contains(key, "\\") {
+		return fmt.Errorf("key name cannot contain path separators or path traversal sequences")
+	}
+	return nil
+}
+
+func backupExistingSecret(store *internal.SecretsStore, key string) {
+	prev, err := store.Get(key)
+	if err != nil {
+		return // No existing value to backup
+	}
+
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return // Cannot determine backup location
+	}
+
+	backupDir := filepath.Join(home, ".simple-secrets", "backups")
+	_ = os.MkdirAll(backupDir, 0700)
+	backupPath := filepath.Join(backupDir, key+".bak")
+	_ = os.WriteFile(backupPath, []byte(prev), 0600)
+}
+
 var addCmd = &cobra.Command{
-	Use:     "add [key] [value]",
-	Short:   "Add a secret (alias for put).",
-	Long:    "Store a secret with the given key and value. This is an alias for the 'put' command.",
-	Example: "simple-secrets add db_password mypassword",
-	Args:    cobra.ExactArgs(2),
-	RunE:    putCmd.RunE, // Same implementation as put
+	Use:                   "add [key] [value]",
+	Short:                 "Add a secret (alias for put).",
+	Long:                  "Store a secret with the given key and value. This is an alias for the 'put' command.\n\nUse quotes for values with spaces or special characters.",
+	Example:               "simple-secrets add db_password mypassword\nsimple-secrets add db_url \"postgresql://user:pass@localhost:5432/db\"",
+	DisableFlagsInUseLine: true,
+	DisableFlagParsing:    true,
+	RunE:                  putCmd.RunE, // Same implementation as put
 }
 
 func init() {
