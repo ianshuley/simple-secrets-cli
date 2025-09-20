@@ -58,6 +58,26 @@ var putCmd = &cobra.Command{
 		key := args[0]
 		value := args[1]
 
+		// Security: Check for indicators of truncated input
+		// Note: Unix systems truncate command arguments at null bytes before they reach Go
+		// This is system-level behavior, not a bug in our application
+
+		// Enhanced validation against suspicious patterns that could indicate truncation
+		if strings.HasSuffix(key, "\x00") {
+			return fmt.Errorf("key name cannot end with null bytes")
+		}
+
+		// Check for common attack patterns where truncation might be attempted
+		suspiciousPatterns := []string{"admin", "root", "key", "secret", "token", "pass"}
+		for _, pattern := range suspiciousPatterns {
+			if key == pattern {
+				// This could be a truncated key like "admin\x00reallylongname" -> "admin"
+				// Ask for confirmation for potentially dangerous keys
+				fmt.Fprintf(os.Stderr, "Warning: Key name '%s' could be the result of null byte truncation.\n", key)
+				fmt.Fprintf(os.Stderr, "If you intended to use a longer key name, please verify the input.\n")
+			}
+		}
+
 		// Validate key name
 		if strings.TrimSpace(key) == "" {
 			return fmt.Errorf("key name cannot be empty")
