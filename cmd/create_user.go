@@ -43,7 +43,7 @@ var createUserCmd = &cobra.Command{
 			return fmt.Errorf("authentication required: token cannot be empty")
 		}
 
-		user, _, err := validateUserCreationAccess()
+		user, _, err := validateUserCreationAccess(cmd)
 		if err != nil {
 			return err
 		}
@@ -77,8 +77,8 @@ type UserInput struct {
 }
 
 // validateUserCreationAccess checks RBAC permissions for user creation
-func validateUserCreationAccess() (*internal.User, *internal.UserStore, error) {
-	user, store, err := RBACGuard(true, TokenFlag)
+func validateUserCreationAccess(cmd *cobra.Command) (*internal.User, *internal.UserStore, error) {
+	user, store, err := RBACGuardWithCmd(true, cmd)
 	if err != nil {
 		return nil, nil, err
 	}

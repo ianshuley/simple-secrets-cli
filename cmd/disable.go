@@ -43,17 +43,17 @@ Disabled secrets are hidden from normal operations but can be re-enabled.`,
 
 		switch args[0] {
 		case "token":
-			return disableToken(args[1])
+			return disableToken(cmd, args[1])
 		case "secret":
-			return disableSecret(args[1])
+			return disableSecret(cmd, args[1])
 		default:
 			return fmt.Errorf("unknown disable type: %s. Use 'token' or 'secret'", args[0])
 		}
 	},
 }
 
-func disableToken(username string) error {
-	context, err := prepareTokenDisableContext(username)
+func disableToken(cmd *cobra.Command, username string) error {
+	context, err := prepareTokenDisableContext(cmd, username)
 	if err != nil {
 		return err
 	}
@@ -69,8 +69,8 @@ func disableToken(username string) error {
 	return nil
 }
 
-func disableSecret(key string) error {
-	context, err := prepareSecretDisableContext(key)
+func disableSecret(cmd *cobra.Command, key string) error {
+	context, err := prepareSecretDisableContext(cmd, key)
 	if err != nil {
 		return err
 	}
@@ -104,8 +104,8 @@ type SecretDisableContext struct {
 }
 
 // prepareTokenDisableContext validates access and prepares context for token disabling
-func prepareTokenDisableContext(targetUsername string) (*TokenDisableContext, error) {
-	currentUser, _, err := validateTokenDisableAccess()
+func prepareTokenDisableContext(cmd *cobra.Command, targetUsername string) (*TokenDisableContext, error) {
+	currentUser, _, err := validateTokenDisableAccess(cmd)
 	if err != nil {
 		return nil, err
 	}
@@ -139,8 +139,8 @@ func prepareTokenDisableContext(targetUsername string) (*TokenDisableContext, er
 }
 
 // prepareSecretDisableContext validates access and prepares context for secret disabling
-func prepareSecretDisableContext(key string) (*SecretDisableContext, error) {
-	user, _, err := validateSecretDisableAccess()
+func prepareSecretDisableContext(cmd *cobra.Command, key string) (*SecretDisableContext, error) {
+	user, _, err := validateSecretDisableAccess(cmd)
 	if err != nil {
 		return nil, err
 	}
@@ -166,8 +166,8 @@ func prepareSecretDisableContext(key string) (*SecretDisableContext, error) {
 }
 
 // validateTokenDisableAccess checks RBAC permissions for token disabling
-func validateTokenDisableAccess() (*internal.User, *internal.UserStore, error) {
-	user, store, err := RBACGuard(true, TokenFlag)
+func validateTokenDisableAccess(cmd *cobra.Command) (*internal.User, *internal.UserStore, error) {
+	user, store, err := RBACGuardWithCmd(true, cmd)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -183,8 +183,8 @@ func validateTokenDisableAccess() (*internal.User, *internal.UserStore, error) {
 }
 
 // validateSecretDisableAccess checks RBAC permissions for secret disabling
-func validateSecretDisableAccess() (*internal.User, *internal.UserStore, error) {
-	user, store, err := RBACGuard(true, TokenFlag)
+func validateSecretDisableAccess(cmd *cobra.Command) (*internal.User, *internal.UserStore, error) {
+	user, store, err := RBACGuardWithCmd(true, cmd)
 	if err != nil {
 		return nil, nil, err
 	}

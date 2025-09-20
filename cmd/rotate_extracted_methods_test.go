@@ -35,7 +35,7 @@ func setupTestEnvironment(t *testing.T) (string, string) {
 	t.Setenv("SIMPLE_SECRETS_CONFIG_DIR", tmp+"/.simple-secrets")
 
 	// Create initial user setup
-	store, _, err := internal.LoadUsers()
+	store, _, _, err := internal.LoadUsers()
 	if err != nil {
 		t.Fatalf("LoadUsers failed: %v", err)
 	}

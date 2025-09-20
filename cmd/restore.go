@@ -45,21 +45,21 @@ var restoreCmd = &cobra.Command{
 			if len(args) < 2 {
 				return fmt.Errorf("secret restore requires a key name")
 			}
-			return restoreSecret(args[1])
+			return restoreSecret(cmd, args[1])
 		case "database":
 			if len(args) < 2 {
 				return fmt.Errorf("database restore requires a backup name")
 			}
-			return restoreDatabase(args[1])
+			return restoreDatabase(cmd, args[1])
 		default:
 			return fmt.Errorf("unknown restore type: %s. Use 'secret' or 'database'", args[0])
 		}
 	},
 }
 
-func restoreSecret(secretKey string) error {
+func restoreSecret(cmd *cobra.Command, secretKey string) error {
 	// RBAC: write access (restoring is a write operation)
-	user, _, err := RBACGuard(true, TokenFlag)
+	user, _, err := RBACGuardWithCmd(true, cmd)
 	if err != nil {
 		return err
 	}
@@ -97,9 +97,9 @@ func restoreSecret(secretKey string) error {
 	return nil
 }
 
-func restoreDatabase(backupName string) error {
+func restoreDatabase(cmd *cobra.Command, backupName string) error {
 	// RBAC: write access (this is a destructive operation)
-	user, _, err := RBACGuard(true, TokenFlag)
+	user, _, err := RBACGuardWithCmd(true, cmd)
 	if err != nil {
 		return err
 	}

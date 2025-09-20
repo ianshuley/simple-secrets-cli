@@ -16,6 +16,7 @@ limitations under the License.
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -55,7 +56,8 @@ type putArguments struct {
 
 func parsePutArguments(cmd *cobra.Command, args []string) (*putArguments, error) {
 	var token string
-	filteredArgs := extractArgumentsAndFlags(args, &token)
+	var tokenExplicitlySet bool
+	filteredArgs := extractArgumentsAndFlags(args, &token, &tokenExplicitlySet)
 
 	if shouldShowHelp(args) {
 		return nil, cmd.Help()
@@ -66,18 +68,24 @@ func parsePutArguments(cmd *cobra.Command, args []string) (*putArguments, error)
 		return nil, err
 	}
 
+	resolvedToken, err := determineAuthTokenWithExplicitFlag(token, tokenExplicitlySet)
+	if err != nil {
+		return nil, err
+	}
+
 	return &putArguments{
 		key:   key,
 		value: value,
-		token: determineAuthToken(token),
+		token: resolvedToken,
 	}, nil
 }
 
-func extractArgumentsAndFlags(args []string, token *string) []string {
+func extractArgumentsAndFlags(args []string, token *string, tokenExplicitlySet *bool) []string {
 	filteredArgs := []string{}
 	for i := 0; i < len(args); i++ {
 		if args[i] == "--token" && i+1 < len(args) {
 			*token = args[i+1]
+			*tokenExplicitlySet = true
 			i++ // skip the token value
 			continue
 		}
@@ -102,11 +110,24 @@ func validatePutArguments(filteredArgs []string) (string, string, error) {
 	return filteredArgs[0], filteredArgs[1], nil
 }
 
-func determineAuthToken(parsedToken string) string {
-	if parsedToken != "" {
-		return parsedToken
+func determineAuthTokenWithExplicitFlag(parsedToken string, explicitlySet bool) (string, error) {
+	if explicitlySet {
+		if strings.TrimSpace(parsedToken) == "" {
+			return "", errors.New(`authentication required: token cannot be empty
+
+🚀 First time? Run setup to get started:
+    simple-secrets --setup
+
+Already have a token? Use one of these methods:
+    simple-secrets --token <your-token> put <key> <value>
+    SIMPLE_SECRETS_TOKEN=<your-token> simple-secrets put <key> <value>
+
+Or save your token in ~/.simple-secrets/config.json:
+    { "token": "<your-token>" }`)
+		}
+		return parsedToken, nil
 	}
-	return TokenFlag
+	return TokenFlag, nil // Fall back to global flag
 }
 
 func executePutCommand(args *putArguments) error {
@@ -138,7 +159,7 @@ func executePutCommand(args *putArguments) error {
 }
 
 func authenticatePutUser(token string) (*internal.User, error) {
-	user, _, err := RBACGuard(true, token)
+	user, _, err := AuthenticateWithToken(true, token)
 	return user, err
 }
 

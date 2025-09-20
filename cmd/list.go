@@ -48,22 +48,22 @@ var listCmd = &cobra.Command{
 
 		switch args[0] {
 		case "keys":
-			return listKeys()
+			return listKeys(cmd)
 		case "backups":
-			return listBackups()
+			return listBackups(cmd)
 		case "users":
-			return listUsers()
+			return listUsers(cmd)
 		case "disabled":
-			return listDisabledSecrets()
+			return listDisabledSecrets(cmd)
 		default:
 			return fmt.Errorf("unknown list type: %s. Use 'keys', 'backups', 'users', or 'disabled'", args[0])
 		}
 	},
 }
 
-func listKeys() error {
+func listKeys(cmd *cobra.Command) error {
 	// RBAC: read access
-	user, _, err := RBACGuard(false, TokenFlag)
+	user, _, err := RBACGuardWithCmd(false, cmd)
 	if err != nil {
 		return err
 	}
@@ -89,9 +89,9 @@ func listKeys() error {
 	return nil
 }
 
-func listBackups() error {
+func listBackups(cmd *cobra.Command) error {
 	// RBAC: read access
-	user, _, err := RBACGuard(false, TokenFlag)
+	user, _, err := RBACGuardWithCmd(false, cmd)
 	if err != nil {
 		return err
 	}
@@ -124,9 +124,9 @@ func listBackups() error {
 	return nil
 }
 
-func listUsers() error {
+func listUsers(cmd *cobra.Command) error {
 	// RBAC: admin required for user management
-	user, store, err := RBACGuard(true, TokenFlag)
+	user, store, err := RBACGuardWithCmd(true, cmd)
 	if err != nil {
 		return err
 	}
@@ -178,8 +178,9 @@ func listUsers() error {
 	return nil
 }
 
-func listDisabledSecrets() error {
-	user, _, err := RBACGuard(false, TokenFlag)
+func listDisabledSecrets(cmd *cobra.Command) error {
+	// RBAC: read access
+	user, _, err := RBACGuardWithCmd(false, cmd)
 	if err != nil {
 		return err
 	}

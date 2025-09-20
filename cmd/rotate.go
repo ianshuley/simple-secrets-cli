@@ -57,22 +57,22 @@ Token rotation options:
 
 		switch args[0] {
 		case "master-key":
-			return rotateMasterKey()
+			return rotateMasterKey(cmd)
 		case "token":
 			if len(args) < 2 {
 				// No username provided - self-rotation
-				return rotateSelfToken()
+				return rotateSelfToken(cmd)
 			}
 			// Username provided - admin rotation
-			return rotateToken(args[1])
+			return rotateToken(cmd, args[1])
 		default:
 			return fmt.Errorf("unknown rotate type: %s. Use 'master-key' or 'token'", args[0])
 		}
 	},
 }
 
-func rotateMasterKey() error {
-	user, store, err := validateMasterKeyRotationAccess()
+func rotateMasterKey(cmd *cobra.Command) error {
+	user, store, err := validateMasterKeyRotationAccess(cmd)
 	if err != nil {
 		return err
 	}
@@ -93,8 +93,8 @@ func rotateMasterKey() error {
 }
 
 // validateMasterKeyRotationAccess checks RBAC permissions for master key rotation
-func validateMasterKeyRotationAccess() (*internal.User, *internal.SecretsStore, error) {
-	user, _, err := RBACGuard(true, TokenFlag)
+func validateMasterKeyRotationAccess(cmd *cobra.Command) (*internal.User, *internal.SecretsStore, error) {
+	user, _, err := RBACGuardWithCmd(true, cmd)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -142,8 +142,8 @@ func printMasterKeyRotationSuccess() {
 	fmt.Println("The old master key and secrets are backed up for emergency recovery.")
 }
 
-func rotateSelfToken() error {
-	context, err := prepareTokenRotationContext(true) // self=true
+func rotateSelfToken(cmd *cobra.Command) error {
+	context, err := prepareTokenRotationContext(cmd, true) // self=true
 	if err != nil {
 		return err
 	}
@@ -160,9 +160,9 @@ func rotateSelfToken() error {
 	return nil
 }
 
-func rotateToken(targetUsername string) error {
+func rotateToken(cmd *cobra.Command, targetUsername string) error {
 	// First, check if this is actually self-rotation (user specified their own username)
-	currentUser, _, err := RBACGuard(false, TokenFlag) // Don't require write access yet
+	currentUser, _, err := RBACGuardWithCmd(false, cmd) // Don't require write access yet
 	if err != nil {
 		return err
 	}
@@ -172,11 +172,11 @@ func rotateToken(targetUsername string) error {
 
 	// If the target username matches the current user, treat as self-rotation
 	if targetUsername == currentUser.Username {
-		return rotateSelfToken()
+		return rotateSelfToken(cmd)
 	}
 
 	// Otherwise, proceed with admin rotation (requires rotate-tokens permission)
-	context, err := prepareTokenRotationContextForUser(targetUsername)
+	context, err := prepareTokenRotationContextForUser(cmd, targetUsername)
 	if err != nil {
 		return err
 	}
@@ -209,8 +209,8 @@ func printBackupLocation(backupDir string) {
 }
 
 // validateTokenRotationAccess checks permissions and loads necessary data for token rotation
-func validateTokenRotationAccess(targetUsername string) (*internal.User, string, []*internal.User, error) {
-	currentUser, store, err := RBACGuard(true, TokenFlag)
+func validateTokenRotationAccess(cmd *cobra.Command, targetUsername string) (*internal.User, string, []*internal.User, error) {
+	currentUser, store, err := RBACGuardWithCmd(true, cmd)
 	if err != nil {
 		return nil, "", nil, err
 	}
@@ -236,8 +236,8 @@ func validateTokenRotationAccess(targetUsername string) (*internal.User, string,
 }
 
 // validateSelfTokenRotationAccess checks permissions for self token rotation
-func validateSelfTokenRotationAccess() (*internal.User, string, []*internal.User, error) {
-	currentUser, store, err := RBACGuard(false, TokenFlag) // Use false - we check specific permission below
+func validateSelfTokenRotationAccess(cmd *cobra.Command) (*internal.User, string, []*internal.User, error) {
+	currentUser, store, err := RBACGuardWithCmd(false, cmd) // Use false - we check specific permission below
 	if err != nil {
 		return nil, "", nil, err
 	}
@@ -309,8 +309,8 @@ type TokenRotationContext struct {
 }
 
 // prepareTokenRotationContext prepares the context for self token rotation
-func prepareTokenRotationContext(isSelfRotation bool) (*TokenRotationContext, error) {
-	currentUser, usersPath, users, err := validateSelfTokenRotationAccess()
+func prepareTokenRotationContext(cmd *cobra.Command, isSelfRotation bool) (*TokenRotationContext, error) {
+	currentUser, usersPath, users, err := validateSelfTokenRotationAccess(cmd)
 	if err != nil {
 		return nil, err
 	}
@@ -335,8 +335,8 @@ func prepareTokenRotationContext(isSelfRotation bool) (*TokenRotationContext, er
 }
 
 // prepareTokenRotationContextForUser prepares the context for admin token rotation
-func prepareTokenRotationContextForUser(targetUsername string) (*TokenRotationContext, error) {
-	currentUser, usersPath, users, err := validateTokenRotationAccess(targetUsername)
+func prepareTokenRotationContextForUser(cmd *cobra.Command, targetUsername string) (*TokenRotationContext, error) {
+	currentUser, usersPath, users, err := validateTokenRotationAccess(cmd, targetUsername)
 	if err != nil {
 		return nil, err
 	}

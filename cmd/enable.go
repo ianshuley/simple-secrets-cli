@@ -41,15 +41,15 @@ Re-enabled secrets become available for normal operations again.`,
 
 		switch args[0] {
 		case "secret":
-			return enableSecret(args[1])
+			return enableSecret(cmd, args[1])
 		default:
 			return fmt.Errorf("unknown enable type: %s. Use 'secret'", args[0])
 		}
 	},
 }
 
-func enableSecret(key string) error {
-	context, err := prepareSecretEnableContext(key)
+func enableSecret(cmd *cobra.Command, key string) error {
+	context, err := prepareSecretEnableContext(cmd, key)
 	if err != nil {
 		return err
 	}
@@ -73,8 +73,8 @@ type SecretEnableContext struct {
 }
 
 // prepareSecretEnableContext validates access and prepares context for secret enabling
-func prepareSecretEnableContext(key string) (*SecretEnableContext, error) {
-	user, _, err := validateSecretEnableAccess()
+func prepareSecretEnableContext(cmd *cobra.Command, key string) (*SecretEnableContext, error) {
+	user, _, err := validateSecretEnableAccess(cmd)
 	if err != nil {
 		return nil, err
 	}
@@ -103,8 +103,8 @@ func prepareSecretEnableContext(key string) (*SecretEnableContext, error) {
 }
 
 // validateSecretEnableAccess checks RBAC permissions for secret enabling
-func validateSecretEnableAccess() (*internal.User, *internal.UserStore, error) {
-	user, store, err := RBACGuard(true, TokenFlag)
+func validateSecretEnableAccess(cmd *cobra.Command) (*internal.User, *internal.UserStore, error) {
+	user, store, err := RBACGuardWithCmd(true, cmd)
 	if err != nil {
 		return nil, nil, err
 	}

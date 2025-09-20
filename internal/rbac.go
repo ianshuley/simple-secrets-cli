@@ -27,6 +27,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 )
@@ -72,6 +73,9 @@ func LoadUsersList(path string) ([]*User, error) {
 // ResolveToken returns the token from CLI flag, env, or config file (in that order).
 func ResolveToken(cliFlag string) (string, error) {
 	if cliFlag != "" {
+		if strings.TrimSpace(cliFlag) == "" {
+			return "", errors.New("authentication required: token cannot be empty")
+		}
 		return cliFlag, nil
 	}
 
@@ -87,7 +91,15 @@ func ResolveToken(cliFlag string) (string, error) {
 	data, err := os.ReadFile(configPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return "", errors.New("authentication required: provide a token via --token, SIMPLE_SECRETS_TOKEN, or ~/.simple-secrets/config.json")
+			return "", errors.New(`authentication required: no token found
+
+🚀 First time? Run setup to get started:
+    simple-secrets --setup
+
+Already have a token? Use one of these methods:
+    --token <your-token> (as a flag)
+    SIMPLE_SECRETS_TOKEN=<your-token> (as environment variable)
+    ~/.simple-secrets/config.json with { "token": "<your-token>" }`)
 		}
 		return "", fmt.Errorf("read config.json: %w", err)
 	}
@@ -213,31 +225,37 @@ func PerformFirstRunSetupWithToken() (*UserStore, string, error) {
 	return store, token, nil
 }
 
-// LoadUsers loads users and roles. Returns (store, firstRun, error).
-func LoadUsers() (*UserStore, bool, error) {
+// LoadUsers loads users and roles. Returns (store, firstRun, token, error).
+// Token is only set when firstRun is true.
+func LoadUsers() (*UserStore, bool, string, error) {
 	usersPath, rolesPath, err := resolveConfigPaths()
 	if err != nil {
-		return nil, false, err
+		return nil, false, "", err
 	}
 
 	users, err := loadUsers(usersPath)
 	if os.IsNotExist(err) {
 		// Check first-run eligibility
 		if err := validateFirstRunEligibility(); err != nil {
-			return nil, false, err
+			return nil, false, "", err
 		}
-		return handleFirstRun(usersPath, rolesPath)
+		store, token, err := handleFirstRunWithToken(usersPath, rolesPath)
+		if err != nil {
+			return nil, false, "", err
+		}
+		return store, true, token, nil
 	}
 	if err != nil {
-		return nil, false, err
+		return nil, false, "", err
 	}
 
 	permissions, err := loadRoles(rolesPath)
 	if err != nil {
-		return nil, false, fmt.Errorf("load roles.json: %w", err)
+		return nil, false, "", fmt.Errorf("load roles.json: %w", err)
 	}
 
-	return createUserStore(users, permissions), false, nil
+	store := createUserStore(users, permissions)
+	return store, false, "", nil
 }
 
 // resolveConfigPaths determines the file paths for users.json and roles.json
@@ -255,8 +273,8 @@ func resolveConfigPaths() (string, string, error) {
 	return usersPath, rolesPath, nil
 }
 
-// handleFirstRun manages the first-run scenario when users.json doesn't exist
-func handleFirstRun(usersPath, rolesPath string) (*UserStore, bool, error) {
+// handleFirstRunWithToken manages the first-run scenario and returns the generated token
+func handleFirstRunWithToken(usersPath, rolesPath string) (*UserStore, string, error) {
 	const (
 		firstRunPrompt         = "First run detected - creating default admin user..."
 		passwordManagerWarning = "⚠️  This will generate an authentication token. Have your password manager ready."
@@ -273,10 +291,10 @@ func handleFirstRun(usersPath, rolesPath string) (*UserStore, bool, error) {
 
 	if userDeclinedSetup(response) {
 		fmt.Println(cancellationMessage)
-		return nil, false, fmt.Errorf("setup cancelled by user")
+		return nil, "", fmt.Errorf("setup cancelled by user")
 	}
 
-	return createDefaultUserFile(usersPath, rolesPath)
+	return createDefaultUserFileWithToken(usersPath, rolesPath)
 }
 
 func userDeclinedSetup(response string) bool {
@@ -515,7 +533,7 @@ func loadRoles(path string) (RolePermissions, error) {
 }
 
 func createDefaultUserFile(usersPath, rolesPath string) (*UserStore, bool, error) {
-	token, user, err := generateDefaultAdmin()
+	_, user, err := generateDefaultAdmin()
 	if err != nil {
 		return nil, false, err
 	}
@@ -526,7 +544,7 @@ func createDefaultUserFile(usersPath, rolesPath string) (*UserStore, bool, error
 		return nil, false, err
 	}
 
-	printFirstRunSuccess(token)
+	// User created successfully (no immediate printing needed)
 
 	// Load the users from the specific path that was just created
 	users, err := loadUsers(usersPath)
@@ -644,12 +662,4 @@ func readConfigFile(path string, target any) error {
 		return err
 	}
 	return json.Unmarshal(data, target)
-}
-
-// printFirstRunSuccess displays the success message with the new admin token
-func printFirstRunSuccess(token string) {
-	fmt.Printf("\n✅ Created default admin user!\n")
-	fmt.Printf("   Username: admin\n")
-	fmt.Printf("   Token:    %s\n", token)
-	fmt.Println("   (Please store this token securely. It will not be shown again.)")
 }

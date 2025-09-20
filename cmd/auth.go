@@ -39,22 +39,23 @@ func RBACGuardWithCmd(needWrite bool, cmd *cobra.Command) (*internal.User, *inte
 	return user, store, nil
 }
 
-// RBACGuard is the legacy function for backward compatibility
-func RBACGuard(needWrite bool, tokenFlag string) (*internal.User, *internal.UserStore, error) {
-	userStore, firstRun, err := internal.LoadUsers()
+// AuthenticateWithToken handles authentication for commands with custom token parsing (like put)
+func AuthenticateWithToken(needWrite bool, token string) (*internal.User, *internal.UserStore, error) {
+	userStore, firstRun, firstRunToken, err := internal.LoadUsers()
 	if err != nil {
 		return nil, nil, err
 	}
 	if firstRun {
 		PrintFirstRunMessage()
+		PrintTokenAtEnd(firstRunToken)
 		return nil, nil, nil
 	}
 
-	token, err := internal.ResolveToken(tokenFlag)
+	resolvedToken, err := internal.ResolveToken(token)
 	if err != nil {
 		return nil, nil, err
 	}
-	user, err := userStore.Lookup(token)
+	user, err := userStore.Lookup(resolvedToken)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -89,12 +90,13 @@ func authenticateUser(cmd *cobra.Command) (*internal.User, *internal.UserStore, 
 
 // loadUsersWithFirstRunCheck loads users and handles first-run scenarios
 func loadUsersWithFirstRunCheck() (*internal.UserStore, bool, error) {
-	userStore, firstRun, err := internal.LoadUsers()
+	userStore, firstRun, token, err := internal.LoadUsers()
 	if err != nil {
 		return nil, false, err
 	}
 	if firstRun {
 		PrintFirstRunMessage()
+		PrintTokenAtEnd(token)
 		return nil, true, nil
 	}
 	return userStore, false, nil

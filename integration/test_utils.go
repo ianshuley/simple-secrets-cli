@@ -21,7 +21,19 @@ import "strings"
 // This is shared utility used by multiple test files to avoid duplication
 func extractTokenFromOutput(output string) string {
 	lines := strings.SplitSeq(output, "\n")
+	foundTokenSection := false
 	for outputLine := range lines {
+		// Look for the new token section header
+		if strings.Contains(outputLine, "🔑 Your authentication token:") {
+			foundTokenSection = true
+			continue
+		}
+		// If we found the token section, the next non-empty line should be the token
+		if foundTokenSection && strings.TrimSpace(outputLine) != "" {
+			return strings.TrimSpace(outputLine)
+		}
+
+		// Fallback: also check for old format "Token:" for backwards compatibility
 		if strings.Contains(outputLine, "Token:") {
 			fields := strings.Fields(outputLine)
 			if len(fields) > 1 {

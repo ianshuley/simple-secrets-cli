@@ -316,13 +316,13 @@ func TestCommandInputValidation(t *testing.T) {
 			name:         "put without key",
 			args:         []string{"put"},
 			wantErr:      true,
-			errorMessage: "accepts 2 arg(s)",
+			errorMessage: "requires exactly 2 arguments",
 		},
 		{
 			name:         "put without value",
 			args:         []string{"put", "key"},
 			wantErr:      true,
-			errorMessage: "accepts 2 arg(s)",
+			errorMessage: "requires exactly 2 arguments",
 		},
 		{
 			name:         "get without key",

@@ -32,12 +32,8 @@ var getCmd = &cobra.Command{
 	Args:    cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Check if token flag was explicitly set to empty string
-		if flag := cmd.Flag("token"); flag != nil && flag.Changed && TokenFlag == "" {
-			return fmt.Errorf("authentication required: token cannot be empty")
-		}
-
 		// RBAC: read access
-		user, _, err := RBACGuard(false, TokenFlag)
+		user, _, err := RBACGuardWithCmd(false, cmd)
 		if err != nil {
 			return err
 		}
