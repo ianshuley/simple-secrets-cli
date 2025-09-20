@@ -18,6 +18,8 @@ package internal
 import (
 	"fmt"
 	"os"
+	"syscall"
+	"time"
 )
 
 // AtomicWriteFile writes data to a file atomically using a temporary file and rename.
@@ -37,6 +39,72 @@ func AtomicWriteFile(path string, data []byte, perm os.FileMode) error {
 		// Clean up temp file on failure
 		_ = os.Remove(tmpPath)
 		return fmt.Errorf("failed to atomically update file: %w", err)
+	}
+
+	return nil
+}
+
+// FileLock represents a file lock
+type FileLock struct {
+	file *os.File
+	path string
+}
+
+// LockFile creates an exclusive file lock for coordinating access to a resource.
+// This prevents multiple processes from concurrently modifying the same data.
+func LockFile(path string) (*FileLock, error) {
+	lockPath := path + ".lock"
+
+	// Create lock file if it doesn't exist
+	file, err := os.OpenFile(lockPath, os.O_CREATE|os.O_WRONLY, 0600)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create lock file: %w", err)
+	}
+
+	// Try to acquire exclusive lock with timeout
+	maxAttempts := 50 // 5 seconds total with 100ms intervals
+	for attempt := 0; attempt < maxAttempts; attempt++ {
+		err = syscall.Flock(int(file.Fd()), syscall.LOCK_EX|syscall.LOCK_NB)
+		if err == nil {
+			// Lock acquired successfully
+			return &FileLock{file: file, path: lockPath}, nil
+		}
+
+		if err != syscall.EWOULDBLOCK {
+			// Real error, not just lock busy
+			file.Close()
+			return nil, fmt.Errorf("failed to acquire file lock: %w", err)
+		}
+
+		// Lock is busy, wait and retry
+		time.Sleep(100 * time.Millisecond)
+	}
+
+	file.Close()
+	return nil, fmt.Errorf("timeout acquiring file lock after %d attempts", maxAttempts)
+}
+
+// Unlock releases the file lock
+func (fl *FileLock) Unlock() error {
+	if fl.file == nil {
+		return nil
+	}
+
+	// Release the lock
+	err := syscall.Flock(int(fl.file.Fd()), syscall.LOCK_UN)
+
+	// Close the file
+	closeErr := fl.file.Close()
+	fl.file = nil
+
+	// Clean up lock file
+	_ = os.Remove(fl.path)
+
+	if err != nil {
+		return fmt.Errorf("failed to release file lock: %w", err)
+	}
+	if closeErr != nil {
+		return fmt.Errorf("failed to close lock file: %w", closeErr)
 	}
 
 	return nil

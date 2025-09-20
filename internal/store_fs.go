@@ -119,7 +119,7 @@ func (s *SecretsStore) backupSecret(key, encryptedValue string) {
 }
 
 func (s *SecretsStore) Put(key, value string) error {
-	// Encrypt outside the lock to minimize lock time
+	// Encrypt outside any locks to minimize lock time
 	s.mu.RLock()
 	masterKey := s.masterKey
 	s.mu.RUnlock()
@@ -129,10 +129,23 @@ func (s *SecretsStore) Put(key, value string) error {
 		return err
 	}
 
+	// Acquire file lock to prevent concurrent writes from other processes
+	lock, err := LockFile(s.SecretsPath)
+	if err != nil {
+		return fmt.Errorf("failed to acquire database lock: %w", err)
+	}
+	defer lock.Unlock()
+
+	// Reload fresh state from disk to get any changes from other processes
+	if err := s.loadSecrets(); err != nil {
+		return fmt.Errorf("failed to reload secrets before write: %w", err)
+	}
+
+	// Now perform the update with fresh state
 	s.mu.Lock()
 	s.ensureBackupExists(key, encryptedValue)
 	s.secrets[key] = encryptedValue
-	err = s.saveSecretsLocked() // saveSecrets but assumes lock held
+	err = s.saveSecretsLocked()
 	s.mu.Unlock()
 
 	return err
@@ -199,6 +212,18 @@ func (s *SecretsStore) ListKeys() []string {
 }
 
 func (s *SecretsStore) Delete(key string) error {
+	// Acquire file lock to prevent concurrent writes from other processes
+	lock, err := LockFile(s.SecretsPath)
+	if err != nil {
+		return fmt.Errorf("failed to acquire database lock: %w", err)
+	}
+	defer lock.Unlock()
+
+	// Reload fresh state from disk to get any changes from other processes
+	if err := s.loadSecrets(); err != nil {
+		return fmt.Errorf("failed to reload secrets before delete: %w", err)
+	}
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -224,6 +249,18 @@ func (s *SecretsStore) DecryptBackup(encryptedData string) (string, error) {
 
 // DisableSecret marks a secret as disabled by adding a special prefix
 func (s *SecretsStore) DisableSecret(key string) error {
+	// Acquire file lock to prevent concurrent writes from other processes
+	lock, err := LockFile(s.SecretsPath)
+	if err != nil {
+		return fmt.Errorf("failed to acquire database lock: %w", err)
+	}
+	defer lock.Unlock()
+
+	// Reload fresh state from disk to get any changes from other processes
+	if err := s.loadSecrets(); err != nil {
+		return fmt.Errorf("failed to reload secrets before disable: %w", err)
+	}
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -301,6 +338,18 @@ func (s *SecretsStore) parseLegacyFormat(data string) string {
 
 // EnableSecret re-enables a previously disabled secret
 func (s *SecretsStore) EnableSecret(key string) error {
+	// Acquire file lock to prevent concurrent writes from other processes
+	lock, err := LockFile(s.SecretsPath)
+	if err != nil {
+		return fmt.Errorf("failed to acquire database lock: %w", err)
+	}
+	defer lock.Unlock()
+
+	// Reload fresh state from disk to get any changes from other processes
+	if err := s.loadSecrets(); err != nil {
+		return fmt.Errorf("failed to reload secrets before enable: %w", err)
+	}
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
