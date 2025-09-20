@@ -196,16 +196,6 @@ func performFirstTimeSetup() {
 	fmt.Println("Creating admin user and generating authentication token.")
 	fmt.Println("Store the token securely - it will not be shown again.")
 
-	fmt.Println("\nProceed? [Y/n]")
-
-	var response string
-	fmt.Scanln(&response)
-
-	if userDeclinedSetup(response) {
-		fmt.Println("Setup cancelled.")
-		return
-	}
-
 	fmt.Println("\nCreating admin user...")
 
 	// Use the clean first-run setup function that returns the token
