@@ -29,8 +29,8 @@ import (
 var putCmd = &cobra.Command{
 	Use:                   "put [key] [value]",
 	Short:                 "Store a secret securely.",
-	Long:                  "Store a secret value under a key. Overwrites if the key exists. Backs up previous value.\n\nTo store values starting with dashes (like SSH keys), use -- to terminate flags:\nsimple-secrets put ssh-key -- \"-----BEGIN RSA PRIVATE KEY-----\\n...\"",
-	Example:               "simple-secrets put db_password s3cr3tP@ssw0rd\nsimple-secrets put ssh-key -- \"-----BEGIN RSA PRIVATE KEY-----\\n...\"",
+	Long:                  "Store a secret value under a key. Overwrites if the key exists. Backs up previous value.\n\nTo store values starting with dashes (like SSH keys), use -- to terminate flags:\nsimple-secrets put --token <token> ssh-key -- \"-----BEGIN RSA PRIVATE KEY-----\\n...\"",
+	Example:               "simple-secrets put db_password s3cr3tP@ssw0rd\nsimple-secrets put --token <token> ssh-key -- \"-----BEGIN RSA PRIVATE KEY-----\\n...\"",
 	Args:                  cobra.ExactArgs(2),
 	DisableFlagsInUseLine: true,
 	FParseErrWhitelist:    cobra.FParseErrWhitelist{UnknownFlags: true},
