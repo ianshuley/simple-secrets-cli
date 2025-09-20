@@ -112,10 +112,15 @@ func TestInputValidationVulnerabilities(t *testing.T) {
 	lines := strings.Split(string(out), "\n")
 	var token string
 	for _, line := range lines {
-		if strings.Contains(line, "Token:") {
-			fields := strings.Fields(line)
-			if len(fields) >= 2 {
-				token = fields[1]
+		if strings.Contains(line, "🔑 Your authentication token:") {
+			// Token is on the next line
+			continue
+		}
+		if strings.TrimSpace(line) != "" && !strings.Contains(line, "🔑") && !strings.Contains(line, "📋") && !strings.Contains(line, "Created") && !strings.Contains(line, "Username:") {
+			// This might be the token line
+			trimmed := strings.TrimSpace(line)
+			if len(trimmed) > 20 && !strings.Contains(trimmed, " ") {
+				token = trimmed
 				break
 			}
 		}

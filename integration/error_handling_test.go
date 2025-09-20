@@ -90,7 +90,7 @@ func TestErrorHandling(t *testing.T) {
 			args:         []string{"list", "keys"},
 			env:          []string{"HOME=" + noTokenTmp}, // Clean environment with only HOME set
 			wantErr:      true,
-			errorMessage: "provide a token via",
+			errorMessage: "authentication required: no token found",
 		},
 		{
 			name:         "list invalid subcommand",
