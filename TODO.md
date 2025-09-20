@@ -25,12 +25,6 @@ I'd like to add a --copy flag that pipes whatever information is being retrieved
 
 ---
 
-## Platform Command
-
-Add `platform` command teasing what's coming next: The Simple Secrets Platform is coming soon! Visit <https://simple-secrets.io> to join the waitlist or learn more
-
----
-
 ## Release Preparation
 
 ### Documentation & User Experience
@@ -74,3 +68,9 @@ Add `platform` command teasing what's coming next: The Simple Secrets Platform i
 ## API Development (v2.0)
 
 Start on API development using abstracted interfaces
+
+## Platform Command
+
+Add `platform` command teasing what's coming next: The Simple Secrets Platform is coming soon! Visit <https://simple-secrets.io> to join the waitlist or learn more
+
+---
