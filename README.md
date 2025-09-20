@@ -65,27 +65,28 @@ simple-secrets list keys
 simple-secrets --setup
 ```
 
-Setup is straightforward:
+Setup process:
 
-- Confirms you're ready to receive an authentication token
-- Creates your admin user automatically
-- Displays your authentication token securely
-- Provides basic usage instructions
+1. **Detects first run** and prompts for admin user creation
+2. **Creates admin user** and generates secure authentication token
+3. **Displays token once** - save it securely as it won't be shown again
+4. **Requires re-running** your original command with the token
 
 ### Basic Usage
 
 ```bash
-# First run creates an admin user
+# First run: triggers setup and creates admin user
 simple-secrets list keys
+# (Shows setup prompt, creates admin, displays token)
+
+# Then use the token for actual operations:
+simple-secrets list keys --token YOUR_ADMIN_TOKEN
 
 # Store a secret
 simple-secrets put api-key "sk-1234567890abcdef" --token YOUR_ADMIN_TOKEN
 
 # Retrieve a secret
 simple-secrets get api-key --token YOUR_ADMIN_TOKEN
-
-# List all secrets
-simple-secrets list keys --token YOUR_ADMIN_TOKEN
 ```
 
 ## Configuration

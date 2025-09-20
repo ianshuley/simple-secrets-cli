@@ -74,20 +74,30 @@ func getConfigDirectory() (string, error) {
 }
 
 func (s *SecretsStore) loadSecrets() error {
-	if _, err := os.Stat(s.SecretsPath); os.IsNotExist(err) {
-		s.mu.Lock()
-		s.secrets = make(map[string]string)
-		s.mu.Unlock()
-		return nil
-	}
-	b, err := os.ReadFile(s.SecretsPath)
+	secrets, err := s.loadSecretsFromDisk()
 	if err != nil {
 		return err
 	}
 
+	s.mu.Lock()
+	s.secrets = secrets
+	s.mu.Unlock()
+	return nil
+}
+
+// loadSecretsFromDisk loads secrets from disk without modifying in-memory state
+func (s *SecretsStore) loadSecretsFromDisk() (map[string]string, error) {
+	if _, err := os.Stat(s.SecretsPath); os.IsNotExist(err) {
+		return make(map[string]string), nil
+	}
+	b, err := os.ReadFile(s.SecretsPath)
+	if err != nil {
+		return nil, err
+	}
+
 	var secrets map[string]string
 	if err := json.Unmarshal(b, &secrets); err != nil {
-		return fmt.Errorf("secrets database appears to be corrupted (JSON parse error: %v). "+
+		return nil, fmt.Errorf("secrets database appears to be corrupted (JSON parse error: %v). "+
 			"Recovery options: "+
 			"Restore from backup: ./simple-secrets restore-database; "+
 			"List available backups: ./simple-secrets list backups; "+
@@ -95,10 +105,7 @@ func (s *SecretsStore) loadSecrets() error {
 			"Do not delete ~/.simple-secrets/ - your backups contain recoverable data", err)
 	}
 
-	s.mu.Lock()
-	s.secrets = secrets
-	s.mu.Unlock()
-	return nil
+	return secrets, nil
 }
 
 // saveSecretsLocked saves secrets to disk, assumes caller holds lock
@@ -136,13 +143,19 @@ func (s *SecretsStore) Put(key, value string) error {
 	}
 	defer lock.Unlock()
 
-	// Reload fresh state from disk to get any changes from other processes
-	if err := s.loadSecrets(); err != nil {
+	// For concurrent operations within the same process, we need to be more careful
+	// Load fresh state but merge it with existing in-memory state
+	freshSecrets, err := s.loadSecretsFromDisk()
+	if err != nil {
 		return fmt.Errorf("failed to reload secrets before write: %w", err)
 	}
 
-	// Now perform the update with fresh state
+	// Now perform the update with merged state
 	s.mu.Lock()
+	// Merge disk state with in-memory state (disk takes precedence for conflicts)
+	for k, v := range freshSecrets {
+		s.secrets[k] = v
+	}
 	s.ensureBackupExists(key, encryptedValue)
 	s.secrets[key] = encryptedValue
 	err = s.saveSecretsLocked()
@@ -219,13 +232,19 @@ func (s *SecretsStore) Delete(key string) error {
 	}
 	defer lock.Unlock()
 
-	// Reload fresh state from disk to get any changes from other processes
-	if err := s.loadSecrets(); err != nil {
+	// Load fresh state but merge it with existing in-memory state
+	freshSecrets, err := s.loadSecretsFromDisk()
+	if err != nil {
 		return fmt.Errorf("failed to reload secrets before delete: %w", err)
 	}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	// Merge disk state with in-memory state (disk takes precedence for conflicts)
+	for k, v := range freshSecrets {
+		s.secrets[k] = v
+	}
 
 	prevEnc, ok := s.secrets[key]
 	if !ok {
@@ -256,13 +275,19 @@ func (s *SecretsStore) DisableSecret(key string) error {
 	}
 	defer lock.Unlock()
 
-	// Reload fresh state from disk to get any changes from other processes
-	if err := s.loadSecrets(); err != nil {
+	// Load fresh state but merge it with existing in-memory state
+	freshSecrets, err := s.loadSecretsFromDisk()
+	if err != nil {
 		return fmt.Errorf("failed to reload secrets before disable: %w", err)
 	}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	// Merge disk state with in-memory state (disk takes precedence for conflicts)
+	for k, v := range freshSecrets {
+		s.secrets[k] = v
+	}
 
 	enc, ok := s.secrets[key]
 	if !ok {
@@ -345,13 +370,19 @@ func (s *SecretsStore) EnableSecret(key string) error {
 	}
 	defer lock.Unlock()
 
-	// Reload fresh state from disk to get any changes from other processes
-	if err := s.loadSecrets(); err != nil {
+	// Load fresh state but merge it with existing in-memory state
+	freshSecrets, err := s.loadSecretsFromDisk()
+	if err != nil {
 		return fmt.Errorf("failed to reload secrets before enable: %w", err)
 	}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	// Merge disk state with in-memory state (disk takes precedence for conflicts)
+	for k, v := range freshSecrets {
+		s.secrets[k] = v
+	}
 
 	// Build a map of original keys to their disabled keys for efficient lookup
 	disabledMap := s.buildDisabledSecretsMap()

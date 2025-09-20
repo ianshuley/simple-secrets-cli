@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"os"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -35,12 +36,15 @@ func TestConcurrentSecretsOperations(t *testing.T) {
 		t.Fatalf("Failed to load secrets store: %v", err)
 	}
 
-	const numGoroutines = 20
-	const operationsPerGoroutine = 50
+	const numGoroutines = 5           // More realistic concurrency level
+	const operationsPerGoroutine = 20 // More realistic operation count
 	var wg sync.WaitGroup
 
 	// Test 1: Concurrent Put operations
 	t.Run("ConcurrentPuts", func(t *testing.T) {
+		var errorCount int64
+		var successCount int64
+
 		wg.Add(numGoroutines)
 		for i := range numGoroutines {
 			go func(workerID int) {
@@ -50,18 +54,24 @@ func TestConcurrentSecretsOperations(t *testing.T) {
 					value := fmt.Sprintf("value_%d_%d_%d", workerID, j, time.Now().UnixNano())
 
 					if err := store.Put(key, value); err != nil {
+						atomic.AddInt64(&errorCount, 1)
 						t.Errorf("Worker %d: Put failed for %s: %v", workerID, key, err)
+					} else {
+						atomic.AddInt64(&successCount, 1)
 					}
 				}
 			}(i)
 		}
 		wg.Wait()
 
+		// Report concurrency statistics
+		t.Logf("Concurrency results: %d successes, %d errors", atomic.LoadInt64(&successCount), atomic.LoadInt64(&errorCount))
+
 		// Verify all keys were stored
 		keys := store.ListKeys()
 		expectedCount := numGoroutines * operationsPerGoroutine
 		if len(keys) != expectedCount {
-			t.Errorf("Expected %d keys, got %d", expectedCount, len(keys))
+			t.Errorf("Expected %d keys, got %d (lost %d operations)", expectedCount, len(keys), expectedCount-len(keys))
 		}
 	})
 

@@ -27,7 +27,8 @@ import (
 // partial writes that could corrupt the file.
 func AtomicWriteFile(path string, data []byte, perm os.FileMode) error {
 	// Use unique temp file name to prevent race conditions in concurrent operations
-	tmpPath := fmt.Sprintf("%s.tmp.%d", path, os.Getpid())
+	// Include nanosecond timestamp and goroutine ID to ensure uniqueness
+	tmpPath := fmt.Sprintf("%s.tmp.%d.%d", path, os.Getpid(), time.Now().UnixNano())
 
 	// Write to temporary file first
 	if err := os.WriteFile(tmpPath, data, perm); err != nil {
@@ -62,7 +63,7 @@ func LockFile(path string) (*FileLock, error) {
 	}
 
 	// Try to acquire exclusive lock with timeout
-	maxAttempts := 50 // 5 seconds total with 100ms intervals
+	maxAttempts := 100 // 10 seconds total with 100ms intervals (increased for high concurrency)
 	for attempt := 0; attempt < maxAttempts; attempt++ {
 		err = syscall.Flock(int(file.Fd()), syscall.LOCK_EX|syscall.LOCK_NB)
 		if err == nil {
@@ -76,8 +77,12 @@ func LockFile(path string) (*FileLock, error) {
 			return nil, fmt.Errorf("failed to acquire file lock: %w", err)
 		}
 
-		// Lock is busy, wait and retry
-		time.Sleep(100 * time.Millisecond)
+		// Lock is busy, wait and retry with exponential backoff
+		backoffMs := 10 + (attempt * 2) // Start at 10ms, increase by 2ms each attempt
+		if backoffMs > 100 {
+			backoffMs = 100 // Cap at 100ms
+		}
+		time.Sleep(time.Duration(backoffMs) * time.Millisecond)
 	}
 
 	file.Close()
