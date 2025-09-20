@@ -132,6 +132,8 @@ func offerAutomaticSetup() {
 	fmt.Println("\n🔐 Welcome to simple-secrets!")
 	fmt.Println("\nFirst time setup required.")
 	fmt.Println("Ready to create your admin user and authentication token.")
+	fmt.Println("\n⚠️  IMPORTANT: Your admin token will be displayed ONCE.")
+	fmt.Println("   Be ready to copy and store it securely!")
 	fmt.Println("\nOptions:")
 	fmt.Println("  • Run: ./simple-secrets --setup")
 	fmt.Println("  • Or press Enter to continue with setup now")
@@ -194,7 +196,6 @@ func performFirstTimeSetup() {
 	fmt.Println("\n🔐 Welcome to simple-secrets!")
 	fmt.Println("\nSimple-secrets setup")
 	fmt.Println("Creating admin user and generating authentication token.")
-	fmt.Println("Store the token securely - it will not be shown again.")
 
 	fmt.Println("\nCreating admin user...")
 
