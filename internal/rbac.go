@@ -448,7 +448,7 @@ func loadUsers(path string) ([]*User, error) {
 		if os.IsNotExist(err) {
 			return nil, err
 		}
-		return nil, fmt.Errorf("users.json is corrupted or invalid: %w. Please fix or delete the file.", err)
+		return nil, fmt.Errorf("users.json is corrupted or invalid: %w; please fix or delete the file", err)
 	}
 
 	return validateUsersList(users)
@@ -486,7 +486,7 @@ func ensureAdminExists(users []*User) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("no admin user found in users.json. Please fix the file or recreate users.")
+	return fmt.Errorf("no admin user found in users.json; please fix the file or recreate users")
 }
 
 func loadRoles(path string) (RolePermissions, error) {

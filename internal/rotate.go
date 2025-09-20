@@ -164,18 +164,18 @@ func (s *SecretsStore) RotateMasterKey(backupDir string) error {
 		return fmt.Errorf("failed to re-encrypt secrets with new key: %w", err)
 	}
 
-	// 5) Write new secrets.json to a temp file first
-	tmpSecrets := s.SecretsPath + ".tmp"
+	// 5) Write new secrets.json using atomic write to prevent race conditions
 	data, err := json.MarshalIndent(reenc, "", "  ")
 	if err != nil {
 		return err
 	}
+	tmpSecrets := fmt.Sprintf("%s.tmp.%d", s.SecretsPath, os.Getpid())
 	if err := os.WriteFile(tmpSecrets, data, 0600); err != nil {
 		return err
 	}
 
-	// 6) Write the NEW master key to a temp file
-	tmpKey := s.KeyPath + ".tmp"
+	// 6) Write the NEW master key to a temp file using unique name
+	tmpKey := fmt.Sprintf("%s.tmp.%d", s.KeyPath, os.Getpid())
 	if err := writeMasterKeyToPath(tmpKey, newKey); err != nil {
 		_ = os.Remove(tmpSecrets) // cleanup temp files on failure
 		return fmt.Errorf("write new master key to temp failed: %w", err)

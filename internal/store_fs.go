@@ -107,11 +107,8 @@ func (s *SecretsStore) saveSecretsLocked() error {
 	if err != nil {
 		return err
 	}
-	tmp := s.SecretsPath + ".tmp"
-	if err := os.WriteFile(tmp, b, 0600); err != nil {
-		return err
-	}
-	return os.Rename(tmp, s.SecretsPath)
+	// Use AtomicWriteFile for proper race condition protection
+	return AtomicWriteFile(s.SecretsPath, b, 0600)
 }
 
 // backupSecret creates an encrypted backup of a secret

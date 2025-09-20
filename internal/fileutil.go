@@ -24,7 +24,8 @@ import (
 // This ensures that either the entire write succeeds or fails completely, preventing
 // partial writes that could corrupt the file.
 func AtomicWriteFile(path string, data []byte, perm os.FileMode) error {
-	tmpPath := path + ".tmp"
+	// Use unique temp file name to prevent race conditions in concurrent operations
+	tmpPath := fmt.Sprintf("%s.tmp.%d", path, os.Getpid())
 
 	// Write to temporary file first
 	if err := os.WriteFile(tmpPath, data, perm); err != nil {

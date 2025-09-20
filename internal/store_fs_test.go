@@ -17,6 +17,8 @@ package internal
 
 import (
 	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -109,11 +111,15 @@ func TestStore_FilePermissionsAndAtomicity(t *testing.T) {
 		t.Fatalf("secrets.json perms = %v, want 0600", st2.Mode().Perm())
 	}
 
-	// No lingering temp file after save
-	tmpPath := s.SecretsPath + ".tmp"
-	_, err = os.Stat(tmpPath)
-	if !os.IsNotExist(err) {
-		t.Fatalf("temp file still exists: %s", tmpPath)
+	// No lingering temp files after save (check for any .tmp files with process ID)
+	files, err := os.ReadDir(filepath.Dir(s.SecretsPath))
+	if err != nil {
+		t.Fatalf("failed to read directory: %v", err)
+	}
+	for _, file := range files {
+		if strings.Contains(file.Name(), ".tmp.") {
+			t.Fatalf("temp file still exists: %s", file.Name())
+		}
 	}
 
 	// Ensure file contents actually changed after an update (atomicity/content check)
