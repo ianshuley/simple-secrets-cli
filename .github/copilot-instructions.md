@@ -160,6 +160,64 @@ func (u User) hasValidToken() bool {
 }
 ```
 
+### Modern Go Patterns
+
+**Prefer slice iteration with range:**
+```go
+// ❌ Avoid indexed loops for simple iteration
+for i := 0; i < len(items); i++ {
+    process(items[i])
+}
+
+// ✅ Use range for cleaner iteration
+for _, item := range items {
+    process(item)
+}
+
+// ✅ Use range with index when needed
+for i, item := range items {
+    processWithIndex(i, item)
+}
+```
+
+**Use `any` instead of `interface{}`:**
+```go
+// ❌ Old style with interface{}
+func ProcessValue(value interface{}) error {
+    // ...
+}
+
+// ✅ Modern style with any (Go 1.18+)
+func ProcessValue(value any) error {
+    // ...
+}
+
+// ✅ Even better: use generics when type matters
+func ProcessValue[T any](value T) error {
+    // ...
+}
+```
+
+**Leverage type parameters for better type safety:**
+```go
+// ❌ Runtime type assertions
+func GetFirst(slice []interface{}) interface{} {
+    if len(slice) > 0 {
+        return slice[0]
+    }
+    return nil
+}
+
+// ✅ Compile-time type safety with generics
+func GetFirst[T any](slice []T) (T, bool) {
+    var zero T
+    if len(slice) > 0 {
+        return slice[0], true
+    }
+    return zero, false
+}
+```
+
 ### Other Style Guidelines
 - Use meaningful variable names that express intent
 - Prefer composition over inheritance
@@ -176,6 +234,9 @@ func (u User) hasValidToken() bool {
 - Prefer interfaces for testability
 - Use context.Context for cancellation and timeouts
 - Handle errors explicitly, don't ignore them
+- Prefer slice iteration with `range` over indexed loops
+- Use `any` instead of `interface{}` (Go 1.18+)
+- Leverage type parameters (generics) when appropriate for better type safety
 
 ## Architecture Principles
 - Single Responsibility Principle

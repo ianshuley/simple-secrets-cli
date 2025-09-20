@@ -26,7 +26,12 @@ import (
 	"time"
 )
 
-const disabledPrefix = "__DISABLED_"
+const (
+	disabledPrefix = "__DISABLED_"
+	// File permission constants for clarity
+	secureFilePermissions      = 0600 // Owner read/write only
+	secureDirectoryPermissions = 0700 // Owner read/write/execute only
+)
 
 type SecretsStore struct {
 	KeyPath     string
@@ -34,20 +39,27 @@ type SecretsStore struct {
 	masterKey   []byte
 	secrets     map[string]string // key -> base64(ciphertext)
 	mu          sync.RWMutex      // protects secrets map and masterKey
+	storage     StorageBackend    // injectable storage backend
 }
 
 // LoadSecretsStore: create ~/.simple-secrets, load key + secrets
 func LoadSecretsStore() (*SecretsStore, error) {
+	return LoadSecretsStoreWithBackend(NewFilesystemBackend())
+}
+
+// LoadSecretsStoreWithBackend allows injection of storage backend for better testability
+func LoadSecretsStoreWithBackend(backend StorageBackend) (*SecretsStore, error) {
 	dir, err := getConfigDirectory()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to determine configuration directory for secrets storage: %w", err)
 	}
-	_ = os.MkdirAll(dir, 0700)
+	_ = os.MkdirAll(dir, secureDirectoryPermissions)
 
 	s := &SecretsStore{
 		KeyPath:     filepath.Join(dir, "master.key"),
 		SecretsPath: filepath.Join(dir, "secrets.json"),
 		secrets:     make(map[string]string),
+		storage:     backend,
 	}
 
 	if err := s.loadOrCreateKey(); err != nil {
@@ -92,7 +104,7 @@ func (s *SecretsStore) loadSecretsFromDisk() (map[string]string, error) {
 	}
 	b, err := os.ReadFile(s.SecretsPath)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to read secrets database from %s: %w", s.SecretsPath, err)
 	}
 
 	var secrets map[string]string
@@ -112,17 +124,17 @@ func (s *SecretsStore) loadSecretsFromDisk() (map[string]string, error) {
 func (s *SecretsStore) saveSecretsLocked() error {
 	b, err := json.MarshalIndent(s.secrets, "", "  ")
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to serialize secrets for saving: %w", err)
 	}
 	// Use AtomicWriteFile for proper race condition protection
-	return AtomicWriteFile(s.SecretsPath, b, 0600)
+	return AtomicWriteFile(s.SecretsPath, b, secureFilePermissions)
 }
 
 // backupSecret creates an encrypted backup of a secret
 func (s *SecretsStore) backupSecret(key, encryptedValue string) {
 	backupPath := s.getBackupPath(key)
 	s.createBackupDirectory()
-	_ = os.WriteFile(backupPath, []byte(encryptedValue), 0600)
+	_ = os.WriteFile(backupPath, []byte(encryptedValue), secureFilePermissions)
 }
 
 func (s *SecretsStore) Put(key, value string) error {
@@ -352,12 +364,15 @@ func (s *SecretsStore) parseJsonFormat(jsonData string) string {
 }
 
 func (s *SecretsStore) parseLegacyFormat(data string) string {
-	const notFound = -1
+	const (
+		notFound         = -1
+		underscoreLength = 1
+	)
 	underscorePosition := strings.Index(data, "_")
 	if underscorePosition == notFound {
 		return ""
 	}
-	positionAfterUnderscore := underscorePosition + 1
+	positionAfterUnderscore := underscorePosition + underscoreLength
 	return data[positionAfterUnderscore:]
 }
 
@@ -442,7 +457,7 @@ var ErrNotFound = os.ErrNotExist
 // createBackupDirectory ensures the backup directory exists with secure permissions
 func (s *SecretsStore) createBackupDirectory() {
 	backupDir := s.getBackupDirectory()
-	_ = os.MkdirAll(backupDir, 0700)
+	_ = os.MkdirAll(backupDir, secureDirectoryPermissions)
 }
 
 // getBackupDirectory returns the path to the backup directory

@@ -29,9 +29,10 @@ func newTempStoreForInterface(t *testing.T) *SecretsStore {
 	tmp := t.TempDir()
 	t.Setenv("HOME", tmp)
 	t.Setenv("SIMPLE_SECRETS_CONFIG_DIR", tmp+"/.simple-secrets")
-	s, err := LoadSecretsStore()
+	// Use dependency injection for better interface testing
+	s, err := LoadSecretsStoreWithBackend(NewFilesystemBackend())
 	if err != nil {
-		t.Fatalf("LoadSecretsStore: %v", err)
+		t.Fatalf("LoadSecretsStoreWithBackend: %v", err)
 	}
 	return s
 }

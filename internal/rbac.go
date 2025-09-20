@@ -257,19 +257,36 @@ func resolveConfigPaths() (string, string, error) {
 
 // handleFirstRun manages the first-run scenario when users.json doesn't exist
 func handleFirstRun(usersPath, rolesPath string) (*UserStore, bool, error) {
-	fmt.Println("First run detected - creating default admin user...")
-	fmt.Println("⚠️  This will generate an authentication token. Have your password manager ready.")
-	fmt.Println("\nProceed? [Y/n]")
+	const (
+		firstRunPrompt         = "First run detected - creating default admin user..."
+		passwordManagerWarning = "⚠️  This will generate an authentication token. Have your password manager ready."
+		proceedPrompt          = "\nProceed? [Y/n]"
+		cancellationMessage    = "Setup cancelled. Run any command again when ready."
+	)
+
+	fmt.Println(firstRunPrompt)
+	fmt.Println(passwordManagerWarning)
+	fmt.Println(proceedPrompt)
 
 	var response string
 	fmt.Scanln(&response)
 
-	if response == "n" || response == "N" || response == "no" || response == "NO" {
-		fmt.Println("Setup cancelled. Run any command again when ready.")
+	if userDeclinedSetup(response) {
+		fmt.Println(cancellationMessage)
 		return nil, false, fmt.Errorf("setup cancelled by user")
 	}
 
 	return createDefaultUserFile(usersPath, rolesPath)
+}
+
+func userDeclinedSetup(response string) bool {
+	declineResponses := []string{"n", "N", "no", "NO"}
+	for _, decline := range declineResponses {
+		if response == decline {
+			return true
+		}
+	}
+	return false
 } // validateFirstRunEligibility ensures we only run first-run setup in truly clean environments
 func validateFirstRunEligibility() error {
 	// Get the config directory from paths
