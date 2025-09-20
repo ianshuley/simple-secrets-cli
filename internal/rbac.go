@@ -289,7 +289,7 @@ func handleFirstRunWithToken(usersPath, rolesPath string) (*UserStore, string, e
 	var response string
 	fmt.Scanln(&response)
 
-	if userDeclinedSetup(response) {
+	if UserDeclinedSetup(response) {
 		fmt.Println(cancellationMessage)
 		return nil, "", fmt.Errorf("setup cancelled by user")
 	}
@@ -297,7 +297,9 @@ func handleFirstRunWithToken(usersPath, rolesPath string) (*UserStore, string, e
 	return createDefaultUserFileWithToken(usersPath, rolesPath)
 }
 
-func userDeclinedSetup(response string) bool {
+// UserDeclinedSetup checks if user declined the setup prompt
+// Exported for use by cmd package to avoid duplication
+func UserDeclinedSetup(response string) bool {
 	declineResponses := []string{"n", "N", "no", "NO"}
 	for _, decline := range declineResponses {
 		if response == decline {

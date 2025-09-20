@@ -31,7 +31,7 @@ func TestSelfTokenRotationBothWays(t *testing.T) {
 	if err != nil {
 		t.Fatalf("first run failed: %v\n%s", err, out)
 	}
-	adminToken := extractToken(string(out))
+	adminToken := ExtractToken(string(out))
 	if adminToken == "" {
 		t.Fatalf("could not extract admin token from output: %s", out)
 	}
@@ -43,7 +43,7 @@ func TestSelfTokenRotationBothWays(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create-user failed: %v\n%s", err, out)
 	}
-	readerToken := extractTokenFromCreateUser(string(out))
+	readerToken := ExtractTokenFromCreateUser(string(out))
 	if readerToken == "" {
 		t.Fatalf("could not extract reader token from output: %s", out)
 	}
@@ -60,7 +60,7 @@ func TestSelfTokenRotationBothWays(t *testing.T) {
 	}
 
 	// Extract new token and verify it works
-	newReaderToken := extractTokenFromSelfRotation(string(out))
+	newReaderToken := ExtractTokenFromSelfRotation(string(out))
 	if newReaderToken == "" {
 		t.Fatalf("could not extract new reader token from output: %s", out)
 	}
@@ -77,7 +77,7 @@ func TestSelfTokenRotationBothWays(t *testing.T) {
 	}
 
 	// Test 3: Verify reader still cannot rotate other users' tokens
-	finalReaderToken := extractTokenFromSelfRotation(string(out))
+	finalReaderToken := ExtractTokenFromSelfRotation(string(out))
 	cmd = exec.Command(cliBin, "rotate", "token", "admin")
 	cmd.Env = append(testEnv(tmp), "SIMPLE_SECRETS_TOKEN="+finalReaderToken)
 	out, err = cmd.CombinedOutput()
@@ -87,26 +87,4 @@ func TestSelfTokenRotationBothWays(t *testing.T) {
 	if !strings.Contains(string(out), "permission denied") {
 		t.Errorf("expected permission denied error, got: %s", out)
 	}
-}
-
-// extractTokenFromCreateUser extracts the token from create-user command output
-func extractTokenFromCreateUser(output string) string {
-	lines := strings.SplitSeq(output, "\n")
-	for line := range lines {
-		if after, ok := strings.CutPrefix(line, "Generated token: "); ok {
-			return after
-		}
-	}
-	return ""
-}
-
-// extractTokenFromSelfRotation extracts the token from self-rotation command output
-func extractTokenFromSelfRotation(output string) string {
-	lines := strings.SplitSeq(output, "\n")
-	for line := range lines {
-		if after, ok := strings.CutPrefix(line, "New token: "); ok {
-			return after
-		}
-	}
-	return ""
 }

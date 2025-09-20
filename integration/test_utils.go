@@ -43,3 +43,30 @@ func extractTokenFromOutput(output string) string {
 	}
 	return ""
 }
+
+// ExtractTokenFromCreateUser extracts the token from create-user command output
+func ExtractTokenFromCreateUser(output string) string {
+	lines := strings.SplitSeq(output, "\n")
+	for line := range lines {
+		if after, ok := strings.CutPrefix(line, "Generated token: "); ok {
+			return after
+		}
+	}
+	return ""
+}
+
+// ExtractTokenFromSelfRotation extracts the token from self-rotation command output
+func ExtractTokenFromSelfRotation(output string) string {
+	lines := strings.SplitSeq(output, "\n")
+	for line := range lines {
+		if after, ok := strings.CutPrefix(line, "New token: "); ok {
+			return after
+		}
+	}
+	return ""
+}
+
+// ExtractToken is an alias for extractTokenFromOutput for backwards compatibility
+func ExtractToken(output string) string {
+	return extractTokenFromOutput(output)
+}

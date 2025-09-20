@@ -33,7 +33,7 @@ func TestErrorHandling(t *testing.T) {
 	if err != nil {
 		t.Fatalf("first run failed: %v\n%s", err, out)
 	}
-	token := extractToken(string(out))
+	token := ExtractToken(string(out))
 	if token == "" {
 		t.Fatalf("could not extract admin token from output: %s", out)
 	}
@@ -171,7 +171,7 @@ func TestRBACEnforcement(t *testing.T) {
 	if err != nil {
 		t.Fatalf("first run failed: %v\n%s", err, out)
 	}
-	adminToken := extractToken(string(out))
+	adminToken := ExtractToken(string(out))
 	if adminToken == "" {
 		t.Fatalf("could not extract admin token from output: %s", out)
 	}
@@ -301,7 +301,7 @@ func TestCommandInputValidation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("first run failed: %v\n%s", err, out)
 	}
-	token := extractToken(string(out))
+	token := ExtractToken(string(out))
 	if token == "" {
 		t.Fatalf("could not extract admin token from output: %s", out)
 	}
@@ -390,7 +390,7 @@ func TestWorkflowIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("first run failed: %v\n%s", err, out)
 	}
-	token := extractToken(string(out))
+	token := ExtractToken(string(out))
 	if token == "" {
 		t.Fatalf("could not extract admin token from output: %s", out)
 	}
@@ -496,7 +496,7 @@ func TestEdgeCases(t *testing.T) {
 	if err != nil {
 		t.Fatalf("first run failed: %v\n%s", err, out)
 	}
-	token := extractToken(string(out))
+	token := ExtractToken(string(out))
 	if token == "" {
 		t.Fatalf("could not extract admin token from output: %s", out)
 	}

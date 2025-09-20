@@ -144,17 +144,12 @@ func offerAutomaticSetup() {
 	var response string
 	fmt.Scanln(&response)
 
-	if userDeclinedSetup(response) {
+	if internal.UserDeclinedSetup(response) {
 		fmt.Println("\nSetup cancelled. Run './simple-secrets --setup' when ready.")
 		return
 	}
 
 	performFirstTimeSetup()
-}
-
-// userDeclinedSetup checks if user declined the setup prompt
-func userDeclinedSetup(response string) bool {
-	return response == "n" || response == "N" || response == "no" || response == "NO"
 }
 
 // displayFirstRunProtectionError shows protection error with helpful guidance
