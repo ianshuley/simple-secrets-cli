@@ -53,7 +53,7 @@ func LoadSecretsStoreWithBackend(backend StorageBackend) (*SecretsStore, error) 
 	if err != nil {
 		return nil, fmt.Errorf("failed to determine configuration directory for secrets storage: %w", err)
 	}
-	_ = os.MkdirAll(dir, secureDirectoryPermissions)
+	_ = backend.MkdirAll(dir, FileMode(secureDirectoryPermissions))
 
 	s := &SecretsStore{
 		KeyPath:     filepath.Join(dir, "master.key"),
@@ -99,10 +99,10 @@ func (s *SecretsStore) loadSecrets() error {
 
 // loadSecretsFromDisk loads secrets from disk without modifying in-memory state
 func (s *SecretsStore) loadSecretsFromDisk() (map[string]string, error) {
-	if _, err := os.Stat(s.SecretsPath); os.IsNotExist(err) {
+	if !s.storage.Exists(s.SecretsPath) {
 		return make(map[string]string), nil
 	}
-	b, err := os.ReadFile(s.SecretsPath)
+	b, err := s.storage.ReadFile(s.SecretsPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read secrets database from %s: %w", s.SecretsPath, err)
 	}
@@ -127,14 +127,14 @@ func (s *SecretsStore) saveSecretsLocked() error {
 		return fmt.Errorf("failed to serialize secrets for saving: %w", err)
 	}
 	// Use AtomicWriteFile for proper race condition protection
-	return AtomicWriteFile(s.SecretsPath, b, secureFilePermissions)
+	return s.storage.AtomicWriteFile(s.SecretsPath, b, FileMode(secureFilePermissions))
 }
 
 // backupSecret creates an encrypted backup of a secret
 func (s *SecretsStore) backupSecret(key, encryptedValue string) {
 	backupPath := s.getBackupPath(key)
 	s.createBackupDirectory()
-	_ = os.WriteFile(backupPath, []byte(encryptedValue), secureFilePermissions)
+	_ = s.storage.WriteFile(backupPath, []byte(encryptedValue), FileMode(secureFilePermissions))
 }
 
 func (s *SecretsStore) Put(key, value string) error {
@@ -457,7 +457,7 @@ var ErrNotFound = os.ErrNotExist
 // createBackupDirectory ensures the backup directory exists with secure permissions
 func (s *SecretsStore) createBackupDirectory() {
 	backupDir := s.getBackupDirectory()
-	_ = os.MkdirAll(backupDir, secureDirectoryPermissions)
+	_ = s.storage.MkdirAll(backupDir, FileMode(secureDirectoryPermissions))
 }
 
 // getBackupDirectory returns the path to the backup directory

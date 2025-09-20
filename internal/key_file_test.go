@@ -22,16 +22,14 @@ import (
 )
 
 func TestLoadOrCreateKey_CreatesKeyIfMissing(t *testing.T) {
-	s := &SecretsStore{
-		KeyPath: t.TempDir() + "/master.key",
+	tmp := t.TempDir()
+	t.Setenv("SIMPLE_SECRETS_CONFIG_DIR", tmp)
+
+	s, err := LoadSecretsStoreWithBackend(NewFilesystemBackend())
+	if err != nil {
+		t.Fatalf("Failed to create store: %v", err)
 	}
-	// Should not exist yet
-	if _, err := os.Stat(s.KeyPath); !os.IsNotExist(err) {
-		t.Fatalf("expected key file to not exist")
-	}
-	if err := s.loadOrCreateKey(); err != nil {
-		t.Fatalf("loadOrCreateKey: %v", err)
-	}
+
 	// Should now exist
 	if _, err := os.Stat(s.KeyPath); err != nil {
 		t.Fatalf("expected key file to exist: %v", err)
@@ -42,20 +40,24 @@ func TestLoadOrCreateKey_CreatesKeyIfMissing(t *testing.T) {
 }
 
 func TestLoadOrCreateKey_LoadsExistingKey(t *testing.T) {
-	s := &SecretsStore{
-		KeyPath: t.TempDir() + "/master.key",
+	tmp := t.TempDir()
+	t.Setenv("SIMPLE_SECRETS_CONFIG_DIR", tmp)
+
+	// Create initial store
+	s, err := LoadSecretsStoreWithBackend(NewFilesystemBackend())
+	if err != nil {
+		t.Fatalf("Failed to create initial store: %v", err)
 	}
-	// Create a key file
-	if err := s.loadOrCreateKey(); err != nil {
-		t.Fatalf("initial create: %v", err)
-	}
+
 	origKey := make([]byte, len(s.masterKey))
 	copy(origKey, s.masterKey)
-	// Now reload
-	s2 := &SecretsStore{KeyPath: s.KeyPath}
-	if err := s2.loadOrCreateKey(); err != nil {
-		t.Fatalf("reload: %v", err)
+
+	// Now reload with a new store
+	s2, err := LoadSecretsStoreWithBackend(NewFilesystemBackend())
+	if err != nil {
+		t.Fatalf("Failed to reload store: %v", err)
 	}
+
 	if len(s2.masterKey) != 32 {
 		t.Fatalf("expected 32-byte key, got %d", len(s2.masterKey))
 	}
@@ -65,21 +67,31 @@ func TestLoadOrCreateKey_LoadsExistingKey(t *testing.T) {
 }
 
 func TestLoadOrCreateKey_InvalidBase64Fails(t *testing.T) {
-	dir := t.TempDir()
-	keyPath := dir + "/master.key"
+	tmp := t.TempDir()
+	t.Setenv("SIMPLE_SECRETS_CONFIG_DIR", tmp)
+
+	// Create invalid key file
+	keyPath := tmp + "/master.key"
 	if err := os.WriteFile(keyPath, []byte("not-base64!"), 0600); err != nil {
 		t.Fatalf("write: %v", err)
 	}
-	s := &SecretsStore{KeyPath: keyPath}
-	if err := s.loadOrCreateKey(); err == nil {
+
+	// Try to load - should fail
+	_, err := LoadSecretsStoreWithBackend(NewFilesystemBackend())
+	if err == nil {
 		t.Fatal("expected error on invalid base64")
 	}
 }
 
 func TestWriteMasterKey_WritesBase64(t *testing.T) {
-	dir := t.TempDir()
-	keyPath := dir + "/master.key"
-	s := &SecretsStore{KeyPath: keyPath}
+	tmp := t.TempDir()
+	t.Setenv("SIMPLE_SECRETS_CONFIG_DIR", tmp)
+
+	s, err := LoadSecretsStoreWithBackend(NewFilesystemBackend())
+	if err != nil {
+		t.Fatalf("Failed to create store: %v", err)
+	}
+
 	key := make([]byte, 32)
 	for i := range key {
 		key[i] = byte(i)
@@ -87,7 +99,7 @@ func TestWriteMasterKey_WritesBase64(t *testing.T) {
 	if err := s.writeMasterKey(key); err != nil {
 		t.Fatalf("writeMasterKey: %v", err)
 	}
-	data, err := os.ReadFile(keyPath)
+	data, err := os.ReadFile(s.KeyPath)
 	if err != nil {
 		t.Fatalf("read: %v", err)
 	}

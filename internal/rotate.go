@@ -176,7 +176,7 @@ func (s *SecretsStore) RotateMasterKey(backupDir string) error {
 
 	// 6) Write the NEW master key to a temp file using unique name
 	tmpKey := fmt.Sprintf("%s.tmp.%d", s.KeyPath, os.Getpid())
-	if err := writeMasterKeyToPath(tmpKey, newKey); err != nil {
+	if err := s.writeMasterKeyToPath(tmpKey, newKey); err != nil {
 		_ = os.Remove(tmpSecrets) // cleanup temp files on failure
 		return fmt.Errorf("write new master key to temp failed: %w", err)
 	}

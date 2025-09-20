@@ -27,22 +27,20 @@ import (
 func TestAtomicMasterKeyRotation(t *testing.T) {
 	// Create a temporary directory for testing
 	tmpDir := t.TempDir()
+	t.Setenv("SIMPLE_SECRETS_CONFIG_DIR", tmpDir)
 
-	// Create test files
-	masterKeyPath := filepath.Join(tmpDir, "master.key")
-	secretsPath := filepath.Join(tmpDir, "secrets.json")
-
-	// Create a secrets store for testing
-	store := &SecretsStore{
-		KeyPath:     masterKeyPath,
-		SecretsPath: secretsPath,
-		secrets:     make(map[string]string),
+	// Create a secrets store using proper constructor
+	store, err := LoadSecretsStoreWithBackend(NewFilesystemBackend())
+	if err != nil {
+		t.Fatalf("Failed to create store: %v", err)
 	}
 
 	// Initialize the store with some test data
 	originalKey := make([]byte, 32) // 32 bytes for AES-256
 	copy(originalKey, []byte("original-master-key-12345678901234567890123456789012")[:32])
-	err := writeMasterKeyToPath(masterKeyPath, originalKey)
+
+	// Set the master key directly for testing
+	err = store.writeMasterKeyToPath(store.KeyPath, originalKey)
 	if err != nil {
 		t.Fatalf("Failed to create test master key: %v", err)
 	}
@@ -69,20 +67,9 @@ func TestAtomicMasterKeyRotation(t *testing.T) {
 	}
 
 	// Verify secrets are still accessible after rotation
-	newStore := &SecretsStore{
-		KeyPath:     masterKeyPath,
-		SecretsPath: secretsPath,
-		secrets:     make(map[string]string),
-	}
-
-	err = newStore.loadOrCreateKey()
+	newStore, err := LoadSecretsStoreWithBackend(NewFilesystemBackend())
 	if err != nil {
-		t.Fatalf("Failed to load rotated key: %v", err)
-	}
-
-	err = newStore.loadSecrets()
-	if err != nil {
-		t.Fatalf("Failed to load secrets after rotation: %v", err)
+		t.Fatalf("Failed to create new store: %v", err)
 	}
 
 	// Verify all secrets are still accessible
@@ -128,9 +115,14 @@ func TestAtomicOperationTempFileCleanup(t *testing.T) {
 	}
 
 	// Test multiple atomic operations to ensure temp files are cleaned up
+	tempStore, err := LoadSecretsStoreWithBackend(NewFilesystemBackend())
+	if err != nil {
+		t.Fatalf("Failed to create temp store: %v", err)
+	}
+
 	for i := 0; i < 5; i++ {
 		newKey := []byte("new-key-" + string(rune('0'+i)))
-		err = writeMasterKeyToPath(masterKeyPath, newKey)
+		err = tempStore.writeMasterKeyToPath(masterKeyPath, newKey)
 		if err != nil {
 			t.Fatalf("Operation %d failed: %v", i, err)
 		}
@@ -177,8 +169,13 @@ func TestAtomicOperationPermissions(t *testing.T) {
 	}
 
 	// Perform atomic operation
+	tempStore, err := LoadSecretsStoreWithBackend(NewFilesystemBackend())
+	if err != nil {
+		t.Fatalf("Failed to create temp store: %v", err)
+	}
+
 	newKey := []byte("new-key-with-permissions-test")
-	err = writeMasterKeyToPath(masterKeyPath, newKey)
+	err = tempStore.writeMasterKeyToPath(masterKeyPath, newKey)
 	if err != nil {
 		t.Fatalf("Atomic operation failed: %v", err)
 	}
@@ -218,16 +215,21 @@ func TestAtomicOperationConcurrency(t *testing.T) {
 			}
 
 			for j := 0; j < 10; j++ {
+				// Create temp store for this operation
+				tempStore, err := LoadSecretsStoreWithBackend(NewFilesystemBackend())
+				if err != nil {
+					errors <- fmt.Errorf("goroutine %d: failed to create temp store: %w", id, err)
+					return
+				}
+
 				key := []byte(fmt.Sprintf("key-from-goroutine-%d-iteration-%d", id, j))
-				err := writeMasterKeyToPath(masterKeyPath, key)
+				err = tempStore.writeMasterKeyToPath(masterKeyPath, key)
 				if err != nil {
 					errors <- fmt.Errorf("goroutine %d: %w", id, err)
 					return
 				}
 				time.Sleep(time.Millisecond) // Small delay to increase chance of race conditions
-			}
-
-			// Verify final file is in a valid state (can be read)
+			} // Verify final file is in a valid state (can be read)
 			finalKey, err := os.ReadFile(masterKeyPath)
 			if err != nil {
 				errors <- fmt.Errorf("goroutine %d: failed to read final key: %w", id, err)
