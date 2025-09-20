@@ -87,12 +87,12 @@ func (s *SecretsStore) loadSecrets() error {
 
 	var secrets map[string]string
 	if err := json.Unmarshal(b, &secrets); err != nil {
-		return fmt.Errorf("secrets database appears to be corrupted (JSON parse error: %v)\n\n"+
-			"🔧 Recovery options:\n"+
-			"  • Restore from backup: ./simple-secrets restore-database\n"+
-			"  • List available backups: ./simple-secrets list backups\n"+
-			"  • Emergency contact: check ~/.simple-secrets/backups/ directory\n\n"+
-			"⚠️  Do not delete ~/.simple-secrets/ - your backups contain recoverable data!", err)
+		return fmt.Errorf("secrets database appears to be corrupted (JSON parse error: %v). "+
+			"Recovery options: "+
+			"Restore from backup: ./simple-secrets restore-database; "+
+			"List available backups: ./simple-secrets list backups; "+
+			"Emergency contact: check ~/.simple-secrets/backups/ directory. "+
+			"Do not delete ~/.simple-secrets/ - your backups contain recoverable data", err)
 	}
 
 	s.mu.Lock()
@@ -240,7 +240,7 @@ func (s *SecretsStore) DisableSecret(key string) error {
 
 	// Mark as disabled using JSON encoding to handle keys with special characters
 	timestamp := time.Now().UnixNano()
-	keyData := map[string]interface{}{
+	keyData := map[string]any{
 		"timestamp": timestamp,
 		"key":       key,
 	}
