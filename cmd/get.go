@@ -33,7 +33,7 @@ var getCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Check if token flag was explicitly set to empty string
 		// RBAC: read access
-		user, _, err := RBACGuardWithCmd(false, cmd)
+		user, _, err := RBACGuard(false, cmd)
 		if err != nil {
 			return err
 		}

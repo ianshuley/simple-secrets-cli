@@ -59,7 +59,7 @@ var restoreCmd = &cobra.Command{
 
 func restoreSecret(cmd *cobra.Command, secretKey string) error {
 	// RBAC: write access (restoring is a write operation)
-	user, _, err := RBACGuardWithCmd(true, cmd)
+	user, _, err := RBACGuard(true, cmd)
 	if err != nil {
 		return err
 	}
@@ -99,7 +99,7 @@ func restoreSecret(cmd *cobra.Command, secretKey string) error {
 
 func restoreDatabase(cmd *cobra.Command, backupName string) error {
 	// RBAC: write access (this is a destructive operation)
-	user, _, err := RBACGuardWithCmd(true, cmd)
+	user, _, err := RBACGuard(true, cmd)
 	if err != nil {
 		return err
 	}

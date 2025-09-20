@@ -63,7 +63,7 @@ var listCmd = &cobra.Command{
 
 func listKeys(cmd *cobra.Command) error {
 	// RBAC: read access
-	user, _, err := RBACGuardWithCmd(false, cmd)
+	user, _, err := RBACGuard(false, cmd)
 	if err != nil {
 		return err
 	}
@@ -91,7 +91,7 @@ func listKeys(cmd *cobra.Command) error {
 
 func listBackups(cmd *cobra.Command) error {
 	// RBAC: read access
-	user, _, err := RBACGuardWithCmd(false, cmd)
+	user, _, err := RBACGuard(false, cmd)
 	if err != nil {
 		return err
 	}
@@ -126,7 +126,7 @@ func listBackups(cmd *cobra.Command) error {
 
 func listUsers(cmd *cobra.Command) error {
 	// RBAC: admin required for user management
-	user, store, err := RBACGuardWithCmd(true, cmd)
+	user, store, err := RBACGuard(true, cmd)
 	if err != nil {
 		return err
 	}
@@ -180,7 +180,7 @@ func listUsers(cmd *cobra.Command) error {
 
 func listDisabledSecrets(cmd *cobra.Command) error {
 	// RBAC: read access
-	user, _, err := RBACGuardWithCmd(false, cmd)
+	user, _, err := RBACGuard(false, cmd)
 	if err != nil {
 		return err
 	}

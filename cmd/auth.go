@@ -22,8 +22,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// RBACGuardWithCmd loads users, checks first run, resolves token, and returns (user, store, error)
-func RBACGuardWithCmd(needWrite bool, cmd *cobra.Command) (*internal.User, *internal.UserStore, error) {
+// RBACGuard loads users, checks first run, resolves token, and returns (user, store, error)
+func RBACGuard(needWrite bool, cmd *cobra.Command) (*internal.User, *internal.UserStore, error) {
 	user, store, err := authenticateUser(cmd)
 	if err != nil {
 		return nil, nil, err

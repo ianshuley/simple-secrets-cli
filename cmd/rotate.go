@@ -94,7 +94,7 @@ func rotateMasterKey(cmd *cobra.Command) error {
 
 // validateMasterKeyRotationAccess checks RBAC permissions for master key rotation
 func validateMasterKeyRotationAccess(cmd *cobra.Command) (*internal.User, *internal.SecretsStore, error) {
-	user, _, err := RBACGuardWithCmd(true, cmd)
+	user, _, err := RBACGuard(true, cmd)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -162,7 +162,7 @@ func rotateSelfToken(cmd *cobra.Command) error {
 
 func rotateToken(cmd *cobra.Command, targetUsername string) error {
 	// First, check if this is actually self-rotation (user specified their own username)
-	currentUser, _, err := RBACGuardWithCmd(false, cmd) // Don't require write access yet
+	currentUser, _, err := RBACGuard(false, cmd) // Don't require write access yet
 	if err != nil {
 		return err
 	}
@@ -210,7 +210,7 @@ func printBackupLocation(backupDir string) {
 
 // validateTokenRotationAccess checks permissions and loads necessary data for token rotation
 func validateTokenRotationAccess(cmd *cobra.Command, targetUsername string) (*internal.User, string, []*internal.User, error) {
-	currentUser, store, err := RBACGuardWithCmd(true, cmd)
+	currentUser, store, err := RBACGuard(true, cmd)
 	if err != nil {
 		return nil, "", nil, err
 	}
@@ -237,7 +237,7 @@ func validateTokenRotationAccess(cmd *cobra.Command, targetUsername string) (*in
 
 // validateSelfTokenRotationAccess checks permissions for self token rotation
 func validateSelfTokenRotationAccess(cmd *cobra.Command) (*internal.User, string, []*internal.User, error) {
-	currentUser, store, err := RBACGuardWithCmd(false, cmd) // Use false - we check specific permission below
+	currentUser, store, err := RBACGuard(false, cmd) // Use false - we check specific permission below
 	if err != nil {
 		return nil, "", nil, err
 	}

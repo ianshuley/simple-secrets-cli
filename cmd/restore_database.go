@@ -45,7 +45,7 @@ var restoreDatabaseCmd = &cobra.Command{
 		}
 
 		// RBAC: write access (this is a destructive operation)
-		user, _, err := RBACGuardWithCmd(true, cmd)
+		user, _, err := RBACGuard(true, cmd)
 		if err != nil {
 			return err
 		}
