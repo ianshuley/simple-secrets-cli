@@ -158,7 +158,7 @@ func (s *SecretsStore) reencryptBackups(oldKey, newKey []byte) error {
 		if err != nil {
 			return err
 		}
-		
+
 		// Skip directories and non-.bak files
 		if info.IsDir() || filepath.Ext(path) != ".bak" {
 			return nil
