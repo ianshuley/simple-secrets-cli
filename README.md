@@ -233,8 +233,8 @@ simple-secrets list backups
 simple-secrets restore secret KEY
 ```
 
-**When created**: Only when overwriting existing secrets (not on initial creation)  
-**Location**: `~/.simple-secrets/backups/[key].bak`  
+**When created**: Only when overwriting existing secrets (not on initial creation)
+**Location**: `~/.simple-secrets/backups/[key].bak`
 **Cross-rotation compatibility**: Individual backups survive master key rotation via automatic re-encryption
 
 #### Master Key Rotation Backups
@@ -249,8 +249,8 @@ simple-secrets list backups
 simple-secrets restore database BACKUP_ID
 ```
 
-**When created**: Automatically during `simple-secrets rotate master-key`  
-**Location**: `~/.simple-secrets/backup-[timestamp]/`  
+**When created**: Automatically during `simple-secrets rotate master-key`
+**Location**: `~/.simple-secrets/backup-[timestamp]/`
 **Contains**: Complete encrypted database snapshot before key rotation
 
 ## Database Reset & Recovery
