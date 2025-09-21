@@ -87,7 +87,7 @@ simple-secrets put api-key '--prod-key-abc123' --token YOUR_ADMIN_TOKEN
 simple-secrets put db-url 'postgresql://user:pass@localhost:5432/db' --token YOUR_ADMIN_TOKEN
 
 # ⚠️  SECURITY: Single quotes vs double quotes
-simple-secrets put safe-key 'echo $(whoami)'     # ✅ Stores literally: "echo $(whoami)"  
+simple-secrets put safe-key 'echo $(whoami)'     # ✅ Stores literally: "echo $(whoami)"
 simple-secrets put danger "echo $(whoami)"       # ❌ Executes command before storing!
 
 # Retrieve a secret
@@ -204,7 +204,7 @@ simple-secrets list disabled
 ```bash
 # ✅ SAFE - Single quotes store values literally
 simple-secrets put script 'rm -rf /'           # Stores the literal string
-simple-secrets put cmd 'echo $(date)'          # Stores the literal string  
+simple-secrets put cmd 'echo $(date)'          # Stores the literal string
 simple-secrets put password 'p@$$w0rd!$'       # Stores exactly as written
 
 # ❌ DANGEROUS - Double quotes allow shell command substitution
