@@ -286,7 +286,6 @@ func generateAndUpdateUserToken(users []*internal.User, targetIndex int) (string
 	return newToken, nil
 }
 
-
 // TokenRotationContext holds all the data needed for token rotation
 type TokenRotationContext struct {
 	RequestingUser *internal.User

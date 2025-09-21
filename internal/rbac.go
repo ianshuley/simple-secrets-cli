@@ -502,8 +502,6 @@ func (us *UserStore) UpdateUserRole(username, newRole string) error {
 	return fmt.Errorf("user %q not found", username)
 }
 
-
-
 // countAdminUsers returns the number of admin users (helper for validation)
 func (us *UserStore) countAdminUsers() int {
 	count := 0
