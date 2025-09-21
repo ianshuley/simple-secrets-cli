@@ -153,7 +153,14 @@ For more config options, run: simple-secrets help config`)
 		return "", fmt.Errorf("unmarshal config.json: %w", err)
 	}
 	if config.Token == "" {
-		return "", errors.New("token not found in config.json")
+		return "", errors.New(`authentication required: no token found
+
+Set your token via:
+    --token <your-token> (as a flag)
+    SIMPLE_SECRETS_TOKEN=<your-token> (as environment variable)
+    ~/.simple-secrets/config.json with {"token": "<your-token>"}
+
+For more config options, run: simple-secrets help config`)
 	}
 
 	return config.Token, nil
