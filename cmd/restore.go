@@ -67,20 +67,16 @@ func restoreSecret(cmd *cobra.Command, secretKey string) error {
 		return nil
 	}
 
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return err
-	}
-
-	backupPath := fmt.Sprintf("%s/.simple-secrets/backups/%s.bak", home, secretKey)
-	data, err := os.ReadFile(backupPath)
-	if err != nil {
-		return fmt.Errorf("could not read backup: %w", err)
-	}
-
 	store, err := internal.LoadSecretsStore()
 	if err != nil {
 		return err
+	}
+
+	// Use store's backup path method to respect config directory
+	backupPath := store.GetBackupPath(secretKey)
+	data, err := os.ReadFile(backupPath)
+	if err != nil {
+		return fmt.Errorf("could not read backup: %w", err)
 	}
 
 	// Backup files are encrypted, so decrypt them first

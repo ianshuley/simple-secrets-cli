@@ -461,3 +461,8 @@ func (s *SecretsStore) getBackupDirectory() string {
 func (s *SecretsStore) getBackupPath(key string) string {
 	return filepath.Join(s.getBackupDirectory(), key+".bak")
 }
+
+// GetBackupPath returns the full path for a secret's backup file (public method)
+func (s *SecretsStore) GetBackupPath(key string) string {
+	return s.getBackupPath(key)
+}
