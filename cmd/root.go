@@ -102,7 +102,7 @@ func handleRootCommand(cmd *cobra.Command, args []string) {
 
 // needsInitialization checks if this is a fresh installation
 func needsInitialization() bool {
-	eligible, err := internal.IsFirstRunEligible()
+	eligible, err := internal.IsFirstRun()
 	if err != nil {
 		return false // If there's an error (like protection), it's not a fresh install
 	}
@@ -111,7 +111,7 @@ func needsInitialization() bool {
 
 // runExplicitSetup handles the --setup flag (user explicitly wants to set up)
 func runExplicitSetup() {
-	isActualFirstRun, err := internal.IsFirstRunEligible()
+	isActualFirstRun, err := internal.IsFirstRun()
 	if err != nil {
 		// Error case (broken state/protection error)
 		displayFirstRunProtectionError(err)
@@ -196,7 +196,7 @@ func performFirstTimeSetup() {
 	fmt.Println("\nCreating admin user...")
 
 	// Use the clean first-run setup function that returns the token
-	_, token, err := internal.PerformFirstRunSetupWithToken()
+	_, token, err := internal.DoFirstRunSetupWithToken()
 	if err != nil {
 		fmt.Printf("\n❌ Setup failed: %v\n", err)
 		return

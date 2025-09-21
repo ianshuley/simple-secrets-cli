@@ -238,10 +238,10 @@ func (s *SecretsStore) cleanupOldBackups(keep int) error {
 	})
 
 	// Remove old backups beyond the keep limit
-	for i := keep; i < len(rotationDirs); i++ {
-		oldDir := filepath.Join(backupRoot, rotationDirs[i])
+	for _, dirName := range rotationDirs[keep:] {
+		oldDir := filepath.Join(backupRoot, dirName)
 		if err := os.RemoveAll(oldDir); err != nil {
-			fmt.Printf("Warning: failed to remove old backup %s: %v\n", rotationDirs[i], err)
+			fmt.Printf("Warning: failed to remove old backup %s: %v\n", dirName, err)
 		}
 	}
 

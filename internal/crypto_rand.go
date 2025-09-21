@@ -19,5 +19,5 @@ import "crypto/rand"
 
 func randReadImpl(b []byte) (int, error) { return rand.Read(b) }
 
-// tiny indirection so it's easy to mock later, if desired
+// Variable function pointer allows for dependency injection during testing
 var randRead = func(b []byte) (int, error) { return randReadImpl(b) }

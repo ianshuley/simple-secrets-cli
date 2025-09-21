@@ -23,79 +23,45 @@ import (
 	"time"
 )
 
-// IsFirstRunEligible checks if this is a fresh installation eligible for first-run setup
-func IsFirstRunEligible() (bool, error) {
+// IsFirstRun checks if this is a fresh installation that needs setup
+func IsFirstRun() (bool, error) {
 	usersPath, err := DefaultUserConfigPath("users.json")
 	if err != nil {
 		return false, err
 	}
 
-	// Check if users.json exists
-	if _, err := os.Stat(usersPath); !os.IsNotExist(err) {
-		return false, nil // users.json exists = not first run
-	}
-
-	// Users.json doesn't exist, check if this is a clean environment
-	if err := validateFirstRunEligibility(); err != nil {
-		return false, err // Broken state - not eligible for first run
-	}
-
-	return true, nil // Clean environment - eligible for first run
+	// If users.json exists, not first run
+	_, err = os.Stat(usersPath)
+	return os.IsNotExist(err), nil
 }
 
-// PerformFirstRunSetup executes the first-run setup process
-// Should only be called after confirming IsFirstRunEligible() returns true
-func PerformFirstRunSetup() (*UserStore, error) {
+// DoFirstRunSetup creates the initial admin user and returns the user store
+func DoFirstRunSetup() (*UserStore, error) {
 	usersPath, rolesPath, err := resolveConfigPaths()
 	if err != nil {
 		return nil, err
 	}
 
-	// Verify we're still eligible (double-check in case of race conditions)
-	if err := validateFirstRunEligibility(); err != nil {
-		return nil, err
-	}
-
-	// Verify users.json still doesn't exist
-	if _, err := os.Stat(usersPath); !os.IsNotExist(err) {
-		return nil, fmt.Errorf("users.json was created by another process")
-	}
-
-	fmt.Println("users.json not found – creating default admin user...")
-	store, firstRun, err := createDefaultUserFile(usersPath, rolesPath)
+	fmt.Println("Setting up simple-secrets for first use...")
+	store, created, err := createDefaultUserFile(usersPath, rolesPath)
 	if err != nil {
 		return nil, err
 	}
-	if !firstRun {
-		return nil, fmt.Errorf("unexpected: first run setup did not complete properly")
+	if !created {
+		return nil, fmt.Errorf("setup failed: could not create default user")
 	}
 	return store, nil
 }
 
-// PerformFirstRunSetupWithToken executes the first-run setup process and returns the admin token
-// Should only be called after confirming IsFirstRunEligible() returns true
-func PerformFirstRunSetupWithToken() (*UserStore, string, error) {
+// DoFirstRunSetupWithToken creates the initial admin user and returns both store and token
+func DoFirstRunSetupWithToken() (*UserStore, string, error) {
 	usersPath, rolesPath, err := resolveConfigPaths()
 	if err != nil {
 		return nil, "", err
 	}
 
-	// Verify we're still eligible (double-check in case of race conditions)
-	if err := validateFirstRunEligibility(); err != nil {
-		return nil, "", err
-	}
-
-	// Verify users.json still doesn't exist
-	if _, err := os.Stat(usersPath); !os.IsNotExist(err) {
-		return nil, "", fmt.Errorf("users.json was created by another process")
-	}
-
-	fmt.Println("users.json not found – creating default admin user...")
-	store, token, err := createDefaultUserFileWithToken(usersPath, rolesPath)
-	if err != nil {
-		return nil, "", err
-	}
-	return store, token, nil
+	fmt.Println("Setting up simple-secrets for first use...")
+	return createDefaultUserFileWithToken(usersPath, rolesPath)
 }
 
 // handleFirstRunWithToken manages the first-run scenario and returns the generated token

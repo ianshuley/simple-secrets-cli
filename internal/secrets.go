@@ -267,7 +267,7 @@ func (s *SecretsStore) Put(key, value string) error {
 	}
 
 	// Now perform the update with merged state
-	s.ensureBackupExists(key, encryptedValue)
+	s.ensureBackupExists(key)
 	s.secrets[key] = encryptedValue
 	err = s.saveSecretsLocked()
 	s.mu.Unlock()
@@ -277,7 +277,12 @@ func (s *SecretsStore) Put(key, value string) error {
 
 // ensureBackupExists stores an encrypted backup of the current value (if any) before modification.
 // This allows rollback if the operation fails. Only the most recent backup is kept.
-func (s *SecretsStore) ensureBackupExists(key, newEncryptedValue string) {
+func (s *SecretsStore) ensureBackupExists(key string) {
+	// Defensive validation: ensure key is not empty
+	if key == "" {
+		return // No backup needed for empty keys
+	}
+
 	// Store current value as backup using existing backup system
 	if currentValue, exists := s.secrets[key]; exists {
 		s.backupSecret(key, currentValue)

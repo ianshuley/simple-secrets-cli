@@ -187,6 +187,11 @@ func authenticatePutUser(token string) (*internal.User, error) {
 	return user, err
 }
 
+// validatePutKeyName ensures secret keys meet security and usability requirements:
+// - Non-empty
+// - No control characters (except tab, LF, CR)
+// - No path traversal sequences
+// - No shell metacharacters
 func validatePutKeyName(key string) error {
 	return ValidateSecureInput(key, SecretKeyValidationConfig)
 }

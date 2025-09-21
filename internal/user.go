@@ -138,11 +138,11 @@ func ResolveToken(cliFlag string) (string, error) {
 Set your token via:
     --token <your-token> (as a flag)
     SIMPLE_SECRETS_TOKEN=<your-token> (as environment variable)
-    ~/.simple-secrets/config.json with {"token": "<your-token>"}
+    Configuration file (run: simple-secrets help config for details)
 
 For more config options, run: simple-secrets help config`)
 		}
-		return "", fmt.Errorf("read config.json: %w", err)
+		return "", fmt.Errorf("failed to read configuration: %w", err)
 	}
 
 	var config struct {
@@ -150,7 +150,7 @@ For more config options, run: simple-secrets help config`)
 		RotationBackupCount *int   `json:"rotation_backup_count,omitempty"` // Number of rotation backups to keep (default: 1)
 	}
 	if err := json.Unmarshal(data, &config); err != nil {
-		return "", fmt.Errorf("unmarshal config.json: %w", err)
+		return "", fmt.Errorf("failed to parse configuration: %w", err)
 	}
 	if config.Token == "" {
 		return "", errors.New(`authentication required: no token found
@@ -158,7 +158,7 @@ For more config options, run: simple-secrets help config`)
 Set your token via:
     --token <your-token> (as a flag)
     SIMPLE_SECRETS_TOKEN=<your-token> (as environment variable)
-    ~/.simple-secrets/config.json with {"token": "<your-token>"}
+    Configuration file (run: simple-secrets help config for details)
 
 For more config options, run: simple-secrets help config`)
 	}
