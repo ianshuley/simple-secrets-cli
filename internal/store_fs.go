@@ -241,7 +241,7 @@ func (s *SecretsStore) Get(key string) (string, error) {
 	if !ok {
 		return "", ErrNotFound
 	}
-	
+
 	// Use atomic key access to prevent stale key usage
 	pt, err := s.decryptWithMasterKey(enc)
 	if err != nil {
