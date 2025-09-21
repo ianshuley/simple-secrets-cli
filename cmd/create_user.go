@@ -17,11 +17,8 @@ package cmd
 
 import (
 	"bufio"
-	"crypto/rand"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"strings"
 	"time"
@@ -40,7 +37,7 @@ var createUserCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Check if token flag was explicitly set to empty string
 		if flag := cmd.Flag("token"); flag != nil && flag.Changed && TokenFlag == "" {
-			return fmt.Errorf("authentication required: token cannot be empty")
+			return ErrAuthenticationRequired
 		}
 
 		user, _, err := validateUserCreationAccess(cmd)
@@ -198,11 +195,7 @@ func validateUsernameAvailability(username string) error {
 
 // generateSecureUserToken creates a cryptographically secure random token
 func generateSecureUserToken() (string, error) {
-	randToken := make([]byte, 20)
-	if _, err := io.ReadFull(rand.Reader, randToken); err != nil {
-		return "", fmt.Errorf("failed to generate token: %w", err)
-	}
-	return base64.RawURLEncoding.EncodeToString(randToken), nil
+	return GenerateSecureToken()
 }
 
 // persistNewUser saves the new user to the users.json file atomically

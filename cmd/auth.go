@@ -16,7 +16,10 @@ limitations under the License.
 package cmd
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"fmt"
+	"io"
 	"simple-secrets/internal"
 
 	"github.com/spf13/cobra"
@@ -132,3 +135,15 @@ func authorizeAccess(user *internal.User, store *internal.UserStore, needWrite b
 	}
 	return nil
 }
+
+// GenerateSecureToken generates a cryptographically secure random token
+func GenerateSecureToken() (string, error) {
+	randToken := make([]byte, 20)
+	if _, err := io.ReadFull(rand.Reader, randToken); err != nil {
+		return "", fmt.Errorf("failed to generate token: %w", err)
+	}
+	return base64.RawURLEncoding.EncodeToString(randToken), nil
+}
+
+// ErrAuthenticationRequired returns a standard authentication required error
+var ErrAuthenticationRequired = fmt.Errorf("authentication required: token cannot be empty")

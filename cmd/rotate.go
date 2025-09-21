@@ -17,8 +17,6 @@ package cmd
 
 import (
 	"bufio"
-	"crypto/rand"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -52,7 +50,7 @@ Token rotation options:
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Check if token flag was explicitly set to empty string
 		if flag := cmd.Flag("token"); flag != nil && flag.Changed && TokenFlag == "" {
-			return fmt.Errorf("authentication required: token cannot be empty")
+			return ErrAuthenticationRequired
 		}
 
 		switch args[0] {
@@ -290,11 +288,7 @@ func generateAndUpdateUserToken(users []*internal.User, targetIndex int) (string
 
 // generateSecureTokenString creates a new secure random token string
 func generateSecureTokenString() (string, error) {
-	randToken := make([]byte, 20)
-	if _, err := rand.Read(randToken); err != nil {
-		return "", err
-	}
-	return base64.RawURLEncoding.EncodeToString(randToken), nil
+	return GenerateSecureToken()
 }
 
 // TokenRotationContext holds all the data needed for token rotation

@@ -37,7 +37,7 @@ var restoreCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Check if token flag was explicitly set to empty string
 		if flag := cmd.Flag("token"); flag != nil && flag.Changed && TokenFlag == "" {
-			return fmt.Errorf("authentication required: token cannot be empty")
+			return ErrAuthenticationRequired
 		}
 
 		switch args[0] {
