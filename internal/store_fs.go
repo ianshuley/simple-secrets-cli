@@ -210,29 +210,6 @@ func (s *SecretsStore) mergeWithDiskState() error {
 	return nil
 }
 
-// BackupStrategy defines how to handle backup for a secret
-type BackupStrategy struct {
-	hasExistingValue bool
-	existingValue    string
-}
-
-// selectBackupValue chooses what value to backup based on the strategy
-func (bs *BackupStrategy) selectBackupValue(newValue string) string {
-	if bs.hasExistingValue {
-		return bs.existingValue // Backup the previous value
-	}
-	return newValue // Backup the new value if no previous value exists
-}
-
-// determineBackupStrategy decides what backup approach to use for a secret
-func (s *SecretsStore) determineBackupStrategy(key string) *BackupStrategy {
-	existingValue, hasExisting := s.secrets[key]
-	return &BackupStrategy{
-		hasExistingValue: hasExisting,
-		existingValue:    existingValue,
-	}
-}
-
 func (s *SecretsStore) Get(key string) (string, error) {
 	s.mu.RLock()
 	enc, ok := s.secrets[key]
