@@ -63,8 +63,8 @@ func LockFile(path string) (*FileLock, error) {
 	}
 
 	// Try to acquire exclusive lock with timeout
-	maxAttempts := 100 // 10 seconds total with 100ms intervals (increased for high concurrency)
-	for attempt := 0; attempt < maxAttempts; attempt++ {
+	const maxLockAttempts = 100 // 10 seconds total with 100ms intervals (increased for high concurrency)
+	for attempt := 0; attempt < maxLockAttempts; attempt++ {
 		err = syscall.Flock(int(file.Fd()), syscall.LOCK_EX|syscall.LOCK_NB)
 		if err == nil {
 			// Lock acquired successfully
@@ -86,7 +86,7 @@ func LockFile(path string) (*FileLock, error) {
 	}
 
 	file.Close()
-	return nil, fmt.Errorf("timeout acquiring file lock after %d attempts", maxAttempts)
+	return nil, fmt.Errorf("timeout acquiring file lock after %d attempts", maxLockAttempts)
 }
 
 // Unlock releases the file lock

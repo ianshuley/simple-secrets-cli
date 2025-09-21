@@ -137,13 +137,25 @@ func (s *SecretsStore) backupSecret(key, encryptedValue string) {
 	_ = s.storage.WriteFile(backupPath, []byte(encryptedValue), FileMode(secureFilePermissions))
 }
 
-func (s *SecretsStore) Put(key, value string) error {
-	// Encrypt outside any locks to minimize lock time
+// encryptWithMasterKey safely encrypts data using the current master key
+// This ensures the key is not stale when used for encryption
+func (s *SecretsStore) encryptWithMasterKey(data []byte) (string, error) {
 	s.mu.RLock()
-	masterKey := s.masterKey
-	s.mu.RUnlock()
+	defer s.mu.RUnlock()
+	return encrypt(s.masterKey, data)
+}
 
-	encryptedValue, err := encrypt(masterKey, []byte(value))
+// decryptWithMasterKey safely decrypts data using the current master key
+// This ensures the key is not stale when used for decryption
+func (s *SecretsStore) decryptWithMasterKey(encryptedData string) ([]byte, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return decrypt(s.masterKey, encryptedData)
+}
+
+func (s *SecretsStore) Put(key, value string) error {
+	// Encrypt using atomic key access to prevent stale key usage
+	encryptedValue, err := s.encryptWithMasterKey([]byte(value))
 	if err != nil {
 		return err
 	}
@@ -157,17 +169,14 @@ func (s *SecretsStore) Put(key, value string) error {
 
 	// For concurrent operations within the same process, we need to be more careful
 	// Load fresh state but merge it with existing in-memory state
-	freshSecrets, err := s.loadSecretsFromDisk()
+	s.mu.Lock()
+	err = s.mergeWithDiskState()
 	if err != nil {
-		return fmt.Errorf("failed to reload secrets before write: %w", err)
+		s.mu.Unlock()
+		return fmt.Errorf("failed to merge disk state: %w", err)
 	}
 
 	// Now perform the update with merged state
-	s.mu.Lock()
-	// Merge disk state with in-memory state (disk takes precedence for conflicts)
-	for k, v := range freshSecrets {
-		s.secrets[k] = v
-	}
 	s.ensureBackupExists(key, encryptedValue)
 	s.secrets[key] = encryptedValue
 	err = s.saveSecretsLocked()
@@ -176,11 +185,29 @@ func (s *SecretsStore) Put(key, value string) error {
 	return err
 }
 
-// ensureBackupExists creates a backup for the secret using the appropriate strategy
+// ensureBackupExists stores an encrypted backup of the current value (if any) before modification.
+// This allows rollback if the operation fails. Only the most recent backup is kept.
 func (s *SecretsStore) ensureBackupExists(key, newEncryptedValue string) {
-	strategy := s.determineBackupStrategy(key)
-	backupValue := strategy.selectBackupValue(newEncryptedValue)
-	s.backupSecret(key, backupValue)
+	// Store current value as backup using existing backup system
+	if currentValue, exists := s.secrets[key]; exists {
+		s.backupSecret(key, currentValue)
+	}
+}
+
+// mergeWithDiskState loads fresh state from disk and merges it with in-memory state.
+// This ensures consistency when multiple processes might be modifying the store.
+// Disk state takes precedence for conflicts.
+func (s *SecretsStore) mergeWithDiskState() error {
+	freshSecrets, err := s.loadSecretsFromDisk()
+	if err != nil {
+		return fmt.Errorf("failed to reload secrets for merge: %w", err)
+	}
+
+	// Merge disk state with in-memory state (disk takes precedence for conflicts)
+	for k, v := range freshSecrets {
+		s.secrets[k] = v
+	}
+	return nil
 }
 
 // BackupStrategy defines how to handle backup for a secret
@@ -209,13 +236,14 @@ func (s *SecretsStore) determineBackupStrategy(key string) *BackupStrategy {
 func (s *SecretsStore) Get(key string) (string, error) {
 	s.mu.RLock()
 	enc, ok := s.secrets[key]
-	masterKey := s.masterKey // Copy for use outside lock
 	s.mu.RUnlock()
 
 	if !ok {
 		return "", ErrNotFound
 	}
-	pt, err := decrypt(masterKey, enc)
+	
+	// Use atomic key access to prevent stale key usage
+	pt, err := s.decryptWithMasterKey(enc)
 	if err != nil {
 		return "", err
 	}
@@ -245,17 +273,12 @@ func (s *SecretsStore) Delete(key string) error {
 	defer lock.Unlock()
 
 	// Load fresh state but merge it with existing in-memory state
-	freshSecrets, err := s.loadSecretsFromDisk()
-	if err != nil {
-		return fmt.Errorf("failed to reload secrets before delete: %w", err)
-	}
-
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	// Merge disk state with in-memory state (disk takes precedence for conflicts)
-	for k, v := range freshSecrets {
-		s.secrets[k] = v
+	err = s.mergeWithDiskState()
+	if err != nil {
+		return fmt.Errorf("failed to merge disk state: %w", err)
 	}
 
 	prevEnc, ok := s.secrets[key]
@@ -271,7 +294,8 @@ func (s *SecretsStore) Delete(key string) error {
 
 // DecryptBackup decrypts a backup file's encrypted content
 func (s *SecretsStore) DecryptBackup(encryptedData string) (string, error) {
-	decrypted, err := decrypt(s.masterKey, encryptedData)
+	// Use atomic key access to prevent stale key usage
+	decrypted, err := s.decryptWithMasterKey(encryptedData)
 	if err != nil {
 		return "", err
 	}
@@ -288,17 +312,12 @@ func (s *SecretsStore) DisableSecret(key string) error {
 	defer lock.Unlock()
 
 	// Load fresh state but merge it with existing in-memory state
-	freshSecrets, err := s.loadSecretsFromDisk()
-	if err != nil {
-		return fmt.Errorf("failed to reload secrets before disable: %w", err)
-	}
-
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	// Merge disk state with in-memory state (disk takes precedence for conflicts)
-	for k, v := range freshSecrets {
-		s.secrets[k] = v
+	err = s.mergeWithDiskState()
+	if err != nil {
+		return fmt.Errorf("failed to merge disk state: %w", err)
 	}
 
 	enc, ok := s.secrets[key]
@@ -386,17 +405,12 @@ func (s *SecretsStore) EnableSecret(key string) error {
 	defer lock.Unlock()
 
 	// Load fresh state but merge it with existing in-memory state
-	freshSecrets, err := s.loadSecretsFromDisk()
-	if err != nil {
-		return fmt.Errorf("failed to reload secrets before enable: %w", err)
-	}
-
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	// Merge disk state with in-memory state (disk takes precedence for conflicts)
-	for k, v := range freshSecrets {
-		s.secrets[k] = v
+	err = s.mergeWithDiskState()
+	if err != nil {
+		return fmt.Errorf("failed to merge disk state: %w", err)
 	}
 
 	// Build a map of original keys to their disabled keys for efficient lookup

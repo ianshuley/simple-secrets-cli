@@ -486,7 +486,8 @@ func (us *UserStore) UpdateUserRole(username, newRole string) error {
 
 // generateSecureToken creates a cryptographically secure random token
 func generateSecureToken() (string, error) {
-	tokenBytes := make([]byte, 20)
+	const tokenLengthBytes = 20 // 20 bytes = 160 bits of entropy
+	tokenBytes := make([]byte, tokenLengthBytes)
 	if _, err := io.ReadFull(rand.Reader, tokenBytes); err != nil {
 		return "", err
 	}
