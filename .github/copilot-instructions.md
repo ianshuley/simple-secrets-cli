@@ -20,6 +20,30 @@
 
 ---
 
+## 🔧 BUILD PROCESS GUIDELINES
+
+### ⛔ NEVER USE `go build` DIRECTLY ⛔
+- **Always use Makefile**: Ensures proper version metadata injection
+- **For development**: `make dev` (injects git commit hash and build timestamp)
+- **For releases**: `make release VERSION=vX.Y.Z` (injects specific version)
+- **Direct `go build`**: Results in "unknown" build metadata (bad)
+
+### 📋 Correct Build Commands:
+- **Development builds**: `make dev` → `simple-secrets dev-abc1234`
+- **Testing builds**: `make dev` before testing to ensure proper metadata
+- **Release builds**: `make release VERSION=v1.0.0` → `simple-secrets v1.0.0`
+- **Clean builds**: `make clean && make dev` for fresh compilation
+
+### 🚨 Why This Matters:
+- Version information is critical for debugging and support
+- Users need to know exactly which build they're running
+- Build timestamps help track when issues were introduced
+- Git commit hashes enable precise code correlation
+
+**If you see "unknown" in version output, the binary was built incorrectly!**
+
+---
+
 ## Code Style Guidelines
 
 ### Avoid `else` in Garbage Collected Languages
