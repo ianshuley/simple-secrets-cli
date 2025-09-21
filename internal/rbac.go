@@ -16,22 +16,18 @@ limitations under the License.
 package internal
 
 import (
-	"crypto/rand"
-	"crypto/sha256"
 	"crypto/subtle"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"slices"
-	"strings"
 	"sync"
 	"time"
 )
 
+// UserStore manages users, their permissions, and authentication
 type UserStore struct {
 	users       []*User
 	permissions RolePermissions
@@ -45,130 +41,12 @@ func (us *UserStore) Users() []*User {
 	return us.users
 }
 
-// HashToken exports the hashToken function for use in CLI user creation.
-func HashToken(token string) string {
-	h := sha256.Sum256([]byte(token))
-	return base64.RawURLEncoding.EncodeToString(h[:])
-}
-
-// DefaultUserConfigPath exports defaultUserConfigPath for CLI use.
-func DefaultUserConfigPath(filename string) (string, error) {
-	// Check for test override first
-	if testDir := os.Getenv("SIMPLE_SECRETS_CONFIG_DIR"); testDir != "" {
-		return filepath.Join(testDir, filename), nil
-	}
-
-	return GetSimpleSecretsFilePath(filename)
-}
-
 // LoadUsersList loads the user list from users.json (for CLI user creation).
 func LoadUsersList(path string) ([]*User, error) {
 	return loadUsers(path)
 }
 
-// ResolveToken returns the token from CLI flag, env, or config file (in that order).
-func ResolveToken(cliFlag string) (string, error) {
-	if cliFlag != "" {
-		if strings.TrimSpace(cliFlag) == "" {
-			return "", errors.New("authentication required: token cannot be empty")
-		}
-		return cliFlag, nil
-	}
-
-	if env := os.Getenv("SIMPLE_SECRETS_TOKEN"); env != "" {
-		return env, nil
-	}
-
-	configPath, err := DefaultUserConfigPath("config.json")
-	if err != nil {
-		return "", err
-	}
-
-	data, err := os.ReadFile(configPath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return "", errors.New(`authentication required: no token found
-
-Use one of these methods:
-    --token <your-token> (as a flag)
-    SIMPLE_SECRETS_TOKEN=<your-token> (as environment variable)
-    ~/.simple-secrets/config.json with { "token": "<your-token>" }`)
-		}
-		return "", fmt.Errorf("read config.json: %w", err)
-	}
-
-	var config struct {
-		Token string `json:"token"`
-	}
-	if err := json.Unmarshal(data, &config); err != nil {
-		return "", fmt.Errorf("unmarshal config.json: %w", err)
-	}
-	if config.Token == "" {
-		return "", errors.New("token not found in config.json")
-	}
-
-	return config.Token, nil
-}
-
-type Role string
-
-const (
-	RoleAdmin  Role = "admin"
-	RoleReader Role = "reader"
-)
-
-// TokenGenerator is a function type for generating secure tokens
-type TokenGenerator func() (string, error)
-
-// DefaultTokenGenerator holds the token generation function (set by cmd package)
-var DefaultTokenGenerator TokenGenerator
-
-// generateSecureToken calls the registered token generator or uses fallback
-func generateSecureToken() (string, error) {
-	if DefaultTokenGenerator != nil {
-		return DefaultTokenGenerator()
-	}
-	// Fallback for tests and direct internal package usage
-	return generateSecureTokenFallback()
-}
-
-// generateSecureTokenFallback is the original implementation for fallback use
-func generateSecureTokenFallback() (string, error) {
-	const tokenLengthBytes = 20 // 20 bytes = 160 bits of entropy
-	tokenBytes := make([]byte, tokenLengthBytes)
-	if _, err := io.ReadFull(rand.Reader, tokenBytes); err != nil {
-		return "", err
-	}
-	return base64.RawURLEncoding.EncodeToString(tokenBytes), nil
-}
-
-type User struct {
-	Username       string     `json:"username"`
-	TokenHash      string     `json:"token_hash"` // SHA-256 hash, base64-encoded
-	Role           Role       `json:"role"`
-	TokenRotatedAt *time.Time `json:"token_rotated_at,omitempty"` // When token was last rotated
-}
-
-type RolePermissions map[Role][]string
-
-func (rp RolePermissions) Has(role Role, perm string) bool {
-	perms := rp[role]
-	return slices.Contains(perms, perm)
-}
-
-func (u *User) Can(perm string, perms RolePermissions) bool {
-	return perms.Has(u.Role, perm)
-}
-
-// DisableToken disables the user's token by clearing the token hash and updating the timestamp
-func (u *User) DisableToken() {
-	u.TokenHash = ""
-	now := time.Now()
-	u.TokenRotatedAt = &now
-}
-
 // IsFirstRunEligible checks if this is a fresh installation eligible for first-run setup
-// This is a read-only check that doesn't trigger any setup or create files
 func IsFirstRunEligible() (bool, error) {
 	usersPath, err := DefaultUserConfigPath("users.json")
 	if err != nil {
@@ -301,87 +179,9 @@ func LoadUsersForAuth() (*UserStore, error) {
 	return store, nil
 }
 
-// resolveConfigPaths determines the file paths for users.json and roles.json
-func resolveConfigPaths() (string, string, error) {
-	usersPath, err := DefaultUserConfigPath("users.json")
-	if err != nil {
-		return "", "", err
-	}
+// UserStore methods for runtime operations
 
-	rolesPath, err := DefaultUserConfigPath("roles.json")
-	if err != nil {
-		return "", "", err
-	}
-
-	return usersPath, rolesPath, nil
-}
-
-// handleFirstRunWithToken manages the first-run scenario and returns the generated token
-func handleFirstRunWithToken(usersPath, rolesPath string) (*UserStore, string, error) {
-	const (
-		firstRunPrompt         = "First run detected - creating default admin user..."
-		passwordManagerWarning = "⚠️  This will generate an authentication token. Have your password manager ready."
-		proceedPrompt          = "\nProceed? [Y/n]"
-		cancellationMessage    = "Setup cancelled. Run any command again when ready."
-	)
-
-	fmt.Println(firstRunPrompt)
-	fmt.Println(passwordManagerWarning)
-	fmt.Println(proceedPrompt)
-
-	var response string
-	fmt.Scanln(&response)
-
-	if UserDeclinedSetup(response) {
-		fmt.Println(cancellationMessage)
-		return nil, "", fmt.Errorf("setup cancelled by user")
-	}
-
-	return createDefaultUserFileWithToken(usersPath, rolesPath)
-}
-
-// UserDeclinedSetup checks if user declined the setup prompt
-// Exported for use by cmd package to avoid duplication
-func UserDeclinedSetup(response string) bool {
-	declineResponses := []string{"n", "N", "no", "NO"}
-	return slices.Contains(declineResponses, response)
-}
-
-// validateFirstRunEligibility ensures we only run first-run setup in truly clean environments
-func validateFirstRunEligibility() error {
-	// Get the config directory from paths
-	usersPath, rolesPath, err := resolveConfigPaths()
-	if err != nil {
-		return err
-	}
-	configDir := filepath.Dir(usersPath)
-
-	// Check for existing files that would indicate this is NOT a first run
-	// Note: users.json is not checked here since this function is only called when users.json doesn't exist
-	existingFiles := []string{
-		rolesPath,                                // roles.json
-		filepath.Join(configDir, "master.key"),   // encryption key
-		filepath.Join(configDir, "secrets.json"), // secrets store
-		filepath.Join(configDir, "backups"),      // backup directory
-	}
-
-	for _, file := range existingFiles {
-		if _, err := os.Stat(file); err == nil {
-			return fmt.Errorf("existing simple-secrets installation detected (found %s). Cannot create new admin user when installation already exists. If this is unexpected, restore it from backup or manually investigate", filepath.Base(file))
-		}
-	}
-
-	return nil
-}
-
-// createUserStore constructs a UserStore with the given users and permissions
-func createUserStore(users []*User, permissions RolePermissions) *UserStore {
-	return &UserStore{
-		users:       users,
-		permissions: permissions,
-	}
-}
-
+// Lookup finds a user by token
 func (us *UserStore) Lookup(token string) (*User, error) {
 	if token == "" {
 		return nil, errors.New("empty token")
@@ -398,6 +198,7 @@ func (us *UserStore) Lookup(token string) (*User, error) {
 	return nil, errors.New("invalid token")
 }
 
+// Permissions returns the role permissions
 func (us *UserStore) Permissions() RolePermissions {
 	us.mu.RLock()
 	defer us.mu.RUnlock()
@@ -499,6 +300,89 @@ func (us *UserStore) UpdateUserRole(username, newRole string) error {
 	return fmt.Errorf("user %q not found", username)
 }
 
+// Private helper functions
+
+// resolveConfigPaths determines the file paths for users.json and roles.json
+func resolveConfigPaths() (string, string, error) {
+	usersPath, err := DefaultUserConfigPath("users.json")
+	if err != nil {
+		return "", "", err
+	}
+
+	rolesPath, err := DefaultUserConfigPath("roles.json")
+	if err != nil {
+		return "", "", err
+	}
+
+	return usersPath, rolesPath, nil
+}
+
+// handleFirstRunWithToken manages the first-run scenario and returns the generated token
+func handleFirstRunWithToken(usersPath, rolesPath string) (*UserStore, string, error) {
+	const (
+		firstRunPrompt         = "First run detected - creating default admin user..."
+		passwordManagerWarning = "⚠️  This will generate an authentication token. Have your password manager ready."
+		proceedPrompt          = "\nProceed? [Y/n]"
+		cancellationMessage    = "Setup cancelled. Run any command again when ready."
+	)
+
+	fmt.Println(firstRunPrompt)
+	fmt.Println(passwordManagerWarning)
+	fmt.Println(proceedPrompt)
+
+	var response string
+	fmt.Scanln(&response)
+
+	if UserDeclinedSetup(response) {
+		fmt.Println(cancellationMessage)
+		return nil, "", fmt.Errorf("setup cancelled by user")
+	}
+
+	return createDefaultUserFileWithToken(usersPath, rolesPath)
+}
+
+// UserDeclinedSetup checks if user declined the setup prompt
+// Exported for use by cmd package to avoid duplication
+func UserDeclinedSetup(response string) bool {
+	declineResponses := []string{"n", "N", "no", "NO"}
+	return slices.Contains(declineResponses, response)
+}
+
+// validateFirstRunEligibility ensures we only run first-run setup in truly clean environments
+func validateFirstRunEligibility() error {
+	// Get the config directory from paths
+	usersPath, rolesPath, err := resolveConfigPaths()
+	if err != nil {
+		return err
+	}
+	configDir := filepath.Dir(usersPath)
+
+	// Check for existing files that would indicate this is NOT a first run
+	// Note: users.json is not checked here since this function is only called when users.json doesn't exist
+	existingFiles := []string{
+		rolesPath,                                // roles.json
+		filepath.Join(configDir, "master.key"),   // encryption key
+		filepath.Join(configDir, "secrets.json"), // secrets store
+		filepath.Join(configDir, "backups"),      // backup directory
+	}
+
+	for _, file := range existingFiles {
+		if _, err := os.Stat(file); err == nil {
+			return fmt.Errorf("existing simple-secrets installation detected (found %s). Cannot create new admin user when installation already exists. If this is unexpected, restore it from backup or manually investigate", filepath.Base(file))
+		}
+	}
+
+	return nil
+}
+
+// createUserStore constructs a UserStore with the given users and permissions
+func createUserStore(users []*User, permissions RolePermissions) *UserStore {
+	return &UserStore{
+		users:       users,
+		permissions: permissions,
+	}
+}
+
 // countAdminUsers returns the number of admin users (helper for validation)
 func (us *UserStore) countAdminUsers() int {
 	count := 0
@@ -509,6 +393,8 @@ func (us *UserStore) countAdminUsers() int {
 	}
 	return count
 }
+
+// File I/O and configuration management
 
 func loadUsers(path string) ([]*User, error) {
 	var users []*User
