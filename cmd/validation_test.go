@@ -99,14 +99,14 @@ func TestValidateSecureInput(t *testing.T) {
 		// Shell metacharacter injection tests
 		{
 			name:        "command_substitution_dollar_paren",
-			input:       "key$(rm -rf /)",
+			input:       "key$(whoami)",
 			config:      SecretKeyValidationConfig,
 			wantErr:     true,
 			errContains: "key name cannot contain shell metacharacters",
 		},
 		{
 			name:        "command_substitution_backtick",
-			input:       "key`rm -rf /`",
+			input:       "key`whoami`",
 			config:      SecretKeyValidationConfig,
 			wantErr:     true,
 			errContains: "key name cannot contain shell metacharacters",
@@ -134,14 +134,14 @@ func TestValidateSecureInput(t *testing.T) {
 		},
 		{
 			name:        "semicolon_separator",
-			input:       "key;rm /tmp/*",
+			input:       "key;echo test",
 			config:      SecretKeyValidationConfig,
 			wantErr:     true,
 			errContains: "key name cannot contain shell metacharacters",
 		},
 		{
 			name:        "ampersand_background",
-			input:       "key&wget malicious",
+			input:       "key&wget example.com",
 			config:      SecretKeyValidationConfig,
 			wantErr:     true,
 			errContains: "key name cannot contain shell metacharacters",

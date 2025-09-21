@@ -16,9 +16,7 @@
 - [ ] **Alternative storage backends**: S3, database implementations of StorageBackend interface
 - [ ] **API testing preparation**: Design test patterns that will work for future HTTP API
 
-
 ---
-
 
 ## Release Preparation
 

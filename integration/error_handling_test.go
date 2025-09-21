@@ -528,8 +528,8 @@ func TestEdgeCases(t *testing.T) {
 		t.Errorf("putting long key should work: %v", err)
 	}
 
-	// Test special characters in key
-	specialKey := "key-with-special@#$%^&*()chars"
+	// Test special characters in key (non-shell metacharacters)
+	specialKey := "key-with-special_chars+equals=and.periods"
 	cmd = exec.Command(cliBin, "put", specialKey, "special-value")
 	cmd.Env = env
 	_, err = cmd.CombinedOutput()

