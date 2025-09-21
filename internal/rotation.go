@@ -26,8 +26,10 @@ import (
 )
 
 const (
-	// DefaultBackupRetentionCount is the number of rotation backups to keep by default
-	DefaultBackupRetentionCount = 5
+	// DefaultRotationBackupCount is the number of rotation backups to keep by default
+	// Set to 1 to minimize attack surface - keeps only the most recent backup
+	// Can be configured via config.json {"rotation_backup_count": N} for environments needing more
+	DefaultRotationBackupCount = 1
 )
 
 // decryptAllSecrets decrypts all secrets with the current master key
@@ -139,7 +141,8 @@ func (s *SecretsStore) RotateMasterKey(backupDir string) error {
 	}
 
 	// 9) Clean up old backups
-	if err := s.cleanupOldBackups(DefaultBackupRetentionCount); err != nil {
+	retentionCount := getRotationBackupCount()
+	if err := s.cleanupOldBackups(retentionCount); err != nil {
 		fmt.Printf("Warning: failed to clean up old backups: %v\n", err)
 	}
 
@@ -415,4 +418,31 @@ func (s *SecretsStore) validateSpecifiedBackup(backupName string) (string, error
 	}
 
 	return backupPath, nil
+}
+
+// getRotationBackupCount returns the configured rotation backup count or default
+func getRotationBackupCount() int {
+	// Try to load from config file
+	configPath, err := DefaultUserConfigPath("config.json")
+	if err != nil {
+		return DefaultRotationBackupCount
+	}
+
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return DefaultRotationBackupCount // Config file doesn't exist or can't be read
+	}
+
+	var config struct {
+		RotationBackupCount *int `json:"rotation_backup_count,omitempty"`
+	}
+	if err := json.Unmarshal(data, &config); err != nil {
+		return DefaultRotationBackupCount // Invalid JSON, use default
+	}
+
+	if config.RotationBackupCount != nil && *config.RotationBackupCount > 0 {
+		return *config.RotationBackupCount
+	}
+
+	return DefaultRotationBackupCount
 }

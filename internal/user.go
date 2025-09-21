@@ -140,7 +140,8 @@ Use one of these methods:
 	}
 
 	var config struct {
-		Token string `json:"token"`
+		Token               string `json:"token"`
+		RotationBackupCount *int   `json:"rotation_backup_count,omitempty"` // Number of rotation backups to keep (default: 1)
 	}
 	if err := json.Unmarshal(data, &config); err != nil {
 		return "", fmt.Errorf("unmarshal config.json: %w", err)
