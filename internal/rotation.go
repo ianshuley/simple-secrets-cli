@@ -270,3 +270,149 @@ func (s *SecretsStore) scanRotationBackupDirectories(backupRoot string) ([]strin
 
 	return rotationDirs, nil
 }
+
+// BackupInfo represents information about a rotation backup
+type BackupInfo struct {
+	Name      string    `json:"name"`
+	Path      string    `json:"path"`
+	Timestamp time.Time `json:"timestamp"`
+	IsValid   bool      `json:"is_valid"`
+}
+
+// validateBackupIntegrity checks if a backup directory contains both required files
+func (s *SecretsStore) validateBackupIntegrity(backupPath string) bool {
+	keyFile := filepath.Join(backupPath, "master.key")
+	secretsFile := filepath.Join(backupPath, "secrets.json")
+
+	_, keyErr := os.Stat(keyFile)
+	_, secretsErr := os.Stat(secretsFile)
+
+	return keyErr == nil && secretsErr == nil
+}
+
+// ListRotationBackups returns information about available rotation backups
+func (s *SecretsStore) ListRotationBackups() ([]BackupInfo, error) {
+	backupRoot := filepath.Join(filepath.Dir(s.KeyPath), "backups")
+	if _, err := os.Stat(backupRoot); os.IsNotExist(err) {
+		return []BackupInfo{}, nil
+	}
+
+	rotationDirs, err := s.scanRotationBackupDirectories(backupRoot)
+	if err != nil {
+		return nil, err
+	}
+
+	var backups []BackupInfo
+	for _, dirName := range rotationDirs {
+		backupPath := filepath.Join(backupRoot, dirName)
+
+		// Parse timestamp from directory name
+		var timestamp time.Time
+		if strings.HasPrefix(dirName, "rotate-") {
+			if ts, err := time.Parse("20060102-150405", strings.TrimPrefix(dirName, "rotate-")); err == nil {
+				timestamp = ts
+			}
+		} else if strings.HasPrefix(dirName, "manual-") {
+			if ts, err := time.Parse("20060102-150405", strings.TrimPrefix(dirName, "manual-")); err == nil {
+				timestamp = ts
+			}
+		}
+
+		backup := BackupInfo{
+			Name:      dirName,
+			Path:      backupPath,
+			Timestamp: timestamp,
+			IsValid:   s.validateBackupIntegrity(backupPath),
+		}
+		backups = append(backups, backup)
+	}
+
+	// Sort by timestamp, newest first
+	sort.Slice(backups, func(i, j int) bool {
+		return backups[i].Timestamp.After(backups[j].Timestamp)
+	})
+
+	return backups, nil
+}
+
+// RestoreFromBackup restores the secrets store from a backup
+func (s *SecretsStore) RestoreFromBackup(backupName string) error {
+	backupPath, err := s.determineBackupPath(backupName)
+	if err != nil {
+		return err
+	}
+
+	// Create a backup of current state before restoring
+	currentBackupDir := filepath.Join(filepath.Dir(s.KeyPath), "backups", "pre-restore-"+time.Now().Format("20060102-150405"))
+	if err := s.backupCurrent(currentBackupDir); err != nil {
+		return fmt.Errorf("failed to backup current state: %w", err)
+	}
+
+	// Copy backup files to current locations
+	backupKeyPath := filepath.Join(backupPath, "master.key")
+	backupSecretsPath := filepath.Join(backupPath, "secrets.json")
+
+	if err := s.copyFileSecurely(backupKeyPath, s.KeyPath); err != nil {
+		return fmt.Errorf("failed to restore master key: %w", err)
+	}
+
+	if err := s.copyFileSecurely(backupSecretsPath, s.SecretsPath); err != nil {
+		return fmt.Errorf("failed to restore secrets: %w", err)
+	}
+
+	// Reload the store to pick up the restored data
+	if err := s.loadOrCreateKey(); err != nil {
+		return fmt.Errorf("failed to load restored key: %w", err)
+	}
+
+	if err := s.loadSecrets(); err != nil {
+		return fmt.Errorf("failed to load restored secrets: %w", err)
+	}
+
+	return nil
+}
+
+// determineBackupPath returns the backup path for restoration, either from the most recent valid backup or a specified backup
+func (s *SecretsStore) determineBackupPath(backupName string) (string, error) {
+	if backupName == "" {
+		return s.findMostRecentValidBackup()
+	}
+	return s.validateSpecifiedBackup(backupName)
+}
+
+// findMostRecentValidBackup finds the most recent valid backup
+func (s *SecretsStore) findMostRecentValidBackup() (string, error) {
+	backups, err := s.ListRotationBackups()
+	if err != nil {
+		return "", fmt.Errorf("failed to list backups: %w", err)
+	}
+	if len(backups) == 0 {
+		return "", fmt.Errorf("no rotation backups found")
+	}
+
+	// Find the first valid backup
+	for _, backup := range backups {
+		if backup.IsValid {
+			return backup.Path, nil
+		}
+	}
+
+	return "", fmt.Errorf("no valid rotation backups found")
+}
+
+// validateSpecifiedBackup validates and returns the path for a specified backup
+func (s *SecretsStore) validateSpecifiedBackup(backupName string) (string, error) {
+	backupRoot := filepath.Join(filepath.Dir(s.KeyPath), "backups")
+	backupPath := filepath.Join(backupRoot, backupName)
+
+	// Verify backup exists and is valid
+	if _, err := os.Stat(backupPath); os.IsNotExist(err) {
+		return "", fmt.Errorf("backup '%s' not found", backupName)
+	}
+
+	if !s.validateBackupIntegrity(backupPath) {
+		return "", fmt.Errorf("backup '%s' is missing required files", backupName)
+	}
+
+	return backupPath, nil
+}
