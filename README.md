@@ -230,6 +230,57 @@ simple-secrets restore secret KEY
 simple-secrets restore database BACKUP_ID
 ```
 
+## Database Reset & Recovery
+
+### ⚠️ Safe Database Reset Procedure
+
+If you need to completely reset your simple-secrets installation:
+
+**🔴 CRITICAL: Backup first if you have important data!**
+
+```bash
+# 1. BACKUP YOUR DATA FIRST (if you want to keep anything)
+simple-secrets list backups --token <your-token>
+# Copy any important backup directories from ~/.simple-secrets/backups/
+
+# 2. For complete reset, remove the config directory
+rm -rf ~/.simple-secrets/
+
+# Or if using custom config directory:
+rm -rf $SIMPLE_SECRETS_CONFIG_DIR
+
+# 3. Next command will trigger fresh installation setup
+simple-secrets --setup
+```
+
+### 🛟 Recovery Options
+
+If something goes wrong and you have backups:
+
+```bash
+# Option 1: Restore from automatic backup (recommended)
+simple-secrets list backups --token <admin-token>
+simple-secrets restore database BACKUP_ID --token <admin-token>
+
+# Option 2: Manual recovery from backup directory
+# Check ~/.simple-secrets/backups/ for rotation snapshots
+# Each rotation creates a timestamped backup with keys + secrets
+
+# Option 3: Restore individual secrets
+simple-secrets restore secret SECRET_KEY --token <admin-token>
+```
+
+### 🚨 Emergency Recovery
+
+If the database is corrupted and you can't access normal commands:
+
+1. **Check backup directory manually**: `ls ~/.simple-secrets/backups/`
+2. **Look for rotation backups**: Directories named like `rotate-2024-01-15-10-30-45/`
+3. **Each contains**: `master.key` and `secrets.json` from that point in time
+4. **Emergency contact info**: Check error messages - they guide you to recovery options
+
+**Remember**: The error message "Do not delete ~/.simple-secrets/ - your backups contain recoverable data" means exactly that - your backup directory has your recovery options!
+
 ## Secret Lifecycle Management
 
 ### Disable Secrets

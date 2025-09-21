@@ -47,8 +47,6 @@ Features:
 
 All secrets are encrypted and stored locally in ~/.simple-secrets/.
 
-🚀 First run? Use --setup or any authentication command to get started.
-
 See 'simple-secrets --help' or the README for more info.`,
 	Run: handleRootCommand,
 }
@@ -67,7 +65,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&TokenFlag, "token", "", "authentication token (overrides env/config)")
 
 	// Add setup flag for manual triggering of first-run experience
-	rootCmd.Flags().Bool("setup", false, "run first-time setup")
+	rootCmd.Flags().Bool("setup", false, "run first-time setup (use after removing ~/.simple-secrets for reset)")
 
 	// Add standard version flags that users expect
 	rootCmd.Flags().BoolP("version", "v", false, "show version information")
