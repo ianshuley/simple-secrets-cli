@@ -31,7 +31,7 @@ var putCmd = &cobra.Command{
 	Use:                   "put [key] [value]",
 	Short:                 "Store a secret securely.",
 	Long:                  "Store a secret value under a key. Overwrites if the key exists. Backs up previous value.\n\nUse quotes for values with spaces or special characters.",
-	Example:               "simple-secrets put db_password s3cr3tP@ssw0rd\nsimple-secrets put db_url \"postgresql://user:pass@localhost:5432/db\"",
+	Example:               "simple-secrets put api-key \"--prod-key-abc123\"\nsimple-secrets put db_url \"postgresql://user:pass@localhost:5432/db\"",
 	DisableFlagsInUseLine: true,
 	DisableFlagParsing:    true,
 	RunE: func(cmd *cobra.Command, args []string) error {
