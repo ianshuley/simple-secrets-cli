@@ -96,6 +96,120 @@ func TestValidateSecureInput(t *testing.T) {
 			errContains: "key name cannot contain path separators or path traversal sequences",
 		},
 
+		// Shell metacharacter injection tests
+		{
+			name:        "command_substitution_dollar_paren",
+			input:       "key$(rm -rf /)",
+			config:      SecretKeyValidationConfig,
+			wantErr:     true,
+			errContains: "key name cannot contain shell metacharacters",
+		},
+		{
+			name:        "command_substitution_backtick",
+			input:       "key`rm -rf /`",
+			config:      SecretKeyValidationConfig,
+			wantErr:     true,
+			errContains: "key name cannot contain shell metacharacters",
+		},
+		{
+			name:        "dollar_variable_expansion",
+			input:       "key$HOME",
+			config:      SecretKeyValidationConfig,
+			wantErr:     true,
+			errContains: "key name cannot contain shell metacharacters",
+		},
+		{
+			name:        "dollar_brace_expansion",
+			input:       "key${USER}",
+			config:      SecretKeyValidationConfig,
+			wantErr:     true,
+			errContains: "key name cannot contain shell metacharacters",
+		},
+		{
+			name:        "pipe_character",
+			input:       "key|grep secret",
+			config:      SecretKeyValidationConfig,
+			wantErr:     true,
+			errContains: "key name cannot contain shell metacharacters",
+		},
+		{
+			name:        "semicolon_separator",
+			input:       "key;rm /tmp/*",
+			config:      SecretKeyValidationConfig,
+			wantErr:     true,
+			errContains: "key name cannot contain shell metacharacters",
+		},
+		{
+			name:        "ampersand_background",
+			input:       "key&wget malicious",
+			config:      SecretKeyValidationConfig,
+			wantErr:     true,
+			errContains: "key name cannot contain shell metacharacters",
+		},
+		{
+			name:        "redirect_output",
+			input:       "key>file.txt",
+			config:      SecretKeyValidationConfig,
+			wantErr:     true,
+			errContains: "key name cannot contain shell metacharacters",
+		},
+		{
+			name:        "redirect_input",
+			input:       "key<file.txt",
+			config:      SecretKeyValidationConfig,
+			wantErr:     true,
+			errContains: "key name cannot contain shell metacharacters",
+		},
+		{
+			name:        "glob_asterisk",
+			input:       "key*wildcard",
+			config:      SecretKeyValidationConfig,
+			wantErr:     true,
+			errContains: "key name cannot contain shell metacharacters",
+		},
+		{
+			name:        "glob_question",
+			input:       "key?wildcard",
+			config:      SecretKeyValidationConfig,
+			wantErr:     true,
+			errContains: "key name cannot contain shell metacharacters",
+		},
+		{
+			name:        "brace_expansion",
+			input:       "key{a,b,c}",
+			config:      SecretKeyValidationConfig,
+			wantErr:     true,
+			errContains: "key name cannot contain shell metacharacters",
+		},
+		{
+			name:        "bracket_glob",
+			input:       "key[0-9]",
+			config:      SecretKeyValidationConfig,
+			wantErr:     true,
+			errContains: "key name cannot contain shell metacharacters",
+		},
+		{
+			name:        "tilde_home_expansion",
+			input:       "key~user",
+			config:      SecretKeyValidationConfig,
+			wantErr:     true,
+			errContains: "key name cannot contain shell metacharacters",
+		},
+		{
+			name:        "exclamation_history",
+			input:       "key!!",
+			config:      SecretKeyValidationConfig,
+			wantErr:     true,
+			errContains: "key name cannot contain shell metacharacters",
+		},
+		{
+			name:        "hash_comment",
+			input:       "key#comment",
+			config:      SecretKeyValidationConfig,
+			wantErr:     true,
+			errContains: "key name cannot contain shell metacharacters",
+		},
+
 		// Custom configuration tests
 		{
 			name:  "custom_config_allow_empty",
@@ -121,11 +235,36 @@ func TestValidateSecureInput(t *testing.T) {
 			name:  "custom_config_allow_control_chars",
 			input: "test\x01value",
 			config: ValidationConfig{
-				EntityType:         "test field",
-				AllowEmpty:         false,
-				AllowControlChars:  true,
-				AllowPathTraversal: false,
+				EntityType:          "test field",
+				AllowEmpty:          false,
+				AllowControlChars:   true,
+				AllowPathTraversal:  false,
+				AllowShellMetachars: false,
 			},
+		},
+		{
+			name:  "custom_config_allow_shell_metachars",
+			input: "key$(dangerous)",
+			config: ValidationConfig{
+				EntityType:          "test field",
+				AllowEmpty:          false,
+				AllowControlChars:   false,
+				AllowPathTraversal:  false,
+				AllowShellMetachars: true, // Allow shell metacharacters
+			},
+		},
+		{
+			name:  "custom_config_disallow_shell_metachars",
+			input: "key$(dangerous)",
+			config: ValidationConfig{
+				EntityType:          "test field",
+				AllowEmpty:          false,
+				AllowControlChars:   false,
+				AllowPathTraversal:  false,
+				AllowShellMetachars: false, // Disallow shell metacharacters
+			},
+			wantErr:     true,
+			errContains: "test field cannot contain shell metacharacters",
 		},
 	}
 
@@ -165,6 +304,9 @@ func TestValidationConfigDefaults(t *testing.T) {
 		}
 		if config.AllowPathTraversal {
 			t.Error("expected AllowPathTraversal to be false for usernames")
+		}
+		if config.AllowShellMetachars {
+			t.Error("expected AllowShellMetachars to be false for usernames")
 		}
 	})
 

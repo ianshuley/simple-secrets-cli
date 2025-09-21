@@ -27,10 +27,11 @@ type ValidationConfig struct {
 	AllowControlChars   bool   // Whether control characters are allowed
 	AllowedControlChars []rune // Specific control chars that are allowed (e.g., tab, newline)
 	AllowPathTraversal  bool   // Whether path separators and .. are allowed
+	AllowShellMetachars bool   // Whether shell metacharacters are allowed (prevents command injection)
 }
 
 // ValidateSecureInput performs comprehensive validation on user input strings
-// to prevent security issues like path traversal and control character injection
+// to prevent security issues like path traversal, control character injection, and command injection
 func ValidateSecureInput(input string, config ValidationConfig) error {
 	if err := validateEmpty(input, config); err != nil {
 		return err
@@ -44,6 +45,12 @@ func ValidateSecureInput(input string, config ValidationConfig) error {
 
 	if !config.AllowPathTraversal {
 		if err := validatePathTraversal(input, config); err != nil {
+			return err
+		}
+	}
+
+	if !config.AllowShellMetachars {
+		if err := validateShellMetacharacters(input, config); err != nil {
 			return err
 		}
 	}
@@ -80,6 +87,42 @@ func validatePathTraversal(input string, config ValidationConfig) error {
 	return nil
 }
 
+func validateShellMetacharacters(input string, config ValidationConfig) error {
+	// Shell metacharacters that can be used for command injection
+	shellMetachars := []string{
+		"$(", // Command substitution
+		"`",  // Backtick command substitution
+		";",  // Command separator
+		"|",  // Pipe
+		"&",  // Background process/AND
+		">",  // Redirection
+		"<",  // Redirection
+		"*",  // Globbing
+		"?",  // Globbing
+		"[",  // Globbing
+		"]",  // Globbing
+		"{",  // Brace expansion
+		"}",  // Brace expansion
+		"~",  // Home directory expansion
+		"!",  // History expansion (bash)
+		"#",  // Comments (when at start or after space)
+	}
+
+	for _, char := range shellMetachars {
+		if strings.Contains(input, char) {
+			return fmt.Errorf("%s cannot contain shell metacharacters (found: %q)", config.EntityType, char)
+		}
+	}
+
+	// Special check for $ followed by any character (not just $( )
+	// This catches both $(cmd) and ${var} and $var patterns
+	if strings.Contains(input, "$") {
+		return fmt.Errorf("%s cannot contain shell metacharacters (found: \"$\")", config.EntityType)
+	}
+
+	return nil
+}
+
 // Predefined validation configurations for common use cases
 
 // UsernameValidationConfig provides secure validation for usernames
@@ -89,6 +132,7 @@ var UsernameValidationConfig = ValidationConfig{
 	AllowControlChars:   false,
 	AllowedControlChars: nil,
 	AllowPathTraversal:  false,
+	AllowShellMetachars: false, // Prevent command injection
 }
 
 // SecretKeyValidationConfig provides secure validation for secret keys
@@ -98,4 +142,5 @@ var SecretKeyValidationConfig = ValidationConfig{
 	AllowControlChars:   false,
 	AllowedControlChars: []rune{0x09, 0x0A, 0x0D}, // tab, LF, CR
 	AllowPathTraversal:  false,
+	AllowShellMetachars: false, // Prevent command injection
 }
