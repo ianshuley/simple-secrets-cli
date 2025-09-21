@@ -82,8 +82,13 @@ simple-secrets list keys
 # Then use the token for actual operations:
 simple-secrets list keys --token YOUR_ADMIN_TOKEN
 
-# Store a secret (values with dashes work naturally in quotes)
-simple-secrets put api-key "--prod-key-abc123" --token YOUR_ADMIN_TOKEN
+# Store a secret (use single quotes to prevent shell command execution)
+simple-secrets put api-key '--prod-key-abc123' --token YOUR_ADMIN_TOKEN
+simple-secrets put db-url 'postgresql://user:pass@localhost:5432/db' --token YOUR_ADMIN_TOKEN
+
+# ⚠️  SECURITY: Single quotes vs double quotes
+simple-secrets put safe-key 'echo $(whoami)'     # ✅ Stores literally: "echo $(whoami)"  
+simple-secrets put danger "echo $(whoami)"       # ❌ Executes command before storing!
 
 # Retrieve a secret
 simple-secrets get api-key --token YOUR_ADMIN_TOKEN
@@ -193,6 +198,24 @@ simple-secrets list disabled
 ```
 
 #### Working with Complex Values
+
+**🛡️ Shell Security Warning**: Always use single quotes for secret values to prevent accidental command execution:
+
+```bash
+# ✅ SAFE - Single quotes store values literally
+simple-secrets put script 'rm -rf /'           # Stores the literal string
+simple-secrets put cmd 'echo $(date)'          # Stores the literal string  
+simple-secrets put password 'p@$$w0rd!$'       # Stores exactly as written
+
+# ❌ DANGEROUS - Double quotes allow shell command substitution
+simple-secrets put dangerous "echo $(whoami)"  # Executes whoami command!
+simple-secrets put risky "rm -rf $HOME"        # Could execute rm command!
+
+# The shell processes double quotes BEFORE the app sees them
+# This affects ALL CLI tools (git, cp, mv, etc.) - not just simple-secrets
+```
+
+#### Complex Value Examples
 
 Values starting with dashes or containing special characters work naturally with quotes:
 

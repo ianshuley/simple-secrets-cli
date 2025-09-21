@@ -30,8 +30,8 @@ import (
 var putCmd = &cobra.Command{
 	Use:                   "put [key] [value]",
 	Short:                 "Store a secret securely.",
-	Long:                  "Store a secret value under a key. Overwrites if the key exists. Backs up previous value.\n\nUse quotes for values with spaces or special characters.",
-	Example:               "simple-secrets put api-key \"--prod-key-abc123\"\nsimple-secrets put db_url \"postgresql://user:pass@localhost:5432/db\"",
+	Long:                  "Store a secret value under a key. Overwrites if the key exists. Backs up previous value.\n\nUse quotes for values with spaces or special characters.\n\n⚠️  SECURITY: Use single quotes to prevent shell command execution:\n    ✅ SAFE:      simple-secrets put key 'value with $(command)'\n    ❌ DANGEROUS: simple-secrets put key \"value with $(command)\"\n\nDouble quotes allow shell command substitution which executes before the app runs.",
+	Example:               "simple-secrets put api-key '--prod-key-abc123'\nsimple-secrets put db_url 'postgresql://user:pass@localhost:5432/db'\nsimple-secrets put script 'echo $(whoami)'  # Stores literally, not executed",
 	DisableFlagsInUseLine: true,
 	DisableFlagParsing:    true,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -211,7 +211,7 @@ func backupExistingSecret(store *internal.SecretsStore, key string) {
 var addCmd = &cobra.Command{
 	Use:                   "add [key] [value]",
 	Short:                 "Add a secret (alias for put).",
-	Long:                  "Store a secret with the given key and value. This is an alias for the 'put' command.\n\nUse quotes for values with spaces or special characters.",
+	Long:                  "Store a secret with the given key and value. This is an alias for the 'put' command.\n\nUse quotes for values with spaces or special characters.\n\n⚠️  SECURITY: Use single quotes to prevent shell command execution:\n    ✅ SAFE:      simple-secrets add key 'value with $(command)'\n    ❌ DANGEROUS: simple-secrets add key \"value with $(command)\"\n\nDouble quotes allow shell command substitution which executes before the app runs.",
 	Example:               "simple-secrets add db_password mypassword\nsimple-secrets add db_url \"postgresql://user:pass@localhost:5432/db\"",
 	DisableFlagsInUseLine: true,
 	DisableFlagParsing:    true,
