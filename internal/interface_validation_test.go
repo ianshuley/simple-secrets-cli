@@ -37,14 +37,21 @@ func newTempStoreForInterface(t *testing.T) *SecretsStore {
 	return s
 }
 
-// TestSecretsManagerInterface validates that SecretsStore implements SecretsManager correctly
-func TestSecretsManagerInterface(t *testing.T) {
+// TestApiInterfaceImplementation validates that our types implement the new API interfaces
+func TestApiInterfaceImplementation(t *testing.T) {
 	store := newTempStoreForInterface(t)
 
-	// Test through interface
-	var secretsMgr SecretsManager = store
+	// Create user store for testing
+	userStore, err := LoadUsersForAuth()
+	if err != nil {
+		// Create empty user store for testing
+		userStore = createUserStore([]*User{}, createDefaultRoles())
+	}
 
-	// Test CRUD operations through interface
+	// Create service adapter
+	adapter := NewServiceAdapter(store, userStore)
+
+	// Test through individual interfaces
 	key := "test/secret"
 	value := "secret-value"
 

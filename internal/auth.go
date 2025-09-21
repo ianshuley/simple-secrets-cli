@@ -344,13 +344,10 @@ func handleFirstRunWithToken(usersPath, rolesPath string) (*UserStore, string, e
 // Exported for use by cmd package to avoid duplication
 func UserDeclinedSetup(response string) bool {
 	declineResponses := []string{"n", "N", "no", "NO"}
-	for _, decline := range declineResponses {
-		if response == decline {
-			return true
-		}
-	}
-	return false
-} // validateFirstRunEligibility ensures we only run first-run setup in truly clean environments
+	return slices.Contains(declineResponses, response)
+}
+
+// validateFirstRunEligibility ensures we only run first-run setup in truly clean environments
 func validateFirstRunEligibility() error {
 	// Get the config directory from paths
 	usersPath, rolesPath, err := resolveConfigPaths()

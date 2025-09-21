@@ -21,6 +21,27 @@ import (
 	"path/filepath"
 )
 
+// FileMode represents file permissions
+type FileMode os.FileMode
+
+// Common file permission constants
+const (
+	FileMode0755 FileMode = 0755
+	FileMode0644 FileMode = 0644
+	FileMode0600 FileMode = 0600
+)
+
+// StorageBackend defines the interface for storage operations
+type StorageBackend interface {
+	ReadFile(path string) ([]byte, error)
+	WriteFile(path string, data []byte, perm FileMode) error
+	AtomicWriteFile(path string, data []byte, perm FileMode) error
+	MkdirAll(path string, perm FileMode) error
+	RemoveAll(path string) error
+	Exists(path string) bool
+	ListDir(path string) ([]string, error)
+}
+
 // FilesystemBackend implements StorageBackend for local filesystem operations
 type FilesystemBackend struct{}
 
