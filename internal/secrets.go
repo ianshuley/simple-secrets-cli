@@ -26,6 +26,86 @@ import (
 	"time"
 )
 
+// FileMode represents file permissions for storage operations
+type FileMode os.FileMode
+
+const (
+	FileMode0755 FileMode = 0755
+	FileMode0644 FileMode = 0644
+	FileMode0600 FileMode = 0600
+)
+
+// StorageBackend defines the interface for storage operations used by the secrets domain
+type StorageBackend interface {
+	ReadFile(path string) ([]byte, error)
+	WriteFile(path string, data []byte, perm FileMode) error
+	AtomicWriteFile(path string, data []byte, perm FileMode) error
+	MkdirAll(path string, perm FileMode) error
+	RemoveAll(path string) error
+	Exists(path string) bool
+	ListDir(path string) ([]string, error)
+}
+
+// FilesystemBackend implements StorageBackend for local filesystem operations
+type FilesystemBackend struct{}
+
+// NewFilesystemBackend creates a new filesystem storage backend
+func NewFilesystemBackend() *FilesystemBackend {
+	return &FilesystemBackend{}
+}
+
+// ReadFile reads data from a file
+func (fs *FilesystemBackend) ReadFile(path string) ([]byte, error) {
+	return os.ReadFile(path)
+}
+
+// WriteFile writes data to a file with specified permissions
+func (fs *FilesystemBackend) WriteFile(path string, data []byte, perm FileMode) error {
+	return os.WriteFile(path, data, os.FileMode(perm))
+}
+
+// AtomicWriteFile performs an atomic write using a temporary file and rename
+func (fs *FilesystemBackend) AtomicWriteFile(path string, data []byte, perm FileMode) error {
+	return AtomicWriteFile(path, data, os.FileMode(perm))
+}
+
+// MkdirAll creates directories with specified permissions
+func (fs *FilesystemBackend) MkdirAll(path string, perm FileMode) error {
+	return os.MkdirAll(path, os.FileMode(perm))
+}
+
+// RemoveAll removes a directory and all its contents
+func (fs *FilesystemBackend) RemoveAll(path string) error {
+	return os.RemoveAll(path)
+}
+
+// Exists checks if a file or directory exists
+func (fs *FilesystemBackend) Exists(path string) bool {
+	_, err := os.Stat(path)
+	return !os.IsNotExist(err)
+}
+
+// ListDir lists the contents of a directory
+func (fs *FilesystemBackend) ListDir(path string) ([]string, error) {
+	entries, err := os.ReadDir(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read directory %s: %w", path, err)
+	}
+
+	var names []string
+	for _, entry := range entries {
+		names = append(names, entry.Name())
+	}
+
+	return names, nil
+}
+
+// ensureDirectoryExists creates the parent directory if it doesn't exist
+func (fs *FilesystemBackend) ensureDirectoryExists(filePath string) error {
+	dir := filepath.Dir(filePath)
+	return fs.MkdirAll(dir, FileMode0755)
+}
+
 const (
 	disabledPrefix = "__DISABLED_"
 	// File permission constants for clarity
