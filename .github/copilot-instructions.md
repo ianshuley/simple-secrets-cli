@@ -205,6 +205,7 @@ for i, item := range items {
 ```
 
 **Use `any` instead of `interface{}`:**
+
 ```go
 // ❌ Old style with interface{}
 func ProcessValue(value interface{}) error {
@@ -217,12 +218,13 @@ func ProcessValue(value any) error {
 }
 
 // ✅ Even better: use generics when type matters
-func ProcessValue[T any](value T) error {
-    // ...
+func ProcessGenericValue(value T) error {
+    // ... (where T is a type parameter)
 }
 ```
 
 **Leverage type parameters for better type safety:**
+
 ```go
 // ❌ Runtime type assertions
 func GetFirst(slice []interface{}) interface{} {
@@ -233,7 +235,8 @@ func GetFirst(slice []interface{}) interface{} {
 }
 
 // ✅ Compile-time type safety with generics
-func GetFirst[T any](slice []T) (T, bool) {
+func GetFirst(slice []T) (T, bool) {
+    // ... (where T is a type parameter)
     var zero T
     if len(slice) > 0 {
         return slice[0], true
