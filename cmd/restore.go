@@ -67,7 +67,7 @@ func restoreSecret(cmd *cobra.Command, secretKey string) error {
 		return nil
 	}
 
-	store, err := internal.LoadSecretsStore()
+	store, err := internal.LoadSecretsStore(internal.NewFilesystemBackend())
 	if err != nil {
 		return err
 	}
@@ -103,7 +103,7 @@ func restoreDatabase(cmd *cobra.Command, backupName string) error {
 		return nil
 	}
 
-	store, err := internal.LoadSecretsStore()
+	store, err := internal.LoadSecretsStore(internal.NewFilesystemBackend())
 	if err != nil {
 		return err
 	}

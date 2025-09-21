@@ -25,7 +25,7 @@ func TestLoadOrCreateKey_CreatesKeyIfMissing(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("SIMPLE_SECRETS_CONFIG_DIR", tmp)
 
-	s, err := LoadSecretsStoreWithBackend(NewFilesystemBackend())
+	s, err := LoadSecretsStore(NewFilesystemBackend())
 	if err != nil {
 		t.Fatalf("Failed to create store: %v", err)
 	}
@@ -44,7 +44,7 @@ func TestLoadOrCreateKey_LoadsExistingKey(t *testing.T) {
 	t.Setenv("SIMPLE_SECRETS_CONFIG_DIR", tmp)
 
 	// Create initial store
-	s, err := LoadSecretsStoreWithBackend(NewFilesystemBackend())
+	s, err := LoadSecretsStore(NewFilesystemBackend())
 	if err != nil {
 		t.Fatalf("Failed to create initial store: %v", err)
 	}
@@ -53,7 +53,7 @@ func TestLoadOrCreateKey_LoadsExistingKey(t *testing.T) {
 	copy(origKey, s.masterKey)
 
 	// Now reload with a new store
-	s2, err := LoadSecretsStoreWithBackend(NewFilesystemBackend())
+	s2, err := LoadSecretsStore(NewFilesystemBackend())
 	if err != nil {
 		t.Fatalf("Failed to reload store: %v", err)
 	}
@@ -77,7 +77,7 @@ func TestLoadOrCreateKey_InvalidBase64Fails(t *testing.T) {
 	}
 
 	// Try to load - should fail
-	_, err := LoadSecretsStoreWithBackend(NewFilesystemBackend())
+	_, err := LoadSecretsStore(NewFilesystemBackend())
 	if err == nil {
 		t.Fatal("expected error on invalid base64")
 	}
@@ -87,7 +87,7 @@ func TestWriteMasterKey_WritesBase64(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("SIMPLE_SECRETS_CONFIG_DIR", tmp)
 
-	s, err := LoadSecretsStoreWithBackend(NewFilesystemBackend())
+	s, err := LoadSecretsStore(NewFilesystemBackend())
 	if err != nil {
 		t.Fatalf("Failed to create store: %v", err)
 	}

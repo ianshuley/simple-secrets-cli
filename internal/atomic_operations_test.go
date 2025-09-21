@@ -30,7 +30,7 @@ func TestAtomicMasterKeyRotation(t *testing.T) {
 	t.Setenv("SIMPLE_SECRETS_CONFIG_DIR", tmpDir)
 
 	// Create a secrets store using proper constructor
-	store, err := LoadSecretsStoreWithBackend(NewFilesystemBackend())
+	store, err := LoadSecretsStore(NewFilesystemBackend())
 	if err != nil {
 		t.Fatalf("Failed to create store: %v", err)
 	}
@@ -67,7 +67,7 @@ func TestAtomicMasterKeyRotation(t *testing.T) {
 	}
 
 	// Verify secrets are still accessible after rotation
-	newStore, err := LoadSecretsStoreWithBackend(NewFilesystemBackend())
+	newStore, err := LoadSecretsStore(NewFilesystemBackend())
 	if err != nil {
 		t.Fatalf("Failed to create new store: %v", err)
 	}
@@ -115,7 +115,7 @@ func TestAtomicOperationTempFileCleanup(t *testing.T) {
 	}
 
 	// Test multiple atomic operations to ensure temp files are cleaned up
-	tempStore, err := LoadSecretsStoreWithBackend(NewFilesystemBackend())
+	tempStore, err := LoadSecretsStore(NewFilesystemBackend())
 	if err != nil {
 		t.Fatalf("Failed to create temp store: %v", err)
 	}
@@ -169,7 +169,7 @@ func TestAtomicOperationPermissions(t *testing.T) {
 	}
 
 	// Perform atomic operation
-	tempStore, err := LoadSecretsStoreWithBackend(NewFilesystemBackend())
+	tempStore, err := LoadSecretsStore(NewFilesystemBackend())
 	if err != nil {
 		t.Fatalf("Failed to create temp store: %v", err)
 	}
@@ -216,7 +216,7 @@ func TestAtomicOperationConcurrency(t *testing.T) {
 
 			for j := 0; j < 10; j++ {
 				// Create temp store for this operation
-				tempStore, err := LoadSecretsStoreWithBackend(NewFilesystemBackend())
+				tempStore, err := LoadSecretsStore(NewFilesystemBackend())
 				if err != nil {
 					errors <- fmt.Errorf("goroutine %d: failed to create temp store: %w", id, err)
 					return

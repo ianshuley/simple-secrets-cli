@@ -31,7 +31,7 @@ func TestConcurrentSecretsOperations(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("SIMPLE_SECRETS_CONFIG_DIR", tmpDir+"/.simple-secrets")
 
-	store, err := LoadSecretsStore()
+	store, err := LoadSecretsStore(NewFilesystemBackend())
 	if err != nil {
 		t.Fatalf("Failed to load secrets store: %v", err)
 	}
@@ -271,7 +271,7 @@ func TestConcurrentMasterKeyRotation(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("SIMPLE_SECRETS_CONFIG_DIR", tmpDir+"/.simple-secrets")
 
-	store, err := LoadSecretsStore()
+	store, err := LoadSecretsStore(NewFilesystemBackend())
 	if err != nil {
 		t.Fatalf("Failed to load secrets store: %v", err)
 	}

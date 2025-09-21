@@ -71,7 +71,7 @@ func listKeys(cmd *cobra.Command) error {
 		return nil
 	}
 
-	store, err := internal.LoadSecretsStore()
+	store, err := internal.LoadSecretsStore(internal.NewFilesystemBackend())
 	if err != nil {
 		return err
 	}
@@ -99,7 +99,7 @@ func listBackups(cmd *cobra.Command) error {
 		return nil
 	}
 
-	store, err := internal.LoadSecretsStore()
+	store, err := internal.LoadSecretsStore(internal.NewFilesystemBackend())
 	if err != nil {
 		return err
 	}
@@ -188,7 +188,7 @@ func listDisabledSecrets(cmd *cobra.Command) error {
 		return nil
 	}
 
-	store, err := internal.LoadSecretsStore()
+	store, err := internal.LoadSecretsStore(internal.NewFilesystemBackend())
 	if err != nil {
 		return err
 	}

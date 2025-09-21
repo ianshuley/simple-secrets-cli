@@ -148,7 +148,7 @@ func prepareSecretDisableContext(cmd *cobra.Command, key string) (*SecretDisable
 		return nil, nil
 	}
 
-	store, err := internal.LoadSecretsStore()
+	store, err := internal.LoadSecretsStore(internal.NewFilesystemBackend())
 	if err != nil {
 		return nil, err
 	}

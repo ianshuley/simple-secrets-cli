@@ -47,7 +47,7 @@ var deleteCmd = &cobra.Command{
 
 		key := args[0]
 
-		store, err := internal.LoadSecretsStore()
+		store, err := internal.LoadSecretsStore(internal.NewFilesystemBackend())
 		if err != nil {
 			return err
 		}

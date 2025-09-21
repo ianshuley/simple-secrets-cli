@@ -100,7 +100,7 @@ func validateMasterKeyRotationAccess(cmd *cobra.Command) (*internal.User, *inter
 		return nil, nil, nil // First run message already printed
 	}
 
-	store, err := internal.LoadSecretsStore()
+	store, err := internal.LoadSecretsStore(internal.NewFilesystemBackend())
 	if err != nil {
 		return nil, nil, err
 	}

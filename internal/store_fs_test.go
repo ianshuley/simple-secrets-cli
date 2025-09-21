@@ -28,9 +28,9 @@ func newTempStore(t *testing.T) *SecretsStore {
 	t.Setenv("HOME", tmp)
 	t.Setenv("SIMPLE_SECRETS_CONFIG_DIR", tmp+"/.simple-secrets")
 	// Use dependency injection for better testability
-	s, err := LoadSecretsStoreWithBackend(NewFilesystemBackend())
+	s, err := LoadSecretsStore(NewFilesystemBackend())
 	if err != nil {
-		t.Fatalf("LoadSecretsStoreWithBackend: %v", err)
+		t.Fatalf("LoadSecretsStore: %v", err)
 	}
 	return s
 }
@@ -62,7 +62,7 @@ func TestStore_PutGetListDelete_PersistsAcrossRestarts(t *testing.T) {
 	}
 
 	// Reload store to ensure on-disk read works
-	s2, err := LoadSecretsStore()
+	s2, err := LoadSecretsStore(NewFilesystemBackend())
 	if err != nil {
 		t.Fatalf("reload: %v", err)
 	}

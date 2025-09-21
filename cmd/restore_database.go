@@ -53,7 +53,7 @@ var restoreDatabaseCmd = &cobra.Command{
 			return nil
 		}
 
-		store, err := internal.LoadSecretsStore()
+		store, err := internal.LoadSecretsStore(internal.NewFilesystemBackend())
 		if err != nil {
 			return err
 		}

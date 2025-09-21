@@ -82,7 +82,7 @@ func prepareSecretEnableContext(cmd *cobra.Command, key string) (*SecretEnableCo
 		return nil, nil
 	}
 
-	store, err := internal.LoadSecretsStore()
+	store, err := internal.LoadSecretsStore(internal.NewFilesystemBackend())
 	if err != nil {
 		return nil, err
 	}

@@ -27,9 +27,9 @@ func newTempStoreForAPI(t *testing.T) (*SecretsStore, *UserStore) {
 	t.Setenv("HOME", tmp)
 	t.Setenv("SIMPLE_SECRETS_CONFIG_DIR", tmp+"/.simple-secrets")
 
-	store, err := LoadSecretsStoreWithBackend(NewFilesystemBackend())
+	store, err := LoadSecretsStore(NewFilesystemBackend())
 	if err != nil {
-		t.Fatalf("LoadSecretsStoreWithBackend: %v", err)
+		t.Fatalf("LoadSecretsStore: %v", err)
 	}
 
 	// Create user store for testing
