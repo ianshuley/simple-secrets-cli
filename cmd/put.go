@@ -82,16 +82,30 @@ func parsePutArguments(cmd *cobra.Command, args []string) (*putArguments, error)
 
 func extractArgumentsAndFlags(args []string, token *string, tokenExplicitlySet *bool) []string {
 	filteredArgs := []string{}
+
 	for i := 0; i < len(args); i++ {
-		if args[i] == "--token" && i+1 < len(args) {
-			*token = args[i+1]
-			*tokenExplicitlySet = true
-			i++ // skip the token value
+		if isTokenFlag(args, i) {
+			i = processTokenFlag(args, i, token, tokenExplicitlySet)
 			continue
 		}
 		filteredArgs = append(filteredArgs, args[i])
 	}
 	return filteredArgs
+}
+
+func isTokenFlag(args []string, position int) bool {
+	return args[position] == "--token" && hasTokenValue(args, position)
+}
+
+func hasTokenValue(args []string, flagPosition int) bool {
+	return flagPosition+1 < len(args)
+}
+
+func processTokenFlag(args []string, flagPosition int, token *string, tokenExplicitlySet *bool) int {
+	valuePosition := flagPosition + 1
+	*token = args[valuePosition]
+	*tokenExplicitlySet = true
+	return valuePosition // Return position of token value to skip it
 }
 
 func shouldShowHelp(args []string) bool {
@@ -110,21 +124,34 @@ func validatePutArguments(filteredArgs []string) (string, string, error) {
 	return filteredArgs[0], filteredArgs[1], nil
 }
 
-func determineAuthTokenWithExplicitFlag(parsedToken string, explicitlySet bool) (string, error) {
-	if explicitlySet {
-		if strings.TrimSpace(parsedToken) == "" {
-			return "", errors.New(`authentication required: token cannot be empty
+func determineAuthTokenWithExplicitFlag(parsedToken string, wasTokenFlagUsed bool) (string, error) {
+	if !wasTokenFlagUsed {
+		return TokenFlag, nil
+	}
+
+	if isEmptyToken(parsedToken) {
+		return "", createEmptyTokenError()
+	}
+
+	return parsedToken, nil
+}
+
+func isEmptyToken(token string) bool {
+	return strings.TrimSpace(token) == ""
+}
+
+func createEmptyTokenError() error {
+	return errors.New(`authentication required: token cannot be empty
 
 Use one of these methods:
     simple-secrets --token <your-token> put <key> <value>
     SIMPLE_SECRETS_TOKEN=<your-token> simple-secrets put <key> <value>
 
 Or save your token in ~/.simple-secrets/config.json:
-    { "token": "<your-token>" }`)
-		}
-		return parsedToken, nil
-	}
-	return TokenFlag, nil // Fall back to global flag
+    {
+		"token": "<your-token>"
+	}`)
+
 }
 
 func executePutCommand(args *putArguments) error {
