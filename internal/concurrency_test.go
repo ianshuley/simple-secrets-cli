@@ -46,7 +46,7 @@ func TestConcurrentSecretsOperations(t *testing.T) {
 		var successCount int64
 
 		wg.Add(numGoroutines)
-		for i := range numGoroutines {
+		for i := range make([]struct{}, numGoroutines) {
 			go func(workerID int) {
 				defer wg.Done()
 				for j := range operationsPerGoroutine {
