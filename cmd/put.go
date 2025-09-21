@@ -161,63 +161,7 @@ func authenticatePutUser(token string) (*internal.User, error) {
 }
 
 func validatePutKeyName(key string) error {
-	if err := checkForNullByteIssues(key); err != nil {
-		return err
-	}
-
 	return ValidateSecureInput(key, SecretKeyValidationConfig)
-}
-
-func checkForNullByteIssues(key string) error {
-	if strings.HasSuffix(key, "\x00") {
-		return fmt.Errorf("key name cannot end with null bytes")
-	}
-
-	if strings.Contains(key, "\x00") {
-		return fmt.Errorf("key name cannot contain null bytes")
-	}
-
-	warnAboutSuspiciousKeys(key)
-	return nil
-}
-
-func warnAboutSuspiciousKeys(key string) {
-	suspiciousPatterns := []string{"admin", "root", "key", "secret", "token", "pass"}
-	for _, pattern := range suspiciousPatterns {
-		if key == pattern {
-			fmt.Fprintf(os.Stderr, "Warning: Key name '%s' could be the result of null byte truncation.\n", key)
-			fmt.Fprintf(os.Stderr, "If you intended to use a longer key name, please verify the input.\n")
-			return
-		}
-	}
-}
-
-func validateKeyBasicRules(key string) error {
-	return ValidateSecureInput(key, SecretKeyValidationConfig)
-}
-
-func validateKeySecurityRules(key string) error {
-	// This function is now redundant but kept for backward compatibility
-	// All validation is handled by validateKeyBasicRules
-	return nil
-}
-
-func checkForControlCharacters(key string) error {
-	// Deprecated: Use ValidateSecureInput with SecretKeyValidationConfig instead
-	for _, r := range key {
-		if r < 0x20 && r != 0x09 && r != 0x0A && r != 0x0D {
-			return fmt.Errorf("key name cannot contain control characters")
-		}
-	}
-	return nil
-}
-
-func checkForPathTraversal(key string) error {
-	// Deprecated: Use ValidateSecureInput with SecretKeyValidationConfig instead
-	if strings.Contains(key, "..") || strings.Contains(key, "/") || strings.Contains(key, "\\") {
-		return fmt.Errorf("key name cannot contain path separators or path traversal sequences")
-	}
-	return nil
 }
 
 func backupExistingSecret(store *internal.SecretsStore, key string) {
