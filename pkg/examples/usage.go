@@ -1,4 +1,4 @@
-/*package examples
+/*
 
 Copyright © 2025 Ian Shuley
 
