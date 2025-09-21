@@ -219,16 +219,39 @@ simple-secrets rotate master-key
 
 ### Backup & Restore
 
+Simple Secrets CLI provides two complementary backup systems for different scenarios:
+
+#### Individual Secret Backups
+
+Automatic backup files (`.bak`) created when secrets are overwritten, providing protection against accidental data loss:
+
 ```bash
-# List available backups
+# List available individual backups
 simple-secrets list backups
 
-# Restore a deleted secret
+# Restore a deleted or overwritten secret
 simple-secrets restore secret KEY
+```
 
-# Restore entire database from backup
+**When created**: Only when overwriting existing secrets (not on initial creation)  
+**Location**: `~/.simple-secrets/backups/[key].bak`  
+**Cross-rotation compatibility**: Individual backups survive master key rotation via automatic re-encryption
+
+#### Master Key Rotation Backups
+
+Complete database snapshots created during master key rotation, preserving entire system state:
+
+```bash
+# List rotation backup directories
+simple-secrets list backups
+
+# Restore entire database from rotation backup
 simple-secrets restore database BACKUP_ID
 ```
+
+**When created**: Automatically during `simple-secrets rotate master-key`  
+**Location**: `~/.simple-secrets/backup-[timestamp]/`  
+**Contains**: Complete encrypted database snapshot before key rotation
 
 ## Database Reset & Recovery
 
