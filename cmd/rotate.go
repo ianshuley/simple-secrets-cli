@@ -272,7 +272,7 @@ func findUserIndex(users []*internal.User, username string) (int, error) {
 
 // generateAndUpdateUserToken creates a new token and updates the user record
 func generateAndUpdateUserToken(users []*internal.User, targetIndex int) (string, error) {
-	newToken, err := generateSecureTokenString()
+	newToken, err := GenerateSecureToken()
 	if err != nil {
 		return "", fmt.Errorf("failed to generate random token: %w", err)
 	}
@@ -286,10 +286,6 @@ func generateAndUpdateUserToken(users []*internal.User, targetIndex int) (string
 	return newToken, nil
 }
 
-// generateSecureTokenString creates a new secure random token string
-func generateSecureTokenString() (string, error) {
-	return GenerateSecureToken()
-}
 
 // TokenRotationContext holds all the data needed for token rotation
 type TokenRotationContext struct {

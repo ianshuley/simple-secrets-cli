@@ -117,6 +117,31 @@ const (
 	RoleReader Role = "reader"
 )
 
+// TokenGenerator is a function type for generating secure tokens
+type TokenGenerator func() (string, error)
+
+// DefaultTokenGenerator holds the token generation function (set by cmd package)
+var DefaultTokenGenerator TokenGenerator
+
+// generateSecureToken calls the registered token generator or uses fallback
+func generateSecureToken() (string, error) {
+	if DefaultTokenGenerator != nil {
+		return DefaultTokenGenerator()
+	}
+	// Fallback for tests and direct internal package usage
+	return generateSecureTokenFallback()
+}
+
+// generateSecureTokenFallback is the original implementation for fallback use
+func generateSecureTokenFallback() (string, error) {
+	const tokenLengthBytes = 20 // 20 bytes = 160 bits of entropy
+	tokenBytes := make([]byte, tokenLengthBytes)
+	if _, err := io.ReadFull(rand.Reader, tokenBytes); err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(tokenBytes), nil
+}
+
 type User struct {
 	Username       string     `json:"username"`
 	TokenHash      string     `json:"token_hash"` // SHA-256 hash, base64-encoded
@@ -477,15 +502,7 @@ func (us *UserStore) UpdateUserRole(username, newRole string) error {
 	return fmt.Errorf("user %q not found", username)
 }
 
-// generateSecureToken creates a cryptographically secure random token
-func generateSecureToken() (string, error) {
-	const tokenLengthBytes = 20 // 20 bytes = 160 bits of entropy
-	tokenBytes := make([]byte, tokenLengthBytes)
-	if _, err := io.ReadFull(rand.Reader, tokenBytes); err != nil {
-		return "", err
-	}
-	return base64.RawURLEncoding.EncodeToString(tokenBytes), nil
-}
+
 
 // countAdminUsers returns the number of admin users (helper for validation)
 func (us *UserStore) countAdminUsers() int {

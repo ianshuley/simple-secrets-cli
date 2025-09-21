@@ -61,6 +61,9 @@ func Execute() {
 }
 
 func init() {
+	// Set up token generator for internal package
+	internal.DefaultTokenGenerator = GenerateSecureToken
+	
 	// Persistent token flag for all commands
 	rootCmd.PersistentFlags().StringVar(&TokenFlag, "token", "", "authentication token (overrides env/config)")
 
