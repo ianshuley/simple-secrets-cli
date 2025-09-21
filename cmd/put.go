@@ -168,11 +168,7 @@ func validatePutKeyName(key string) error {
 		return err
 	}
 
-	if err := validateKeyBasicRules(key); err != nil {
-		return err
-	}
-
-	return validateKeySecurityRules(key)
+	return ValidateSecureInput(key, SecretKeyValidationConfig)
 }
 
 func checkForNullByteIssues(key string) error {
@@ -200,21 +196,17 @@ func warnAboutSuspiciousKeys(key string) {
 }
 
 func validateKeyBasicRules(key string) error {
-	if strings.TrimSpace(key) == "" {
-		return fmt.Errorf("key name cannot be empty")
-	}
-	return nil
+	return ValidateSecureInput(key, SecretKeyValidationConfig)
 }
 
 func validateKeySecurityRules(key string) error {
-	if err := checkForControlCharacters(key); err != nil {
-		return err
-	}
-
-	return checkForPathTraversal(key)
+	// This function is now redundant but kept for backward compatibility
+	// All validation is handled by validateKeyBasicRules
+	return nil
 }
 
 func checkForControlCharacters(key string) error {
+	// Deprecated: Use ValidateSecureInput with SecretKeyValidationConfig instead
 	for _, r := range key {
 		if r < 0x20 && r != 0x09 && r != 0x0A && r != 0x0D {
 			return fmt.Errorf("key name cannot contain control characters")
@@ -224,6 +216,7 @@ func checkForControlCharacters(key string) error {
 }
 
 func checkForPathTraversal(key string) error {
+	// Deprecated: Use ValidateSecureInput with SecretKeyValidationConfig instead
 	if strings.Contains(key, "..") || strings.Contains(key, "/") || strings.Contains(key, "\\") {
 		return fmt.Errorf("key name cannot contain path separators or path traversal sequences")
 	}

@@ -1,0 +1,101 @@
+/*
+Copyright © 2025 Ian Shuley
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+	http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+package cmd
+
+import (
+	"fmt"
+	"strings"
+)
+
+// ValidationConfig controls what validation rules are applied to an input string
+type ValidationConfig struct {
+	EntityType          string // "key name", "username", etc. for error messages
+	AllowEmpty          bool   // Whether empty strings are allowed
+	AllowControlChars   bool   // Whether control characters are allowed
+	AllowedControlChars []rune // Specific control chars that are allowed (e.g., tab, newline)
+	AllowPathTraversal  bool   // Whether path separators and .. are allowed
+}
+
+// ValidateSecureInput performs comprehensive validation on user input strings
+// to prevent security issues like path traversal and control character injection
+func ValidateSecureInput(input string, config ValidationConfig) error {
+	if err := validateEmpty(input, config); err != nil {
+		return err
+	}
+
+	if !config.AllowControlChars {
+		if err := validateControlCharacters(input, config); err != nil {
+			return err
+		}
+	}
+
+	if !config.AllowPathTraversal {
+		if err := validatePathTraversal(input, config); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func validateEmpty(input string, config ValidationConfig) error {
+	if !config.AllowEmpty && strings.TrimSpace(input) == "" {
+		return fmt.Errorf("%s cannot be empty", config.EntityType)
+	}
+	return nil
+}
+
+func validateControlCharacters(input string, config ValidationConfig) error {
+	allowedMap := make(map[rune]bool)
+	for _, r := range config.AllowedControlChars {
+		allowedMap[r] = true
+	}
+
+	for _, r := range input {
+		isControlChar := r < 32 || r == 127
+		if isControlChar && !allowedMap[r] {
+			return fmt.Errorf("%s cannot contain control characters", config.EntityType)
+		}
+	}
+	return nil
+}
+
+func validatePathTraversal(input string, config ValidationConfig) error {
+	if strings.Contains(input, "..") || strings.Contains(input, "/") || strings.Contains(input, "\\") {
+		return fmt.Errorf("%s cannot contain path separators or path traversal sequences", config.EntityType)
+	}
+	return nil
+}
+
+// Predefined validation configurations for common use cases
+
+// UsernameValidationConfig provides secure validation for usernames
+var UsernameValidationConfig = ValidationConfig{
+	EntityType:          "username",
+	AllowEmpty:          false,
+	AllowControlChars:   false,
+	AllowedControlChars: nil,
+	AllowPathTraversal:  false,
+}
+
+// SecretKeyValidationConfig provides secure validation for secret keys
+var SecretKeyValidationConfig = ValidationConfig{
+	EntityType:          "key name",
+	AllowEmpty:          false,
+	AllowControlChars:   false,
+	AllowedControlChars: []rune{0x09, 0x0A, 0x0D}, // tab, LF, CR
+	AllowPathTraversal:  false,
+}

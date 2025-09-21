@@ -165,8 +165,18 @@ func createUserWithToken(userInput *UserInput) (*internal.User, string, error) {
 	return newUser, token, nil
 }
 
+// validateUsername performs comprehensive username validation
+func validateUsername(username string) error {
+	return ValidateSecureInput(username, UsernameValidationConfig)
+}
+
 // validateUsernameAvailability checks if the username is already taken
 func validateUsernameAvailability(username string) error {
+	// First validate the username format and security
+	if err := validateUsername(username); err != nil {
+		return err
+	}
+
 	usersPath, err := internal.DefaultUserConfigPath("users.json")
 	if err != nil {
 		return err
