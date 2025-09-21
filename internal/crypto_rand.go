@@ -18,3 +18,6 @@ package internal
 import "crypto/rand"
 
 func randReadImpl(b []byte) (int, error) { return rand.Read(b) }
+
+// tiny indirection so it's easy to mock later, if desired
+var randRead = func(b []byte) (int, error) { return randReadImpl(b) }
