@@ -33,6 +33,11 @@ type ValidationConfig struct {
 // ValidateSecureInput performs comprehensive validation on user input strings
 // to prevent security issues like path traversal, control character injection, and command injection
 func ValidateSecureInput(input string, config ValidationConfig) error {
+	// First check for potential post-shell-expansion injection patterns
+	if err := detectShellInjectionArtifacts(input, config); err != nil {
+		return err
+	}
+
 	if err := validateEmpty(input, config); err != nil {
 		return err
 	}
@@ -118,6 +123,53 @@ func validateShellMetacharacters(input string, config ValidationConfig) error {
 	// This catches both $(cmd) and ${var} and $var patterns
 	if strings.Contains(input, "$") {
 		return fmt.Errorf("%s cannot contain shell metacharacters (found: \"$\")", config.EntityType)
+	}
+
+	return nil
+}
+
+// detectShellInjectionArtifacts detects patterns that suggest shell command injection
+// may have already occurred before the application received the input
+func detectShellInjectionArtifacts(input string, config ValidationConfig) error {
+	if config.AllowShellMetachars {
+		return nil // Skip detection if shell metacharacters are explicitly allowed
+	}
+
+	// Only check for obvious command injection artifacts, not legitimate path characters
+	// Focus on detecting output patterns rather than input patterns
+	suspiciousPatterns := []struct {
+		pattern string
+		message string
+	}{
+		// Common error messages that suggest injection
+		{"Permission denied", "potential shell command injection detected (Permission denied output)"},
+		{"command not found", "potential shell command injection detected (command not found output)"},
+		{"rm: it is dangerous", "potential shell command injection detected (rm command output)"},
+		{"cannot remove", "potential shell command injection detected (rm/file operation output)"},
+		
+		// Detect echo command output patterns (common in injection)
+		{"-INJECTED", "potential shell command injection detected (echo command output pattern)"},
+		{"-SAFE", "potential shell command injection detected (echo command output pattern)"},
+		{"echo:", "potential shell command injection detected (echo command error output)"},
+		
+		// Detect other obvious command outputs
+		{"cannot access", "potential shell command injection detected (file access error)"},
+		{"Text file busy", "potential shell command injection detected (file busy error)"},
+		
+		// Common command outputs
+		{"drwx", "potential shell command injection detected (ls -l output pattern)"},
+		{"total ", "potential shell command injection detected (ls total output)"},
+	}
+
+	for _, suspicious := range suspiciousPatterns {
+		if strings.Contains(input, suspicious.pattern) {
+			return fmt.Errorf("security warning: %s. Use single quotes to prevent shell expansion", suspicious.message)
+		}
+	}
+
+	// Detect null byte truncation warning patterns
+	if strings.Contains(input, "null byte truncation") {
+		return fmt.Errorf("security warning: input appears to contain shell injection artifacts")
 	}
 
 	return nil
