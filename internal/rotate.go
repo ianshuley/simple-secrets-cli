@@ -205,11 +205,7 @@ func (s *SecretsStore) RotateMasterKey(backupDir string) error {
 
 // reencryptBackups re-encrypts all individual backup files from old key to new key
 func (s *SecretsStore) reencryptBackups(oldKey, newKey []byte) error {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return err
-	}
-	backupDir := filepath.Join(home, ".simple-secrets", "backups")
+	backupDir := s.getBackupDirectory()
 
 	// Check if backup directory exists
 	if _, err := os.Stat(backupDir); os.IsNotExist(err) {
