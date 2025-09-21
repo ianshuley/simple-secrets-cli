@@ -146,16 +146,16 @@ func detectShellInjectionArtifacts(input string, config ValidationConfig) error 
 		{"command not found", "potential shell command injection detected (command not found output)"},
 		{"rm: it is dangerous", "potential shell command injection detected (rm command output)"},
 		{"cannot remove", "potential shell command injection detected (rm/file operation output)"},
-		
+
 		// Detect echo command output patterns (common in injection)
 		{"-INJECTED", "potential shell command injection detected (echo command output pattern)"},
 		{"-SAFE", "potential shell command injection detected (echo command output pattern)"},
 		{"echo:", "potential shell command injection detected (echo command error output)"},
-		
+
 		// Detect other obvious command outputs
 		{"cannot access", "potential shell command injection detected (file access error)"},
 		{"Text file busy", "potential shell command injection detected (file busy error)"},
-		
+
 		// Common command outputs
 		{"drwx", "potential shell command injection detected (ls -l output pattern)"},
 		{"total ", "potential shell command injection detected (ls total output)"},
