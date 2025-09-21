@@ -250,23 +250,16 @@ func createDefaultUserFileWithToken(usersPath, rolesPath string) (*UserStore, st
 	return store, token, nil
 }
 
-// createDefaultConfigFile creates a config.json with commented examples
+// createDefaultConfigFile creates a minimal config.json with sensible defaults
+// Documentation and examples are available via 'simple-secrets help config'
 func createDefaultConfigFile() error {
 	configContent := `{
-  // Configuration file for simple-secrets CLI
-  //
-  // This file is optional and allows you to customize behavior.
-  // All settings shown below are examples with their default values.
-  //
-  // To store a personal access token for authentication:
-  // "token": "your-personal-access-token-here",
-  //
-  // To configure how many backup copies are kept during master key rotation:
   "rotation_backup_count": 1
-  //
-  // Note: Individual secret backups are always 1 (previous version) by design.
-  // The rotation_backup_count only affects master key rotation operations.
 }`
 
-	return os.WriteFile("config.json", []byte(configContent), 0600)
+	configPath, err := DefaultUserConfigPath("config.json")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(configPath, []byte(configContent), 0600)
 }

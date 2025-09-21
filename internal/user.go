@@ -105,7 +105,11 @@ func DefaultUserConfigPath(filename string) (string, error) {
 		return filepath.Join(testDir, filename), nil
 	}
 
-	return GetSimpleSecretsFilePath(filename)
+	configDir, err := GetSimpleSecretsPath()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(configDir, filename), nil
 }
 
 // ResolveToken returns the token from CLI flag, env, or config file (in that order).
@@ -131,10 +135,12 @@ func ResolveToken(cliFlag string) (string, error) {
 		if os.IsNotExist(err) {
 			return "", errors.New(`authentication required: no token found
 
-Use one of these methods:
+Set your token via:
     --token <your-token> (as a flag)
     SIMPLE_SECRETS_TOKEN=<your-token> (as environment variable)
-    ~/.simple-secrets/config.json with { "token": "<your-token>" }`)
+    ~/.simple-secrets/config.json with {"token": "<your-token>"}
+
+For more config options, run: simple-secrets help config`)
 		}
 		return "", fmt.Errorf("read config.json: %w", err)
 	}
@@ -151,4 +157,19 @@ Use one of these methods:
 	}
 
 	return config.Token, nil
+}
+
+// ====================================
+// Configuration Path Utilities
+// ====================================
+// These functions handle configuration file paths and directory management
+// for the simple-secrets application user configuration.
+
+// GetSimpleSecretsPath returns the path to the .simple-secrets directory
+func GetSimpleSecretsPath() (string, error) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("failed to get user home directory: %w", err)
+	}
+	return filepath.Join(homeDir, ".simple-secrets"), nil
 }
