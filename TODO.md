@@ -19,11 +19,6 @@
 
 ---
 
-## Add Clipboard Flag
-
-I'd like to add a --copy flag that pipes whatever information is being retrieved to the clipboard instead of to the console.
-
----
 
 ## Release Preparation
 
