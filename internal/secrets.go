@@ -1,17 +1,7 @@
 /*
 Copyright © 2025 Ian Shuley
 
-Licensed under the Apache License, Versio// getConfigDirectory returns the configuration directory, respecting test overrides
-
-	func getConfigDirectory() (string, error) {
-		// For testing purposes
-		if testDir := os.Getenv("SIMPLE_SECRETS_CONFIG_DIR"); testDir != "" {
-			return testDir, nil
-		}
-
-		return GetSimpleSecretsPath()
-	}icense");
-
+Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
@@ -52,13 +42,9 @@ type SecretsStore struct {
 	storage     StorageBackend    // injectable storage backend
 }
 
-// LoadSecretsStore: create ~/.simple-secrets, load key + secrets
-func LoadSecretsStore() (*SecretsStore, error) {
-	return LoadSecretsStoreWithBackend(NewFilesystemBackend())
-}
-
-// LoadSecretsStoreWithBackend allows injection of storage backend for better testability
-func LoadSecretsStoreWithBackend(backend StorageBackend) (*SecretsStore, error) {
+// LoadSecretsStore creates ~/.simple-secrets, loads key + secrets
+// For testing, inject a custom backend; for production, use NewFilesystemBackend()
+func LoadSecretsStore(backend StorageBackend) (*SecretsStore, error) {
 	dir, err := getConfigDirectory()
 	if err != nil {
 		return nil, fmt.Errorf("failed to determine configuration directory for secrets storage: %w", err)
@@ -83,18 +69,15 @@ func LoadSecretsStoreWithBackend(backend StorageBackend) (*SecretsStore, error) 
 
 // getConfigDirectory returns the configuration directory, respecting test overrides
 func getConfigDirectory() (string, error) {
-	// Check for test override first
+	// For testing purposes
 	if testDir := os.Getenv("SIMPLE_SECRETS_CONFIG_DIR"); testDir != "" {
 		return testDir, nil
 	}
 
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(home, ".simple-secrets"), nil
+	return GetSimpleSecretsPath()
 }
 
+// loadSecrets loads secrets from disk and updates in-memory state
 func (s *SecretsStore) loadSecrets() error {
 	secrets, err := s.loadSecretsFromDisk()
 	if err != nil {
@@ -138,6 +121,22 @@ func (s *SecretsStore) saveSecretsLocked() error {
 	}
 	// Use AtomicWriteFile for proper race condition protection
 	return s.storage.AtomicWriteFile(s.SecretsPath, b, FileMode(secureFilePermissions))
+}
+
+// mergeWithDiskState loads fresh state from disk and merges it with in-memory state.
+// This ensures consistency when multiple processes might be modifying the store.
+// Disk state takes precedence for conflicts.
+func (s *SecretsStore) mergeWithDiskState() error {
+	freshSecrets, err := s.loadSecretsFromDisk()
+	if err != nil {
+		return fmt.Errorf("failed to reload secrets for merge: %w", err)
+	}
+
+	// Merge disk state with in-memory state (disk takes precedence for conflicts)
+	for k, v := range freshSecrets {
+		s.secrets[k] = v
+	}
+	return nil
 }
 
 // backupSecret creates an encrypted backup of a secret
@@ -202,22 +201,6 @@ func (s *SecretsStore) ensureBackupExists(key, newEncryptedValue string) {
 	if currentValue, exists := s.secrets[key]; exists {
 		s.backupSecret(key, currentValue)
 	}
-}
-
-// mergeWithDiskState loads fresh state from disk and merges it with in-memory state.
-// This ensures consistency when multiple processes might be modifying the store.
-// Disk state takes precedence for conflicts.
-func (s *SecretsStore) mergeWithDiskState() error {
-	freshSecrets, err := s.loadSecretsFromDisk()
-	if err != nil {
-		return fmt.Errorf("failed to reload secrets for merge: %w", err)
-	}
-
-	// Merge disk state with in-memory state (disk takes precedence for conflicts)
-	for k, v := range freshSecrets {
-		s.secrets[k] = v
-	}
-	return nil
 }
 
 func (s *SecretsStore) Get(key string) (string, error) {
