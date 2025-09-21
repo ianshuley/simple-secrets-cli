@@ -93,10 +93,7 @@ func ResolveToken(cliFlag string) (string, error) {
 		if os.IsNotExist(err) {
 			return "", errors.New(`authentication required: no token found
 
-🚀 First time? Run setup to get started:
-    simple-secrets --setup
-
-Already have a token? Use one of these methods:
+Use one of these methods:
     --token <your-token> (as a flag)
     SIMPLE_SECRETS_TOKEN=<your-token> (as environment variable)
     ~/.simple-secrets/config.json with { "token": "<your-token>" }`)

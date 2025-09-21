@@ -175,10 +175,10 @@ func displayExistingInstallationInfo() {
 	fmt.Println("  • Create new user:    ./simple-secrets create-user --token <token> username role")
 	fmt.Println("  • List users:         ./simple-secrets list --token <token> users")
 
-	fmt.Println("\n🔑 Need your token? If you've lost it, you can:")
-	fmt.Println("  • Create a new user with: ./simple-secrets create-user <username> <role>")
-	fmt.Println("  • Or rotate an existing token: ./simple-secrets rotate token <username>")
-	fmt.Println("  • Nuclear option: Back up ~/.simple-secrets/, delete it, and start fresh")
+	fmt.Println("\n🔑 Need your token? If you've lost it:")
+	fmt.Println("  • Nuclear option: Back up ~/.simple-secrets/, delete it, and run --setup to start fresh")
+	fmt.Println("  • Or check if it's saved in ~/.simple-secrets/config.json")
+	fmt.Println("  • Or check your environment: echo $SIMPLE_SECRETS_TOKEN")
 
 	fmt.Println("\n💡 Pro tip: Set the environment variable to avoid typing --token each time:")
 	fmt.Println("  export SIMPLE_SECRETS_TOKEN=<your-token>")

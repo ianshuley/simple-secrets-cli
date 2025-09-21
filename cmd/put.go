@@ -115,10 +115,7 @@ func determineAuthTokenWithExplicitFlag(parsedToken string, explicitlySet bool) 
 		if strings.TrimSpace(parsedToken) == "" {
 			return "", errors.New(`authentication required: token cannot be empty
 
-🚀 First time? Run setup to get started:
-    simple-secrets --setup
-
-Already have a token? Use one of these methods:
+Use one of these methods:
     simple-secrets --token <your-token> put <key> <value>
     SIMPLE_SECRETS_TOKEN=<your-token> simple-secrets put <key> <value>
 
