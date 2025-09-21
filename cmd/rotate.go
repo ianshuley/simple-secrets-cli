@@ -64,7 +64,7 @@ Token rotation options:
 			// Username provided - admin rotation
 			return rotateToken(cmd, args[1])
 		default:
-			return fmt.Errorf("unknown rotate type: %s. Use 'master-key' or 'token'", args[0])
+			return NewUnknownTypeError("rotate", args[0], "'master-key' or 'token'")
 		}
 	},
 }
@@ -217,7 +217,7 @@ func validateTokenRotationAccess(cmd *cobra.Command, targetUsername string) (*in
 	}
 
 	if !currentUser.Can("rotate-tokens", store.Permissions()) {
-		return nil, "", nil, fmt.Errorf("permission denied: need 'rotate-tokens' permission")
+		return nil, "", nil, NewPermissionDeniedError("rotate-tokens")
 	}
 
 	usersPath, err := internal.DefaultUserConfigPath("users.json")
@@ -267,7 +267,7 @@ func findUserIndex(users []*internal.User, username string) (int, error) {
 			return i, nil
 		}
 	}
-	return -1, fmt.Errorf("user '%s' not found", username)
+	return -1, NewUserNotFoundError(username)
 }
 
 // generateAndUpdateUserToken creates a new token and updates the user record

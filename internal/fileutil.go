@@ -18,6 +18,7 @@ package internal
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"syscall"
 	"time"
 )
@@ -113,4 +114,22 @@ func (fl *FileLock) Unlock() error {
 	}
 
 	return nil
+}
+
+// GetSimpleSecretsPath returns the path to the .simple-secrets directory in the user's home
+func GetSimpleSecretsPath() (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("find home dir: %w", err)
+	}
+	return filepath.Join(home, ".simple-secrets"), nil
+}
+
+// GetSimpleSecretsFilePath returns the path to a file within .simple-secrets directory
+func GetSimpleSecretsFilePath(filename string) (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("find home dir: %w", err)
+	}
+	return filepath.Join(home, ".simple-secrets", filename), nil
 }

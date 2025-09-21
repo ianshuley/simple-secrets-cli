@@ -47,7 +47,7 @@ Disabled secrets are hidden from normal operations but can be re-enabled.`,
 		case "secret":
 			return disableSecret(cmd, args[1])
 		default:
-			return fmt.Errorf("unknown disable type: %s. Use 'token' or 'secret'", args[0])
+			return NewUnknownTypeError("disable", args[0], "'token' or 'secret'")
 		}
 	},
 }
@@ -155,7 +155,7 @@ func prepareSecretDisableContext(cmd *cobra.Command, key string) (*SecretDisable
 
 	// Check if secret exists
 	if _, err := store.Get(key); err != nil {
-		return nil, fmt.Errorf("secret not found")
+		return nil, NewSecretNotFoundError()
 	}
 
 	return &SecretDisableContext{
@@ -176,7 +176,7 @@ func validateTokenDisableAccess(cmd *cobra.Command) (*internal.User, *internal.U
 	}
 
 	if !user.Can("rotate-tokens", store.Permissions()) {
-		return nil, nil, fmt.Errorf("permission denied: need 'rotate-tokens' permission to disable tokens")
+		return nil, nil, NewPermissionDeniedError("rotate-tokens to disable tokens")
 	}
 
 	return user, store, nil
@@ -193,7 +193,7 @@ func validateSecretDisableAccess(cmd *cobra.Command) (*internal.User, *internal.
 	}
 
 	if !user.Can("write", store.Permissions()) {
-		return nil, nil, fmt.Errorf("permission denied: need 'write' permission to disable secrets")
+		return nil, nil, NewPermissionDeniedError("write to disable secrets")
 	}
 
 	return user, store, nil

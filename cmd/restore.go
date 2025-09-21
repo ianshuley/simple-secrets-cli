@@ -52,7 +52,7 @@ var restoreCmd = &cobra.Command{
 			}
 			return restoreDatabase(cmd, args[1])
 		default:
-			return fmt.Errorf("unknown restore type: %s. Use 'secret' or 'database'", args[0])
+			return NewUnknownTypeError("restore", args[0], "'secret' or 'database'")
 		}
 	},
 }

@@ -56,7 +56,7 @@ var listCmd = &cobra.Command{
 		case "disabled":
 			return listDisabledSecrets(cmd)
 		default:
-			return fmt.Errorf("unknown list type: %s. Use 'keys', 'backups', 'users', or 'disabled'", args[0])
+			return NewUnknownTypeError("list", args[0], "'keys', 'backups', 'users', or 'disabled'")
 		}
 	},
 }
@@ -134,7 +134,7 @@ func listUsers(cmd *cobra.Command) error {
 		return nil
 	}
 	if !user.Can("manage-users", store.Permissions()) {
-		return fmt.Errorf("permission denied: need 'manage-users' permission")
+		return NewPermissionDeniedError("manage-users")
 	}
 
 	// Load current users

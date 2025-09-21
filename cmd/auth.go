@@ -69,7 +69,7 @@ func AuthenticateWithToken(needWrite bool, token string) (*internal.User, *inter
 		return nil, nil, err
 	}
 	if needWrite && !user.Can("write", userStore.Permissions()) {
-		return nil, nil, fmt.Errorf("permission denied: need 'write'")
+		return nil, nil, NewWritePermissionError()
 	}
 	return user, userStore, nil
 }
@@ -131,7 +131,7 @@ func resolveTokenFromCommand(cmd *cobra.Command) (string, error) {
 // authorizeAccess checks if the user has the required permissions
 func authorizeAccess(user *internal.User, store *internal.UserStore, needWrite bool) error {
 	if needWrite && !user.Can("write", store.Permissions()) {
-		return fmt.Errorf("permission denied: need 'write'")
+		return NewWritePermissionError()
 	}
 	return nil
 }
@@ -147,3 +147,28 @@ func GenerateSecureToken() (string, error) {
 
 // ErrAuthenticationRequired returns a standard authentication required error
 var ErrAuthenticationRequired = fmt.Errorf("authentication required: token cannot be empty")
+
+// Common error constructors to reduce duplication
+func NewPermissionDeniedError(permission string) error {
+	return fmt.Errorf("permission denied: need '%s' permission", permission)
+}
+
+func NewWritePermissionError() error {
+	return fmt.Errorf("permission denied: need 'write'")
+}
+
+func NewSecretNotFoundError() error {
+	return fmt.Errorf("secret not found")
+}
+
+func NewDisabledSecretNotFoundError() error {
+	return fmt.Errorf("disabled secret not found")
+}
+
+func NewUserNotFoundError(username string) error {
+	return fmt.Errorf("user '%s' not found", username)
+}
+
+func NewUnknownTypeError(typeName, value, validOptions string) error {
+	return fmt.Errorf("unknown %s type: %s. Use %s", typeName, value, validOptions)
+}

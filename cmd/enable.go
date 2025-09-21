@@ -43,7 +43,7 @@ Re-enabled secrets become available for normal operations again.`,
 		case "secret":
 			return enableSecret(cmd, args[1])
 		default:
-			return fmt.Errorf("unknown enable type: %s. Use 'secret'", args[0])
+			return NewUnknownTypeError("enable", args[0], "'secret'")
 		}
 	},
 }
@@ -92,7 +92,7 @@ func prepareSecretEnableContext(cmd *cobra.Command, key string) (*SecretEnableCo
 	found := slices.Contains(disabledSecrets, key)
 
 	if !found {
-		return nil, fmt.Errorf("disabled secret not found")
+		return nil, NewDisabledSecretNotFoundError()
 	}
 
 	return &SecretEnableContext{
@@ -113,7 +113,7 @@ func validateSecretEnableAccess(cmd *cobra.Command) (*internal.User, *internal.U
 	}
 
 	if !user.Can("write", store.Permissions()) {
-		return nil, nil, fmt.Errorf("permission denied: need 'write' permission to enable secrets")
+		return nil, nil, NewPermissionDeniedError("write to enable secrets")
 	}
 
 	return user, store, nil

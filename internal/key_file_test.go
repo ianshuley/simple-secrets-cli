@@ -92,7 +92,7 @@ func TestWriteMasterKey_WritesBase64(t *testing.T) {
 		t.Fatalf("Failed to create store: %v", err)
 	}
 
-	key := make([]byte, 32)
+	key := make([]byte, AES256KeySize)
 	for i := range key {
 		key[i] = byte(i)
 	}

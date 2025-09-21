@@ -50,7 +50,7 @@ var getCmd = &cobra.Command{
 		value, err := store.Get(key)
 		if err != nil {
 			if errors.Is(err, os.ErrNotExist) {
-				return fmt.Errorf("secret not found")
+				return NewSecretNotFoundError()
 			}
 			return err
 		}

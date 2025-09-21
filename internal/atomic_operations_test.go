@@ -36,7 +36,7 @@ func TestAtomicMasterKeyRotation(t *testing.T) {
 	}
 
 	// Initialize the store with some test data
-	originalKey := make([]byte, 32) // 32 bytes for AES-256
+	originalKey := make([]byte, AES256KeySize) // AES-256
 	copy(originalKey, []byte("original-master-key-12345678901234567890123456789012")[:32])
 
 	// Set the master key directly for testing

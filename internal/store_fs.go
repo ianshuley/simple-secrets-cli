@@ -1,7 +1,17 @@
 /*
 Copyright © 2025 Ian Shuley
 
-Licensed under the Apache License, Version 2.0 (the "License");
+Licensed under the Apache License, Versio// getConfigDirectory returns the configuration directory, respecting test overrides
+
+	func getConfigDirectory() (string, error) {
+		// For testing purposes
+		if testDir := os.Getenv("SIMPLE_SECRETS_CONFIG_DIR"); testDir != "" {
+			return testDir, nil
+		}
+
+		return GetSimpleSecretsPath()
+	}icense");
+
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 

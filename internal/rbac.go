@@ -58,11 +58,7 @@ func DefaultUserConfigPath(filename string) (string, error) {
 		return filepath.Join(testDir, filename), nil
 	}
 
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "", fmt.Errorf("find home dir: %w", err)
-	}
-	return filepath.Join(home, ".simple-secrets", filename), nil
+	return GetSimpleSecretsFilePath(filename)
 }
 
 // LoadUsersList loads the user list from users.json (for CLI user creation).

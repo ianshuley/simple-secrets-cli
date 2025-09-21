@@ -24,7 +24,7 @@ import (
 // loadOrCreateKey sets s.masterKey; creates the file if missing.
 func (s *SecretsStore) loadOrCreateKey() error {
 	if !s.storage.Exists(s.KeyPath) {
-		key := make([]byte, 32) // AES-256
+		key := make([]byte, AES256KeySize) // AES-256
 		if _, err := rand.Read(key); err != nil {
 			return err
 		}

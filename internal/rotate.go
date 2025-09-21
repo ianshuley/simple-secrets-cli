@@ -153,7 +153,7 @@ func (s *SecretsStore) RotateMasterKey(backupDir string) error {
 	}
 
 	// 3) Generate a NEW key
-	newKey := make([]byte, 32)
+	newKey := make([]byte, AES256KeySize)
 	if _, err := randRead(newKey); err != nil {
 		return fmt.Errorf("generate new key: %w", err)
 	}
