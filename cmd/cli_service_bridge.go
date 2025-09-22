@@ -127,23 +127,3 @@ func GetCLIServiceHelper() (*CLIServiceHelper, error) {
 	}
 	return globalCLIHelper, nil
 }
-
-// RBACGuardV2 is a new version of RBACGuard that uses the service layer
-func RBACGuardV2(needWrite bool, cmd *cobra.Command) (*internal.User, *internal.UserStore, error) {
-	helper, err := GetCLIServiceHelper()
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to initialize service layer: %w", err)
-	}
-
-	return helper.AuthenticateCommand(cmd, needWrite)
-}
-
-// AuthenticateWithTokenV2 is a new version of AuthenticateWithToken that uses the service layer
-func AuthenticateWithTokenV2(needWrite bool, token string) (*internal.User, *internal.UserStore, error) {
-	helper, err := GetCLIServiceHelper()
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to initialize service layer: %w", err)
-	}
-
-	return helper.AuthenticateToken(token, needWrite)
-}
