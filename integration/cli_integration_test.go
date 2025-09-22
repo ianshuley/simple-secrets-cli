@@ -59,7 +59,7 @@ func TestPutGetListDelete(t *testing.T) {
 		t.Fatalf("first run failed: %v\n%s", err, out)
 	}
 	// Extract token from output
-	token := extractToken(string(out))
+	token := ExtractToken(string(out))
 	if token == "" {
 		t.Fatalf("could not extract admin token from output: %s", out)
 	}
@@ -101,11 +101,6 @@ func TestPutGetListDelete(t *testing.T) {
 	}
 }
 
-// extractToken parses the admin token from first-run output
-func extractToken(out string) string {
-	return extractTokenFromOutput(out)
-}
-
 func TestCreateUserAndLogin(t *testing.T) {
 	tmp := t.TempDir()
 	// First run to create admin and extract token
@@ -115,7 +110,7 @@ func TestCreateUserAndLogin(t *testing.T) {
 	if err != nil {
 		t.Fatalf("first run failed: %v\n%s", err, out)
 	}
-	token := extractToken(string(out))
+	token := ExtractToken(string(out))
 	if token == "" {
 		t.Fatalf("could not extract admin token from output: %s", out)
 	}

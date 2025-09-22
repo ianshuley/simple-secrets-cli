@@ -36,7 +36,7 @@ func TestFirstRunProtection_BlocksWhenMasterKeyExists(t *testing.T) {
 	os.WriteFile(masterKeyPath, []byte("fake-master-key"), 0600)
 
 	// Attempt to trigger first-run (should be blocked)
-	_, firstRun, err := LoadUsers()
+	_, firstRun, _, err := LoadUsers()
 
 	// Should fail with protection error
 	if err == nil {
@@ -70,7 +70,7 @@ func TestFirstRunProtection_BlocksWhenSecretsJsonExists(t *testing.T) {
 	os.WriteFile(secretsPath, []byte(`{"secrets":[]}`), 0600)
 
 	// Attempt to trigger first-run (should be blocked)
-	_, firstRun, err := LoadUsers()
+	_, firstRun, _, err := LoadUsers()
 
 	// Should fail with protection error
 	if err == nil {
@@ -97,7 +97,7 @@ func TestFirstRunProtection_AllowsCleanFirstRun(t *testing.T) {
 	t.Setenv("SIMPLE_SECRETS_CONFIG_DIR", tmpDir+"/.simple-secrets")
 
 	// No existing files - should allow first-run
-	store, firstRun, err := LoadUsers()
+	store, firstRun, _, err := LoadUsers()
 
 	if err != nil {
 		t.Fatalf("unexpected error on clean first-run: %v", err)
@@ -136,7 +136,7 @@ func TestFirstRunProtection_AllowsWhenOnlyConfigJsonExists(t *testing.T) {
 	os.WriteFile(configPath, []byte(`{"token":"test"}`), 0600)
 
 	// Should still allow first-run since no critical files exist
-	store, firstRun, err := LoadUsers()
+	store, firstRun, _, err := LoadUsers()
 
 	if err != nil {
 		t.Fatalf("unexpected error when only config.json exists: %v", err)
@@ -158,7 +158,7 @@ func TestFirstRunProtection_AllowsNormalOperationWithAllFiles(t *testing.T) {
 	t.Setenv("SIMPLE_SECRETS_CONFIG_DIR", tmpDir+"/.simple-secrets")
 
 	// Create complete installation first
-	store, firstRun, err := LoadUsers()
+	store, firstRun, _, err := LoadUsers()
 	if err != nil {
 		t.Fatalf("failed to create initial installation: %v", err)
 	}
@@ -167,7 +167,7 @@ func TestFirstRunProtection_AllowsNormalOperationWithAllFiles(t *testing.T) {
 	}
 
 	// Now verify that normal operation works when all files exist
-	store2, firstRun2, err2 := LoadUsers()
+	store2, firstRun2, _, err2 := LoadUsers()
 
 	if err2 != nil {
 		t.Fatalf("unexpected error on normal operation: %v", err2)

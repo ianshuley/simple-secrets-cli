@@ -115,7 +115,7 @@ func TestFirstRunCreatesDefaultAdmin(t *testing.T) {
 	t.Setenv("HOME", dir)
 	t.Setenv("SIMPLE_SECRETS_CONFIG_DIR", dir+"/.simple-secrets")
 	os.RemoveAll(dir + "/.simple-secrets")
-	_, firstRun, err := LoadUsers()
+	_, firstRun, _, err := LoadUsers()
 	if err != nil {
 		t.Fatalf("LoadUsers: %v", err)
 	}

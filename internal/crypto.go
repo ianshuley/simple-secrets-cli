@@ -24,6 +24,11 @@ import (
 	"io"
 )
 
+// Crypto constants to eliminate magic numbers
+const (
+	AES256KeySize = 32 // AES-256 key size in bytes
+)
+
 // encrypt: AES-256-GCM → base64(ciphertext with nonce prefix)
 func encrypt(key, plaintext []byte) (string, error) {
 	block, err := aes.NewCipher(key)

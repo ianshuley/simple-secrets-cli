@@ -16,6 +16,7 @@ limitations under the License.
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -29,87 +30,197 @@ import (
 var putCmd = &cobra.Command{
 	Use:                   "put [key] [value]",
 	Short:                 "Store a secret securely.",
-	Long:                  "Store a secret value under a key. Overwrites if the key exists. Backs up previous value.\n\nTo store values starting with dashes (like SSH keys), use -- to terminate flags:\nsimple-secrets put ssh-key -- \"-----BEGIN RSA PRIVATE KEY-----\\n...\"",
-	Example:               "simple-secrets put db_password s3cr3tP@ssw0rd\nsimple-secrets put ssh-key -- \"-----BEGIN RSA PRIVATE KEY-----\\n...\"",
-	Args:                  cobra.ExactArgs(2),
+	Long:                  "Store a secret value under a key. Overwrites if the key exists. Backs up previous value.\n\nUse quotes for values with spaces or special characters.\n\n⚠️  SECURITY: Use single quotes to prevent shell command execution:\n    ✅ SAFE:      simple-secrets put key 'value with $(command)'\n    ❌ DANGEROUS: simple-secrets put key \"value with $(command)\"\n\nDouble quotes allow shell command substitution which executes before the app runs.",
+	Example:               "simple-secrets put api-key '--prod-key-abc123'\nsimple-secrets put db_url 'postgresql://user:pass@localhost:5432/db'\nsimple-secrets put script 'echo $(whoami)'  # Stores literally, not executed",
 	DisableFlagsInUseLine: true,
-	FParseErrWhitelist:    cobra.FParseErrWhitelist{UnknownFlags: true},
+	DisableFlagParsing:    true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// Check if token flag was explicitly set to empty string
-		if flag := cmd.Flag("token"); flag != nil && flag.Changed && TokenFlag == "" {
-			return fmt.Errorf("authentication required: token cannot be empty")
-		}
-
-		// RBAC: write access
-		user, _, err := RBACGuard(true, TokenFlag)
-		if err != nil {
-			return err
-		}
-		if user == nil {
-			return nil
-		}
-
-		// Initialize the secrets store
-		store, err := internal.LoadSecretsStore()
+		parsedArgs, err := parsePutArguments(cmd, args)
 		if err != nil {
 			return err
 		}
 
-		key := args[0]
-		value := args[1]
-
-		// Validate key name
-		if strings.TrimSpace(key) == "" {
-			return fmt.Errorf("key name cannot be empty")
+		if parsedArgs == nil {
+			return nil // Help was shown
 		}
 
-		// Check for null bytes and other problematic characters
-		if strings.Contains(key, "\x00") {
-			return fmt.Errorf("key name cannot contain null bytes")
-		}
-
-		// Check for control characters (0x00-0x1F except \t, \n, \r)
-		for _, r := range key {
-			if r < 0x20 && r != 0x09 && r != 0x0A && r != 0x0D {
-				return fmt.Errorf("key name cannot contain control characters")
-			}
-		}
-
-		// Check for path traversal attempts
-		if strings.Contains(key, "..") || strings.Contains(key, "/") || strings.Contains(key, "\\") {
-			return fmt.Errorf("key name cannot contain path separators or path traversal sequences")
-		}
-
-		// Backup previous value if it exists
-		prev, err := store.Get(key)
-		if err == nil {
-			// Only backup if key existed
-			home, err := os.UserHomeDir()
-			if err == nil {
-				backupDir := filepath.Join(home, ".simple-secrets", "backups")
-				_ = os.MkdirAll(backupDir, 0700)
-				backupPath := filepath.Join(backupDir, key+".bak")
-				_ = os.WriteFile(backupPath, []byte(prev), 0600)
-			}
-		}
-
-		// Save secret (encrypted)
-		if err := store.Put(key, value); err != nil {
-			return err
-		}
-
-		fmt.Printf("Secret %q stored.\n", key)
-		return nil
+		return executePutCommand(parsedArgs)
 	},
 }
 
+type putArguments struct {
+	key   string
+	value string
+	token string
+}
+
+func parsePutArguments(cmd *cobra.Command, args []string) (*putArguments, error) {
+	var token string
+	var tokenExplicitlySet bool
+	filteredArgs := extractArgumentsAndFlags(args, &token, &tokenExplicitlySet)
+
+	if shouldShowHelp(args) {
+		return nil, cmd.Help()
+	}
+
+	key, value, err := validatePutArguments(filteredArgs)
+	if err != nil {
+		return nil, err
+	}
+
+	resolvedToken, err := determineAuthTokenWithExplicitFlag(token, tokenExplicitlySet)
+	if err != nil {
+		return nil, err
+	}
+
+	return &putArguments{
+		key:   key,
+		value: value,
+		token: resolvedToken,
+	}, nil
+}
+
+func extractArgumentsAndFlags(args []string, token *string, tokenExplicitlySet *bool) []string {
+	filteredArgs := []string{}
+
+	for i := 0; i < len(args); i++ {
+		if isTokenFlag(args, i) {
+			i = processTokenFlag(args, i, token, tokenExplicitlySet)
+			continue
+		}
+		filteredArgs = append(filteredArgs, args[i])
+	}
+	return filteredArgs
+}
+
+func isTokenFlag(args []string, position int) bool {
+	return args[position] == "--token" && hasTokenValue(args, position)
+}
+
+func hasTokenValue(args []string, flagPosition int) bool {
+	return flagPosition+1 < len(args)
+}
+
+func processTokenFlag(args []string, flagPosition int, token *string, tokenExplicitlySet *bool) int {
+	valuePosition := flagPosition + 1
+	*token = args[valuePosition]
+	*tokenExplicitlySet = true
+	return valuePosition // Return position of token value to skip it
+}
+
+func shouldShowHelp(args []string) bool {
+	for _, arg := range args {
+		if arg == "--help" || arg == "-h" {
+			return true
+		}
+	}
+	return false
+}
+
+func validatePutArguments(filteredArgs []string) (string, string, error) {
+	if len(filteredArgs) != 2 {
+		return "", "", fmt.Errorf("requires exactly 2 arguments [key] [value], got %d", len(filteredArgs))
+	}
+	return filteredArgs[0], filteredArgs[1], nil
+}
+
+func determineAuthTokenWithExplicitFlag(parsedToken string, wasTokenFlagUsed bool) (string, error) {
+	if !wasTokenFlagUsed {
+		return TokenFlag, nil
+	}
+
+	if isEmptyToken(parsedToken) {
+		return "", createEmptyTokenError()
+	}
+
+	return parsedToken, nil
+}
+
+func isEmptyToken(token string) bool {
+	return strings.TrimSpace(token) == ""
+}
+
+func createEmptyTokenError() error {
+	return errors.New(`authentication required: token cannot be empty
+
+Use one of these methods:
+    simple-secrets --token <your-token> put <key> <value>
+    SIMPLE_SECRETS_TOKEN=<your-token> simple-secrets put <key> <value>
+
+Or save your token in ~/.simple-secrets/config.json:
+    {
+		"token": "<your-token>"
+	}`)
+
+}
+
+func executePutCommand(args *putArguments) error {
+	user, err := authenticatePutUser(args.token)
+	if err != nil {
+		return err
+	}
+	if user == nil {
+		return nil
+	}
+
+	if err := validatePutKeyName(args.key); err != nil {
+		return err
+	}
+
+	store, err := internal.LoadSecretsStore(internal.NewFilesystemBackend())
+	if err != nil {
+		return err
+	}
+
+	backupExistingSecret(store, args.key)
+
+	if err := store.Put(args.key, args.value); err != nil {
+		return err
+	}
+
+	fmt.Printf("Secret %q stored.\n", args.key)
+	return nil
+}
+
+func authenticatePutUser(token string) (*internal.User, error) {
+	user, _, err := AuthenticateWithToken(true, token)
+	return user, err
+}
+
+// validatePutKeyName ensures secret keys meet security and usability requirements:
+// - Non-empty
+// - No control characters (except tab, LF, CR)
+// - No path traversal sequences
+// - No shell metacharacters
+func validatePutKeyName(key string) error {
+	return ValidateSecureInput(key, SecretKeyValidationConfig)
+}
+
+func backupExistingSecret(store *internal.SecretsStore, key string) {
+	prev, err := store.Get(key)
+	if err != nil {
+		return // No existing value to backup
+	}
+
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return // Cannot determine backup location
+	}
+
+	backupDir := filepath.Join(home, ".simple-secrets", "backups")
+	_ = os.MkdirAll(backupDir, 0700)
+	backupPath := filepath.Join(backupDir, key+".bak")
+	_ = os.WriteFile(backupPath, []byte(prev), 0600)
+}
+
 var addCmd = &cobra.Command{
-	Use:     "add [key] [value]",
-	Short:   "Add a secret (alias for put).",
-	Long:    "Store a secret with the given key and value. This is an alias for the 'put' command.",
-	Example: "simple-secrets add db_password mypassword",
-	Args:    cobra.ExactArgs(2),
-	RunE:    putCmd.RunE, // Same implementation as put
+	Use:                   "add [key] [value]",
+	Short:                 "Add a secret (alias for put).",
+	Long:                  "Store a secret with the given key and value. This is an alias for the 'put' command.\n\nUse quotes for values with spaces or special characters.\n\n⚠️  SECURITY: Use single quotes to prevent shell command execution:\n    ✅ SAFE:      simple-secrets add key 'value with $(command)'\n    ❌ DANGEROUS: simple-secrets add key \"value with $(command)\"\n\nDouble quotes allow shell command substitution which executes before the app runs.",
+	Example:               "simple-secrets add db_password mypassword\nsimple-secrets add db_url \"postgresql://user:pass@localhost:5432/db\"",
+	DisableFlagsInUseLine: true,
+	DisableFlagParsing:    true,
+	RunE:                  putCmd.RunE, // Same implementation as put
 }
 
 func init() {

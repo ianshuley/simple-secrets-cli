@@ -36,20 +36,20 @@ Re-enabled secrets become available for normal operations again.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Check if token flag was explicitly set to empty string
 		if flag := cmd.Flag("token"); flag != nil && flag.Changed && TokenFlag == "" {
-			return fmt.Errorf("authentication required: token cannot be empty")
+			return ErrAuthenticationRequired
 		}
 
 		switch args[0] {
 		case "secret":
-			return enableSecret(args[1])
+			return enableSecret(cmd, args[1])
 		default:
-			return fmt.Errorf("unknown enable type: %s. Use 'secret'", args[0])
+			return NewUnknownTypeError("enable", args[0], "'secret'")
 		}
 	},
 }
 
-func enableSecret(key string) error {
-	context, err := prepareSecretEnableContext(key)
+func enableSecret(cmd *cobra.Command, key string) error {
+	context, err := prepareSecretEnableContext(cmd, key)
 	if err != nil {
 		return err
 	}
@@ -73,8 +73,8 @@ type SecretEnableContext struct {
 }
 
 // prepareSecretEnableContext validates access and prepares context for secret enabling
-func prepareSecretEnableContext(key string) (*SecretEnableContext, error) {
-	user, _, err := validateSecretEnableAccess()
+func prepareSecretEnableContext(cmd *cobra.Command, key string) (*SecretEnableContext, error) {
+	user, _, err := validateSecretEnableAccess(cmd)
 	if err != nil {
 		return nil, err
 	}
@@ -82,7 +82,7 @@ func prepareSecretEnableContext(key string) (*SecretEnableContext, error) {
 		return nil, nil
 	}
 
-	store, err := internal.LoadSecretsStore()
+	store, err := internal.LoadSecretsStore(internal.NewFilesystemBackend())
 	if err != nil {
 		return nil, err
 	}
@@ -92,7 +92,7 @@ func prepareSecretEnableContext(key string) (*SecretEnableContext, error) {
 	found := slices.Contains(disabledSecrets, key)
 
 	if !found {
-		return nil, fmt.Errorf("disabled secret not found")
+		return nil, NewDisabledSecretNotFoundError()
 	}
 
 	return &SecretEnableContext{
@@ -103,8 +103,8 @@ func prepareSecretEnableContext(key string) (*SecretEnableContext, error) {
 }
 
 // validateSecretEnableAccess checks RBAC permissions for secret enabling
-func validateSecretEnableAccess() (*internal.User, *internal.UserStore, error) {
-	user, store, err := RBACGuard(true, TokenFlag)
+func validateSecretEnableAccess(cmd *cobra.Command) (*internal.User, *internal.UserStore, error) {
+	user, store, err := RBACGuard(true, cmd)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -113,7 +113,7 @@ func validateSecretEnableAccess() (*internal.User, *internal.UserStore, error) {
 	}
 
 	if !user.Can("write", store.Permissions()) {
-		return nil, nil, fmt.Errorf("permission denied: need 'write' permission to enable secrets")
+		return nil, nil, NewPermissionDeniedError("write to enable secrets")
 	}
 
 	return user, store, nil

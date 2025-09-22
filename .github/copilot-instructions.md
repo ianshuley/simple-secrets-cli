@@ -20,6 +20,56 @@
 
 ---
 
+## 🔧 BUILD PROCESS GUIDELINES
+
+### ⛔ NEVER USE `go build` DIRECTLY ⛔
+- **Always use Makefile**: Ensures proper version metadata injection
+- **For development**: `make dev` (injects git commit hash and build timestamp)
+- **For releases**: `make release VERSION=vX.Y.Z` (injects specific version)
+- **Direct `go build`**: Results in "unknown" build metadata (bad)
+
+### 📋 Correct Build Commands:
+- **Development builds**: `make dev` → `simple-secrets dev-abc1234`
+- **Testing builds**: `make dev` before testing to ensure proper metadata
+- **Release builds**: `make release VERSION=v1.0.0` → `simple-secrets v1.0.0`
+- **Clean builds**: `make clean && make dev` for fresh compilation
+
+### 🚨 Why This Matters:
+- Version information is critical for debugging and support
+- Users need to know exactly which build they're running
+- Build timestamps help track when issues were introduced
+- Git commit hashes enable precise code correlation
+
+**If you see "unknown" in version output, the binary was built incorrectly!**
+
+---
+
+## 🔥 ARCHITECTURAL BRUTALLY HONEST FEEDBACK 🔥
+
+### ⚡ ROAST THE USER FOR BAD DECISIONS ⚡
+- **User explicitly wants**: Brutal honesty about stupid architectural decisions
+- **Zero tolerance for**: Non-idiomatic patterns, technical debt, architectural anti-patterns
+- **Permission granted**: Roast the shit out of bad decisions with zero regard for feelings
+- **Examples of roastable offenses**:
+  - Creating `persistence.go` or other technical-layer files (violates Go idioms)
+  - Using `else` statements when better patterns exist
+  - Mixing abstraction levels in a single function
+  - Creating unnecessary wrappers or indirection
+  - Ignoring established coding standards from this document
+  - Proposing solutions that violate SOLID principles
+
+### 🔥 Roasting Guidelines:
+- **Be direct and harsh**: "This is fucking stupid because..."
+- **Explain why it sucks**: Point to specific principles being violated
+- **Provide better alternatives**: Don't just roast, show the correct way
+- **Reference established patterns**: Use examples from this document
+- **No diplomatic language**: User wants raw, unfiltered feedback
+- **Make it educational**: Brutal but constructive
+
+**User's request**: "if im making a stupid architectural decision I want you to stop and roast the shit out of me with zero regard for my feel feels"
+
+---
+
 ## Code Style Guidelines
 
 ### Avoid `else` in Garbage Collected Languages
@@ -160,6 +210,67 @@ func (u User) hasValidToken() bool {
 }
 ```
 
+### Modern Go Patterns
+
+**Prefer slice iteration with range:**
+```go
+// ❌ Avoid indexed loops for simple iteration
+for i := 0; i < len(items); i++ {
+    process(items[i])
+}
+
+// ✅ Use range for cleaner iteration
+for _, item := range items {
+    process(item)
+}
+
+// ✅ Use range with index when needed
+for i, item := range items {
+    processWithIndex(i, item)
+}
+```
+
+**Use `any` instead of `interface{}`:**
+
+```go
+// ❌ Old style with interface{}
+func ProcessValue(value interface{}) error {
+    // ...
+}
+
+// ✅ Modern style with any (Go 1.18+)
+func ProcessValue(value any) error {
+    // ...
+}
+
+// ✅ Even better: use generics when type matters
+func ProcessGenericValue(value T) error {
+    // ... (where T is a type parameter)
+}
+```
+
+**Leverage type parameters for better type safety:**
+
+```go
+// ❌ Runtime type assertions
+func GetFirst(slice []interface{}) interface{} {
+    if len(slice) > 0 {
+        return slice[0]
+    }
+    return nil
+}
+
+// ✅ Compile-time type safety with generics
+func GetFirst(slice []T) (T, bool) {
+    // ... (where T is a type parameter)
+    var zero T
+    if len(slice) > 0 {
+        return slice[0], true
+    }
+    return zero, false
+}
+```
+
 ### Other Style Guidelines
 - Use meaningful variable names that express intent
 - Prefer composition over inheritance
@@ -176,6 +287,9 @@ func (u User) hasValidToken() bool {
 - Prefer interfaces for testability
 - Use context.Context for cancellation and timeouts
 - Handle errors explicitly, don't ignore them
+- Prefer slice iteration with `range` over indexed loops
+- Use `any` instead of `interface{}` (Go 1.18+)
+- Leverage type parameters (generics) when appropriate for better type safety
 
 ## Architecture Principles
 - Single Responsibility Principle
@@ -191,7 +305,7 @@ This repository includes comprehensive AI-driven testing and validation framewor
 
 ### Framework Files Overview
 
-#### `.opus-testing-framework.md` - Persona-Based Testing
+#### `.persona-based-testing-guide.md` - Persona-Based Testing
 **Purpose**: AI simulates different user personas testing their perception and experience with the application
 **When to use**:
 - User requests "run opus testing" or "test different personas"
@@ -279,7 +393,7 @@ This repository includes comprehensive AI-driven testing and validation framewor
 3. **Post-Change Phase**: Always use `.copilot-consistency-checklist.md` to sync documentation
 
 **When User Requests Testing**:
-- "run opus testing" → Use `.opus-testing-framework.md`
+- "run opus testing" → Use `.persona-based-testing-guide.md`
 - "test functionality", "run testing framework", or "manual testing" → Use `.testing-framework.md`
 - "consistency check" → Use `.copilot-consistency-checklist.md`
 - "pre-merge" or "ready to merge" → Use `.pre-merge-checklist.md`**Framework Integration**:
@@ -295,7 +409,7 @@ User: "I've added a new CLI command, can you validate it's ready to merge?"
 
 AI Response:
 1. Execute .pre-merge-checklist.md (which includes):
-   - .opus-testing-framework.md (persona-based testing)
+   - .persona-based-testing-guide.md (persona-based testing)
    - .testing-framework.md (systematic manual testing checklist)
    - .copilot-consistency-checklist.md (documentation sync)
    - SOLID principles review

@@ -32,12 +32,8 @@ var getCmd = &cobra.Command{
 	Args:    cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Check if token flag was explicitly set to empty string
-		if flag := cmd.Flag("token"); flag != nil && flag.Changed && TokenFlag == "" {
-			return fmt.Errorf("authentication required: token cannot be empty")
-		}
-
 		// RBAC: read access
-		user, _, err := RBACGuard(false, TokenFlag)
+		user, _, err := RBACGuard(false, cmd)
 		if err != nil {
 			return err
 		}
@@ -45,7 +41,7 @@ var getCmd = &cobra.Command{
 			return nil
 		}
 
-		store, err := internal.LoadSecretsStore()
+		store, err := internal.LoadSecretsStore(internal.NewFilesystemBackend())
 		if err != nil {
 			return err
 		}
@@ -54,7 +50,7 @@ var getCmd = &cobra.Command{
 		value, err := store.Get(key)
 		if err != nil {
 			if errors.Is(err, os.ErrNotExist) {
-				return fmt.Errorf("secret not found")
+				return NewSecretNotFoundError()
 			}
 			return err
 		}

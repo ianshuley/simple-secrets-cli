@@ -65,47 +65,78 @@ simple-secrets list keys
 simple-secrets --setup
 ```
 
-Setup is straightforward:
+Setup process:
 
-- Confirms you're ready to receive an authentication token
-- Creates your admin user automatically
-- Displays your authentication token securely
-- Provides basic usage instructions
+1. **Detects first run** and prompts for admin user creation
+2. **Creates admin user** and generates secure authentication token
+3. **Displays token once** - save it securely as it won't be shown again
+4. **Requires re-running** your original command with the token
 
 ### Basic Usage
 
 ```bash
-# First run creates an admin user
+# First run: triggers setup and creates admin user
 simple-secrets list keys
+# (Shows setup prompt, creates admin, displays token)
 
-# Store a secret
-simple-secrets put api-key "sk-1234567890abcdef" --token YOUR_ADMIN_TOKEN
+# Then use the token for actual operations:
+simple-secrets list keys --token YOUR_ADMIN_TOKEN
+
+# Store a secret (use single quotes to prevent shell command execution)
+simple-secrets put api-key '--prod-key-abc123' --token YOUR_ADMIN_TOKEN
+simple-secrets put db-url 'postgresql://user:pass@localhost:5432/db' --token YOUR_ADMIN_TOKEN
+
+# ⚠️  SECURITY: Single quotes vs double quotes
+simple-secrets put safe-key 'echo $(whoami)'     # ✅ Stores literally: "echo $(whoami)"
+simple-secrets put danger "echo $(whoami)"       # ❌ Executes command before storing!
 
 # Retrieve a secret
 simple-secrets get api-key --token YOUR_ADMIN_TOKEN
-
-# List all secrets
-simple-secrets list keys --token YOUR_ADMIN_TOKEN
 ```
 
 ## Configuration
+
+### Automatic Setup
+
+During first-run, simple-secrets automatically creates a commented `config.json` template with examples:
+
+```json
+{
+  // Configuration file for simple-secrets CLI
+  //
+  // This file is optional and allows you to customize behavior.
+  // All settings shown below are examples with their default values.
+  //
+  // To store a personal access token for authentication:
+  // "token": "your-personal-access-token-here",
+  //
+  // To configure how many backup copies are kept during master key rotation:
+  "rotation_backup_count": 1
+  //
+  // Note: Individual secret backups are always 1 (previous version) by design.
+  // The rotation_backup_count only affects master key rotation operations.
+}
+```
 
 ### Authentication Methods
 
 1. **Command flag**: `--token YOUR_TOKEN`
 2. **Environment variable**: `export SIMPLE_SECRETS_TOKEN=YOUR_TOKEN`
-3. **Config file**: `~/.simple-secrets/config.json`
+3. **Config file**: `~/.simple-secrets/config.json` (auto-created during first-run)
 
-```json
-{
-  "token": "YOUR_TOKEN"
-}
-```
+**Configuration Options:**
+
+- `token`: Authentication token for API access
+- `rotation_backup_count`: Number of rotation backups to keep (default: 1)
+  - Set to 1 for minimal attack surface (recommended for high-security environments)
+  - Increase (e.g., 3-5) for more recovery options in development/testing
+  - Must be a positive integer
 
 ### File Structure
 
 ```text
 ~/.simple-secrets/
+├── config.json     # Optional configuration (auto-created)
 ├── master.key      # Encryption key (protect this!)
 ├── secrets.json    # Encrypted secrets
 ├── users.json      # User accounts and roles
@@ -166,6 +197,44 @@ simple-secrets enable secret KEY
 simple-secrets list disabled
 ```
 
+#### Working with Complex Values
+
+**🛡️ Shell Security Warning**: Always use single quotes for secret values to prevent accidental command execution:
+
+```bash
+# ✅ SAFE - Single quotes store values literally
+simple-secrets put script 'rm -rf /'           # Stores the literal string
+simple-secrets put cmd 'echo $(date)'          # Stores the literal string
+simple-secrets put password 'p@$$w0rd!$'       # Stores exactly as written
+
+# ❌ DANGEROUS - Double quotes allow shell command substitution
+simple-secrets put dangerous "echo $(whoami)"  # Executes whoami command!
+simple-secrets put risky "rm -rf $HOME"        # Could execute rm command!
+
+# The shell processes double quotes BEFORE the app sees them
+# This affects ALL CLI tools (git, cp, mv, etc.) - not just simple-secrets
+```
+
+#### Complex Value Examples
+
+Values starting with dashes or containing special characters work naturally with quotes:
+
+```bash
+# API keys starting with dashes
+simple-secrets put api-key "--prod-key-abc123"
+
+# Multi-line content like SSH keys
+simple-secrets put ssh-key "-----BEGIN RSA PRIVATE KEY-----
+MIIEpAIBAAKCAQEA...
+-----END RSA PRIVATE KEY-----"
+
+# JSON configuration
+simple-secrets put config '{"database": {"host": "localhost", "port": 5432}}'
+
+# From files
+simple-secrets put ssl-cert "$(cat /path/to/certificate.pem)"
+```
+
 ### User Management
 
 ```bash
@@ -198,16 +267,90 @@ simple-secrets rotate master-key
 
 ### Backup & Restore
 
+Simple Secrets CLI provides two complementary backup systems for different scenarios:
+
+#### Individual Secret Backups
+
+Automatic backup files (`.bak`) created when secrets are overwritten, providing protection against accidental data loss:
+
 ```bash
-# List available backups
+# List available individual backups
 simple-secrets list backups
 
-# Restore a deleted secret
+# Restore a deleted or overwritten secret
 simple-secrets restore secret KEY
+```
 
-# Restore entire database from backup
+**When created**: Only when overwriting existing secrets (not on initial creation)
+**Location**: `~/.simple-secrets/backups/[key].bak`
+**Cross-rotation compatibility**: Individual backups survive master key rotation via automatic re-encryption
+
+#### Master Key Rotation Backups
+
+Complete database snapshots created during master key rotation, preserving entire system state:
+
+```bash
+# List rotation backup directories
+simple-secrets list backups
+
+# Restore entire database from rotation backup
 simple-secrets restore database BACKUP_ID
 ```
+
+**When created**: Automatically during `simple-secrets rotate master-key`
+**Location**: `~/.simple-secrets/backup-[timestamp]/`
+**Contains**: Complete encrypted database snapshot before key rotation
+
+## Database Reset & Recovery
+
+### ⚠️ Safe Database Reset Procedure
+
+If you need to completely reset your simple-secrets installation:
+
+**🔴 CRITICAL: Backup first if you have important data!**
+
+```bash
+# 1. BACKUP YOUR DATA FIRST (if you want to keep anything)
+simple-secrets list backups --token <your-token>
+# Copy any important backup directories from ~/.simple-secrets/backups/
+
+# 2. For complete reset, remove the config directory
+rm -rf ~/.simple-secrets/
+
+# Or if using custom config directory:
+rm -rf $SIMPLE_SECRETS_CONFIG_DIR
+
+# 3. Next command will trigger fresh installation setup
+simple-secrets --setup
+```
+
+### 🛟 Recovery Options
+
+If something goes wrong and you have backups:
+
+```bash
+# Option 1: Restore from automatic backup (recommended)
+simple-secrets list backups --token <admin-token>
+simple-secrets restore database BACKUP_ID --token <admin-token>
+
+# Option 2: Manual recovery from backup directory
+# Check ~/.simple-secrets/backups/ for rotation snapshots
+# Each rotation creates a timestamped backup with keys + secrets
+
+# Option 3: Restore individual secrets
+simple-secrets restore secret SECRET_KEY --token <admin-token>
+```
+
+### 🚨 Emergency Recovery
+
+If the database is corrupted and you can't access normal commands:
+
+1. **Check backup directory manually**: `ls ~/.simple-secrets/backups/`
+2. **Look for rotation backups**: Directories named like `rotate-2024-01-15-10-30-45/`
+3. **Each contains**: `master.key` and `secrets.json` from that point in time
+4. **Emergency contact info**: Check error messages - they guide you to recovery options
+
+**Remember**: The error message "Do not delete ~/.simple-secrets/ - your backups contain recoverable data" means exactly that - your backup directory has your recovery options!
 
 ## Secret Lifecycle Management
 
@@ -270,6 +413,24 @@ make release VERSION=v1.0.0
 
 # Clean build artifacts
 make clean
+```
+
+## Shell Completion
+
+Enable shell autocompletion for better CLI experience:
+
+```bash
+# Bash completion
+simple-secrets completion bash > /etc/bash_completion.d/simple-secrets
+
+# Zsh completion
+simple-secrets completion zsh > "${fpath[1]}/_simple-secrets"
+
+# Fish completion
+simple-secrets completion fish > ~/.config/fish/completions/simple-secrets.fish
+
+# PowerShell completion
+simple-secrets completion powershell > simple-secrets.ps1
 ```
 
 ## Security Considerations

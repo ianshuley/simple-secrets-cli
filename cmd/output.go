@@ -24,7 +24,14 @@ func PrintFirstRunMessage() {
 	fmt.Println("  --token <your-token> (as a flag)")
 	fmt.Println("  SIMPLE_SECRETS_TOKEN=<your-token> ./simple-secrets ... (as an env var)")
 	fmt.Println("  or place it in ~/.simple-secrets/config.json as { \"token\": \"<your-token>\" }")
-	fmt.Println("(The token was printed above. Store it securely; it will not be shown again.)")
 	fmt.Println("\nIf creating config.json manually, ensure it has secure permissions:")
 	fmt.Println("  chmod 600 ~/.simple-secrets/config.json")
+}
+
+// PrintTokenAtEnd displays the token at the end of the setup flow for better UX
+func PrintTokenAtEnd(token string) {
+	fmt.Printf("\n🔑 Your authentication token:\n")
+	fmt.Printf("   %s\n", token)
+	fmt.Println("\n📋 Please store this token securely in your password manager.")
+	fmt.Println("   It will not be shown again!")
 }

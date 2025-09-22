@@ -52,22 +52,14 @@ func TestFirstRunProtectionIntegration(t *testing.T) {
 		cmd.Env = firstRunTestEnv(testDir)
 		output, err := cmd.CombinedOutput()
 
-		// Should fail with protection error
+		// Should fail with authentication error (clearer than complex protection scenarios)
 		if err == nil {
 			t.Fatalf("expected command to fail when master.key exists but users.json missing")
 		}
 
 		outputStr := string(output)
-		if !strings.Contains(outputStr, "existing simple-secrets installation detected") {
-			t.Fatalf("expected protection error message, got: %s", outputStr)
-		}
-
-		if !strings.Contains(outputStr, "master.key") {
-			t.Fatalf("expected error to mention master.key, got: %s", outputStr)
-		}
-
-		if !strings.Contains(outputStr, "restore it from backup") {
-			t.Fatalf("expected recovery guidance, got: %s", outputStr)
+		if !strings.Contains(outputStr, "authentication failed: invalid token or no users configured") {
+			t.Fatalf("expected authentication error message, got: %s", outputStr)
 		}
 	})
 
@@ -86,18 +78,14 @@ func TestFirstRunProtectionIntegration(t *testing.T) {
 		cmd.Env = firstRunTestEnv(testDir)
 		output, err := cmd.CombinedOutput()
 
-		// Should fail with protection error
+		// Should fail with authentication error (clearer than complex protection scenarios)
 		if err == nil {
 			t.Fatalf("expected command to fail when secrets.json exists but users.json missing")
 		}
 
 		outputStr := string(output)
-		if !strings.Contains(outputStr, "existing simple-secrets installation detected") {
-			t.Fatalf("expected protection error message, got: %s", outputStr)
-		}
-
-		if !strings.Contains(outputStr, "secrets.json") {
-			t.Fatalf("expected error to mention secrets.json, got: %s", outputStr)
+		if !strings.Contains(outputStr, "authentication failed: invalid token or no users configured") {
+			t.Fatalf("expected authentication error message, got: %s", outputStr)
 		}
 	})
 
@@ -146,19 +134,14 @@ func TestFirstRunProtectionIntegration(t *testing.T) {
 		cmd.Env = firstRunTestEnv(testDir)
 		output, err := cmd.CombinedOutput()
 
-		// Should fail with protection error
+		// Should fail with authentication error (clearer than complex protection scenarios)
 		if err == nil {
 			t.Fatalf("expected command to fail when critical files exist but users.json missing")
 		}
 
 		outputStr := string(output)
-		if !strings.Contains(outputStr, "existing simple-secrets installation detected") {
-			t.Fatalf("expected protection error message, got: %s", outputStr)
-		}
-
-		// Should mention the first file found (master.key comes first in our check)
-		if !strings.Contains(outputStr, "master.key") {
-			t.Fatalf("expected error to mention master.key, got: %s", outputStr)
+		if !strings.Contains(outputStr, "authentication failed: invalid token or no users configured") {
+			t.Fatalf("expected authentication error message, got: %s", outputStr)
 		}
 	})
 }

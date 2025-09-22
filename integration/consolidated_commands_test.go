@@ -42,7 +42,7 @@ func TestConsolidatedListCommands(t *testing.T) {
 	if err != nil {
 		t.Fatalf("first run failed: %v\n%s", err, out)
 	}
-	token := extractToken(string(out))
+	token := ExtractToken(string(out))
 	if token == "" {
 		t.Fatalf("could not extract admin token from output: %s", out)
 	}
@@ -118,7 +118,7 @@ func TestConsolidatedRotateCommands(t *testing.T) {
 	if err != nil {
 		t.Fatalf("first run failed: %v\n%s", err, out)
 	}
-	token := extractToken(string(out))
+	token := ExtractToken(string(out))
 	if token == "" {
 		t.Fatalf("could not extract admin token from output: %s", out)
 	}
@@ -210,7 +210,7 @@ func TestConsolidatedRestoreCommands(t *testing.T) {
 	if err != nil {
 		t.Fatalf("first run failed: %v\n%s", err, out)
 	}
-	token := extractToken(string(out))
+	token := ExtractToken(string(out))
 	if token == "" {
 		t.Fatalf("could not extract admin token from output: %s", out)
 	}
@@ -314,7 +314,7 @@ func TestLegacyCommandsStillWork(t *testing.T) {
 	if err != nil {
 		t.Fatalf("first run failed: %v\n%s", err, out)
 	}
-	token := extractToken(string(out))
+	token := ExtractToken(string(out))
 	if token == "" {
 		t.Fatalf("could not extract admin token from output: %s", out)
 	}
@@ -414,7 +414,7 @@ func TestConsolidatedDisableEnableCommands(t *testing.T) {
 	if err != nil {
 		t.Fatalf("first run failed: %v\n%s", err, out)
 	}
-	token := extractToken(string(out))
+	token := ExtractToken(string(out))
 	if token == "" {
 		t.Fatalf("could not extract admin token from output: %s", out)
 	}
@@ -542,4 +542,3 @@ func TestConsolidatedDisableEnableCommands(t *testing.T) {
 		})
 	}
 }
-

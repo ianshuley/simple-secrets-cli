@@ -19,13 +19,12 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
-	"os"
 )
 
 // loadOrCreateKey sets s.masterKey; creates the file if missing.
 func (s *SecretsStore) loadOrCreateKey() error {
-	if _, err := os.Stat(s.KeyPath); os.IsNotExist(err) {
-		key := make([]byte, 32) // AES-256
+	if !s.storage.Exists(s.KeyPath) {
+		key := make([]byte, AES256KeySize) // AES-256
 		if _, err := rand.Read(key); err != nil {
 			return err
 		}
@@ -36,7 +35,7 @@ func (s *SecretsStore) loadOrCreateKey() error {
 		return nil
 	}
 
-	data, err := os.ReadFile(s.KeyPath)
+	data, err := s.storage.ReadFile(s.KeyPath)
 	if err != nil {
 		return err
 	}
@@ -52,11 +51,11 @@ func (s *SecretsStore) loadOrCreateKey() error {
 
 // writeMasterKey overwrites the key file (0600).
 func (s *SecretsStore) writeMasterKey(newKey []byte) error {
-	return writeMasterKeyToPath(s.KeyPath, newKey)
+	return s.writeMasterKeyToPath(s.KeyPath, newKey)
 }
 
-// writeMasterKeyToPath writes a master key to the specified path.
-func writeMasterKeyToPath(path string, key []byte) error {
+// writeMasterKeyToPath writes a master key to the specified path atomically.
+func (s *SecretsStore) writeMasterKeyToPath(path string, key []byte) error {
 	enc := base64.StdEncoding.EncodeToString(key)
-	return os.WriteFile(path, []byte(enc), 0600)
+	return s.storage.AtomicWriteFile(path, []byte(enc), FileMode(0600))
 }

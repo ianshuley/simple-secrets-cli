@@ -15,24 +15,9 @@ limitations under the License.
 */
 package internal
 
-import (
-	"errors"
-	"testing"
-)
+import "crypto/rand"
 
-func TestRotateMasterKey_RandFailure(t *testing.T) {
-	s := newTempStore(t)
-	err := s.Put("a", "b")
-	if err != nil {
-		t.Fatalf("put: %v", err)
-	}
+func randReadImpl(b []byte) (int, error) { return rand.Read(b) }
 
-	orig := randRead
-	randRead = func(b []byte) (int, error) { return 0, errors.New("rng fail") }
-	defer func() { randRead = orig }()
-
-	err = s.RotateMasterKey("")
-	if err == nil {
-		t.Fatal("expected rotate to fail on RNG error")
-	}
-}
+// Variable function pointer allows for dependency injection during testing
+var randRead = func(b []byte) (int, error) { return randReadImpl(b) }

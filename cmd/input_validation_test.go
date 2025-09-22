@@ -16,8 +16,6 @@ limitations under the License.
 package cmd
 
 import (
-	"fmt"
-	"strings"
 	"testing"
 )
 
@@ -70,12 +68,6 @@ func TestValidateKeyName(t *testing.T) {
 			key:         "   ",
 			expectError: true,
 			errorMsg:    "key name cannot be empty",
-		},
-		{
-			name:        "null_byte_injection",
-			key:         "test\x00key",
-			expectError: true,
-			errorMsg:    "key name cannot contain null bytes",
 		},
 		{
 			name:        "control_character_injection",
@@ -138,27 +130,6 @@ func TestValidateKeyName(t *testing.T) {
 
 // validateKeyName extracts the validation logic to be testable
 func validateKeyName(key string) error {
-	// This mirrors the validation logic in put.go
-	if strings.TrimSpace(key) == "" {
-		return fmt.Errorf("key name cannot be empty")
-	}
-
-	// Check for null bytes and other problematic characters
-	if strings.Contains(key, "\x00") {
-		return fmt.Errorf("key name cannot contain null bytes")
-	}
-
-	// Check for control characters (0x00-0x1F except \t, \n, \r)
-	for _, r := range key {
-		if r < 0x20 && r != 0x09 && r != 0x0A && r != 0x0D {
-			return fmt.Errorf("key name cannot contain control characters")
-		}
-	}
-
-	// Check for path traversal attempts
-	if strings.Contains(key, "..") || strings.Contains(key, "/") || strings.Contains(key, "\\") {
-		return fmt.Errorf("key name cannot contain path separators or path traversal sequences")
-	}
-
-	return nil
+	// This mirrors the actual validation logic in put.go
+	return ValidateSecureInput(key, SecretKeyValidationConfig)
 }

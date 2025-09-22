@@ -16,14 +16,17 @@ limitations under the License.
 package cmd
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"fmt"
+	"io"
 	"simple-secrets/internal"
 
 	"github.com/spf13/cobra"
 )
 
-// RBACGuardWithCmd loads users, checks first run, resolves token, and returns (user, store, error)
-func RBACGuardWithCmd(needWrite bool, cmd *cobra.Command) (*internal.User, *internal.UserStore, error) {
+// RBACGuard loads users, checks first run, resolves token, and returns (user, store, error)
+func RBACGuard(needWrite bool, cmd *cobra.Command) (*internal.User, *internal.UserStore, error) {
 	user, store, err := authenticateUser(cmd)
 	if err != nil {
 		return nil, nil, err
@@ -39,27 +42,34 @@ func RBACGuardWithCmd(needWrite bool, cmd *cobra.Command) (*internal.User, *inte
 	return user, store, nil
 }
 
-// RBACGuard is the legacy function for backward compatibility
-func RBACGuard(needWrite bool, tokenFlag string) (*internal.User, *internal.UserStore, error) {
-	userStore, firstRun, err := internal.LoadUsers()
+// AuthenticateWithToken handles authentication for commands with custom token parsing (like put)
+func AuthenticateWithToken(needWrite bool, token string) (*internal.User, *internal.UserStore, error) {
+	// First check if this is a first-run scenario
+	userStore, firstRun, firstRunToken, err := internal.LoadUsers()
 	if err != nil {
-		return nil, nil, err
-	}
-	if firstRun {
+		// If LoadUsers fails, try the auth-specific path
+		authStore, authErr := internal.LoadUsersForAuth()
+		if authErr != nil {
+			return nil, nil, authErr
+		}
+		userStore = authStore
+		firstRun = false
+	} else if firstRun {
 		PrintFirstRunMessage()
+		PrintTokenAtEnd(firstRunToken)
 		return nil, nil, nil
 	}
 
-	token, err := internal.ResolveToken(tokenFlag)
+	resolvedToken, err := internal.ResolveToken(token)
 	if err != nil {
 		return nil, nil, err
 	}
-	user, err := userStore.Lookup(token)
+	user, err := userStore.Lookup(resolvedToken)
 	if err != nil {
 		return nil, nil, err
 	}
 	if needWrite && !user.Can("write", userStore.Permissions()) {
-		return nil, nil, fmt.Errorf("permission denied: need 'write'")
+		return nil, nil, NewWritePermissionError()
 	}
 	return user, userStore, nil
 }
@@ -89,12 +99,18 @@ func authenticateUser(cmd *cobra.Command) (*internal.User, *internal.UserStore, 
 
 // loadUsersWithFirstRunCheck loads users and handles first-run scenarios
 func loadUsersWithFirstRunCheck() (*internal.UserStore, bool, error) {
-	userStore, firstRun, err := internal.LoadUsers()
+	userStore, firstRun, token, err := internal.LoadUsers()
 	if err != nil {
-		return nil, false, err
+		// If LoadUsers fails, try the auth-specific path
+		authStore, authErr := internal.LoadUsersForAuth()
+		if authErr != nil {
+			return nil, false, authErr
+		}
+		return authStore, false, nil
 	}
 	if firstRun {
 		PrintFirstRunMessage()
+		PrintTokenAtEnd(token)
 		return nil, true, nil
 	}
 	return userStore, false, nil
@@ -115,7 +131,44 @@ func resolveTokenFromCommand(cmd *cobra.Command) (string, error) {
 // authorizeAccess checks if the user has the required permissions
 func authorizeAccess(user *internal.User, store *internal.UserStore, needWrite bool) error {
 	if needWrite && !user.Can("write", store.Permissions()) {
-		return fmt.Errorf("permission denied: need 'write'")
+		return NewWritePermissionError()
 	}
 	return nil
+}
+
+// GenerateSecureToken generates a cryptographically secure random token
+func GenerateSecureToken() (string, error) {
+	randToken := make([]byte, 20)
+	if _, err := io.ReadFull(rand.Reader, randToken); err != nil {
+		return "", fmt.Errorf("failed to generate token: %w", err)
+	}
+	return base64.RawURLEncoding.EncodeToString(randToken), nil
+}
+
+// ErrAuthenticationRequired returns a standard authentication required error
+var ErrAuthenticationRequired = fmt.Errorf("authentication required: token cannot be empty")
+
+// Common error constructors to reduce duplication
+func NewPermissionDeniedError(permission string) error {
+	return fmt.Errorf("permission denied: need '%s' permission", permission)
+}
+
+func NewWritePermissionError() error {
+	return fmt.Errorf("permission denied: need 'write'")
+}
+
+func NewSecretNotFoundError() error {
+	return fmt.Errorf("secret not found")
+}
+
+func NewDisabledSecretNotFoundError() error {
+	return fmt.Errorf("disabled secret not found")
+}
+
+func NewUserNotFoundError(username string) error {
+	return fmt.Errorf("user '%s' not found", username)
+}
+
+func NewUnknownTypeError(typeName, value, validOptions string) error {
+	return fmt.Errorf("unknown %s type: %s. Use %s", typeName, value, validOptions)
 }

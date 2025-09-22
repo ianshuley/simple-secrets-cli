@@ -33,11 +33,11 @@ var deleteCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Check if token flag was explicitly set to empty string
 		if flag := cmd.Flag("token"); flag != nil && flag.Changed && TokenFlag == "" {
-			return fmt.Errorf("authentication required: token cannot be empty")
+			return ErrAuthenticationRequired
 		}
 
 		// RBAC: write access
-		user, _, err := RBACGuard(true, TokenFlag)
+		user, _, err := RBACGuard(true, cmd)
 		if err != nil {
 			return err
 		}
@@ -47,7 +47,7 @@ var deleteCmd = &cobra.Command{
 
 		key := args[0]
 
-		store, err := internal.LoadSecretsStore()
+		store, err := internal.LoadSecretsStore(internal.NewFilesystemBackend())
 		if err != nil {
 			return err
 		}

@@ -23,7 +23,7 @@ import (
 )
 
 func TestEncryptDecrypt_RoundTrip(t *testing.T) {
-	key := make([]byte, 32)
+	key := make([]byte, AES256KeySize)
 	_, err := rand.Read(key)
 	if err != nil {
 		t.Fatal(err)
@@ -55,7 +55,7 @@ func TestEncryptDecrypt_RoundTrip(t *testing.T) {
 }
 
 func TestDecrypt_TamperFails(t *testing.T) {
-	key := make([]byte, 32)
+	key := make([]byte, AES256KeySize)
 	_, err := rand.Read(key)
 	if err != nil {
 		t.Fatal(err)
@@ -85,7 +85,7 @@ func TestDecrypt_TamperFails(t *testing.T) {
 }
 
 func FuzzEncryptDecrypt(f *testing.F) {
-	key := make([]byte, 32)
+	key := make([]byte, AES256KeySize)
 	_, _ = rand.Read(key)
 
 	seeds := [][]byte{nil, []byte("a"), bytes.Repeat([]byte("abc"), 100)}

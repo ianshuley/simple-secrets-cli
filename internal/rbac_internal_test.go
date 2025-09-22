@@ -200,7 +200,7 @@ func TestHandleFirstRun(t *testing.T) {
 	t.Setenv("SIMPLE_SECRETS_CONFIG_DIR", tmp+"/.simple-secrets")
 
 	// Call LoadUsers which should trigger first run setup
-	store, firstRun, err := LoadUsers()
+	store, firstRun, _, err := LoadUsers()
 	if err != nil {
 		t.Fatalf("LoadUsers failed: %v", err)
 	}
@@ -241,7 +241,7 @@ func TestCreateUserStore(t *testing.T) {
 	t.Setenv("SIMPLE_SECRETS_CONFIG_DIR", tmp+"/.simple-secrets")
 
 	// Create user store via LoadUsers
-	_, _, err := LoadUsers()
+	_, _, _, err := LoadUsers()
 	if err != nil {
 		t.Fatalf("LoadUsers failed: %v", err)
 	}

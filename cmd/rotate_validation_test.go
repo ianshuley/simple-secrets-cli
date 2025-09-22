@@ -24,6 +24,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/spf13/cobra"
 )
 
 // Mock functions for testing
@@ -35,7 +37,7 @@ func setupTestEnvironment(t *testing.T) (string, string) {
 	t.Setenv("SIMPLE_SECRETS_CONFIG_DIR", tmp+"/.simple-secrets")
 
 	// Create initial user setup
-	store, _, err := internal.LoadUsers()
+	store, _, _, err := internal.LoadUsers()
 	if err != nil {
 		t.Fatalf("LoadUsers failed: %v", err)
 	}
@@ -64,7 +66,10 @@ func TestValidateMasterKeyRotationAccess(t *testing.T) {
 
 	// Test successful validation
 	TokenFlag = token
-	user, store, err := validateMasterKeyRotationAccess()
+	mockCmd := &cobra.Command{}
+	mockCmd.Flags().String("token", "", "")
+	mockCmd.Flag("token").Value.Set(token)
+	user, store, err := validateMasterKeyRotationAccess(mockCmd)
 	if err != nil {
 		t.Fatalf("validateMasterKeyRotationAccess failed: %v", err)
 	}
@@ -83,7 +88,10 @@ func TestValidateMasterKeyRotationAccess(t *testing.T) {
 
 	// Test with invalid token
 	TokenFlag = "invalid-token"
-	user, store, err = validateMasterKeyRotationAccess()
+	mockCmd3 := &cobra.Command{}
+	mockCmd3.Flags().String("token", "", "")
+	mockCmd3.Flag("token").Value.Set("invalid-token")
+	user, store, err = validateMasterKeyRotationAccess(mockCmd3)
 	if err == nil {
 		t.Fatalf("expected error for invalid token")
 	}
@@ -243,7 +251,10 @@ func TestValidateTokenRotationAccess(t *testing.T) {
 
 	// Test successful validation
 	TokenFlag = token
-	user, returnedUsersPath, returnedUsers, err := validateTokenRotationAccess("testuser")
+	mockCmd := &cobra.Command{}
+	mockCmd.Flags().String("token", "", "")
+	mockCmd.Flag("token").Value.Set(token)
+	user, returnedUsersPath, returnedUsers, err := validateTokenRotationAccess(mockCmd, "testuser")
 	if err != nil {
 		t.Fatalf("validateTokenRotationAccess failed: %v", err)
 	}
@@ -262,7 +273,11 @@ func TestValidateTokenRotationAccess(t *testing.T) {
 
 	// Test with non-existent user (validateTokenRotationAccess doesn't check user existence)
 	// It only validates that the caller has permission to rotate tokens
-	user, _, _, err = validateTokenRotationAccess("nonexistent")
+	// Test with nonexistent user
+	mockCmd2 := &cobra.Command{}
+	mockCmd2.Flags().String("token", "", "")
+	mockCmd2.Flag("token").Value.Set(token)
+	user, _, _, err = validateTokenRotationAccess(mockCmd2, "nonexistent")
 	if err != nil {
 		t.Fatalf("unexpected error for validateTokenRotationAccess: %v", err)
 	}

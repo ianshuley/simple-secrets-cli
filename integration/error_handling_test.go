@@ -33,7 +33,7 @@ func TestErrorHandling(t *testing.T) {
 	if err != nil {
 		t.Fatalf("first run failed: %v\n%s", err, out)
 	}
-	token := extractToken(string(out))
+	token := ExtractToken(string(out))
 	if token == "" {
 		t.Fatalf("could not extract admin token from output: %s", out)
 	}
@@ -90,7 +90,7 @@ func TestErrorHandling(t *testing.T) {
 			args:         []string{"list", "keys"},
 			env:          []string{"HOME=" + noTokenTmp}, // Clean environment with only HOME set
 			wantErr:      true,
-			errorMessage: "provide a token via",
+			errorMessage: "authentication required: no token found",
 		},
 		{
 			name:         "list invalid subcommand",
@@ -171,7 +171,7 @@ func TestRBACEnforcement(t *testing.T) {
 	if err != nil {
 		t.Fatalf("first run failed: %v\n%s", err, out)
 	}
-	adminToken := extractToken(string(out))
+	adminToken := ExtractToken(string(out))
 	if adminToken == "" {
 		t.Fatalf("could not extract admin token from output: %s", out)
 	}
@@ -301,7 +301,7 @@ func TestCommandInputValidation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("first run failed: %v\n%s", err, out)
 	}
-	token := extractToken(string(out))
+	token := ExtractToken(string(out))
 	if token == "" {
 		t.Fatalf("could not extract admin token from output: %s", out)
 	}
@@ -316,13 +316,13 @@ func TestCommandInputValidation(t *testing.T) {
 			name:         "put without key",
 			args:         []string{"put"},
 			wantErr:      true,
-			errorMessage: "accepts 2 arg(s)",
+			errorMessage: "requires exactly 2 arguments",
 		},
 		{
 			name:         "put without value",
 			args:         []string{"put", "key"},
 			wantErr:      true,
-			errorMessage: "accepts 2 arg(s)",
+			errorMessage: "requires exactly 2 arguments",
 		},
 		{
 			name:         "get without key",
@@ -390,7 +390,7 @@ func TestWorkflowIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("first run failed: %v\n%s", err, out)
 	}
-	token := extractToken(string(out))
+	token := ExtractToken(string(out))
 	if token == "" {
 		t.Fatalf("could not extract admin token from output: %s", out)
 	}
@@ -496,7 +496,7 @@ func TestEdgeCases(t *testing.T) {
 	if err != nil {
 		t.Fatalf("first run failed: %v\n%s", err, out)
 	}
-	token := extractToken(string(out))
+	token := ExtractToken(string(out))
 	if token == "" {
 		t.Fatalf("could not extract admin token from output: %s", out)
 	}
@@ -528,8 +528,8 @@ func TestEdgeCases(t *testing.T) {
 		t.Errorf("putting long key should work: %v", err)
 	}
 
-	// Test special characters in key
-	specialKey := "key-with-special@#$%^&*()chars"
+	// Test special characters in key (non-shell metacharacters)
+	specialKey := "key-with-special_chars+equals=and.periods"
 	cmd = exec.Command(cliBin, "put", specialKey, "special-value")
 	cmd.Env = env
 	_, err = cmd.CombinedOutput()

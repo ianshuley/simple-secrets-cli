@@ -38,22 +38,22 @@ Disabled secrets are hidden from normal operations but can be re-enabled.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Check if token flag was explicitly set to empty string
 		if flag := cmd.Flag("token"); flag != nil && flag.Changed && TokenFlag == "" {
-			return fmt.Errorf("authentication required: token cannot be empty")
+			return ErrAuthenticationRequired
 		}
 
 		switch args[0] {
 		case "token":
-			return disableToken(args[1])
+			return disableToken(cmd, args[1])
 		case "secret":
-			return disableSecret(args[1])
+			return disableSecret(cmd, args[1])
 		default:
-			return fmt.Errorf("unknown disable type: %s. Use 'token' or 'secret'", args[0])
+			return NewUnknownTypeError("disable", args[0], "'token' or 'secret'")
 		}
 	},
 }
 
-func disableToken(username string) error {
-	context, err := prepareTokenDisableContext(username)
+func disableToken(cmd *cobra.Command, username string) error {
+	context, err := prepareTokenDisableContext(cmd, username)
 	if err != nil {
 		return err
 	}
@@ -69,8 +69,8 @@ func disableToken(username string) error {
 	return nil
 }
 
-func disableSecret(key string) error {
-	context, err := prepareSecretDisableContext(key)
+func disableSecret(cmd *cobra.Command, key string) error {
+	context, err := prepareSecretDisableContext(cmd, key)
 	if err != nil {
 		return err
 	}
@@ -104,8 +104,8 @@ type SecretDisableContext struct {
 }
 
 // prepareTokenDisableContext validates access and prepares context for token disabling
-func prepareTokenDisableContext(targetUsername string) (*TokenDisableContext, error) {
-	currentUser, _, err := validateTokenDisableAccess()
+func prepareTokenDisableContext(cmd *cobra.Command, targetUsername string) (*TokenDisableContext, error) {
+	currentUser, _, err := validateTokenDisableAccess(cmd)
 	if err != nil {
 		return nil, err
 	}
@@ -139,8 +139,8 @@ func prepareTokenDisableContext(targetUsername string) (*TokenDisableContext, er
 }
 
 // prepareSecretDisableContext validates access and prepares context for secret disabling
-func prepareSecretDisableContext(key string) (*SecretDisableContext, error) {
-	user, _, err := validateSecretDisableAccess()
+func prepareSecretDisableContext(cmd *cobra.Command, key string) (*SecretDisableContext, error) {
+	user, _, err := validateSecretDisableAccess(cmd)
 	if err != nil {
 		return nil, err
 	}
@@ -148,14 +148,14 @@ func prepareSecretDisableContext(key string) (*SecretDisableContext, error) {
 		return nil, nil
 	}
 
-	store, err := internal.LoadSecretsStore()
+	store, err := internal.LoadSecretsStore(internal.NewFilesystemBackend())
 	if err != nil {
 		return nil, err
 	}
 
 	// Check if secret exists
 	if _, err := store.Get(key); err != nil {
-		return nil, fmt.Errorf("secret not found")
+		return nil, NewSecretNotFoundError()
 	}
 
 	return &SecretDisableContext{
@@ -166,8 +166,8 @@ func prepareSecretDisableContext(key string) (*SecretDisableContext, error) {
 }
 
 // validateTokenDisableAccess checks RBAC permissions for token disabling
-func validateTokenDisableAccess() (*internal.User, *internal.UserStore, error) {
-	user, store, err := RBACGuard(true, TokenFlag)
+func validateTokenDisableAccess(cmd *cobra.Command) (*internal.User, *internal.UserStore, error) {
+	user, store, err := RBACGuard(true, cmd)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -176,15 +176,15 @@ func validateTokenDisableAccess() (*internal.User, *internal.UserStore, error) {
 	}
 
 	if !user.Can("rotate-tokens", store.Permissions()) {
-		return nil, nil, fmt.Errorf("permission denied: need 'rotate-tokens' permission to disable tokens")
+		return nil, nil, NewPermissionDeniedError("rotate-tokens to disable tokens")
 	}
 
 	return user, store, nil
 }
 
 // validateSecretDisableAccess checks RBAC permissions for secret disabling
-func validateSecretDisableAccess() (*internal.User, *internal.UserStore, error) {
-	user, store, err := RBACGuard(true, TokenFlag)
+func validateSecretDisableAccess(cmd *cobra.Command) (*internal.User, *internal.UserStore, error) {
+	user, store, err := RBACGuard(true, cmd)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -193,7 +193,7 @@ func validateSecretDisableAccess() (*internal.User, *internal.UserStore, error) 
 	}
 
 	if !user.Can("write", store.Permissions()) {
-		return nil, nil, fmt.Errorf("permission denied: need 'write' permission to disable secrets")
+		return nil, nil, NewPermissionDeniedError("write to disable secrets")
 	}
 
 	return user, store, nil

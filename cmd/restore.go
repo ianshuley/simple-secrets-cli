@@ -37,7 +37,7 @@ var restoreCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Check if token flag was explicitly set to empty string
 		if flag := cmd.Flag("token"); flag != nil && flag.Changed && TokenFlag == "" {
-			return fmt.Errorf("authentication required: token cannot be empty")
+			return ErrAuthenticationRequired
 		}
 
 		switch args[0] {
@@ -45,21 +45,21 @@ var restoreCmd = &cobra.Command{
 			if len(args) < 2 {
 				return fmt.Errorf("secret restore requires a key name")
 			}
-			return restoreSecret(args[1])
+			return restoreSecret(cmd, args[1])
 		case "database":
 			if len(args) < 2 {
 				return fmt.Errorf("database restore requires a backup name")
 			}
-			return restoreDatabase(args[1])
+			return restoreDatabase(cmd, args[1])
 		default:
-			return fmt.Errorf("unknown restore type: %s. Use 'secret' or 'database'", args[0])
+			return NewUnknownTypeError("restore", args[0], "'secret' or 'database'")
 		}
 	},
 }
 
-func restoreSecret(secretKey string) error {
+func restoreSecret(cmd *cobra.Command, secretKey string) error {
 	// RBAC: write access (restoring is a write operation)
-	user, _, err := RBACGuard(true, TokenFlag)
+	user, _, err := RBACGuard(true, cmd)
 	if err != nil {
 		return err
 	}
@@ -67,20 +67,16 @@ func restoreSecret(secretKey string) error {
 		return nil
 	}
 
-	home, err := os.UserHomeDir()
+	store, err := internal.LoadSecretsStore(internal.NewFilesystemBackend())
 	if err != nil {
 		return err
 	}
 
-	backupPath := fmt.Sprintf("%s/.simple-secrets/backups/%s.bak", home, secretKey)
+	// Use store's backup path method to respect config directory
+	backupPath := store.GetBackupPath(secretKey)
 	data, err := os.ReadFile(backupPath)
 	if err != nil {
 		return fmt.Errorf("could not read backup: %w", err)
-	}
-
-	store, err := internal.LoadSecretsStore()
-	if err != nil {
-		return err
 	}
 
 	// Backup files are encrypted, so decrypt them first
@@ -97,9 +93,9 @@ func restoreSecret(secretKey string) error {
 	return nil
 }
 
-func restoreDatabase(backupName string) error {
+func restoreDatabase(cmd *cobra.Command, backupName string) error {
 	// RBAC: write access (this is a destructive operation)
-	user, _, err := RBACGuard(true, TokenFlag)
+	user, _, err := RBACGuard(true, cmd)
 	if err != nil {
 		return err
 	}
@@ -107,7 +103,7 @@ func restoreDatabase(backupName string) error {
 		return nil
 	}
 
-	store, err := internal.LoadSecretsStore()
+	store, err := internal.LoadSecretsStore(internal.NewFilesystemBackend())
 	if err != nil {
 		return err
 	}
