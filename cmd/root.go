@@ -3,7 +3,7 @@ Copyright © 2025 Ian Shuley
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+You may obtain a copy of the License\t// Use the main first-run setup function with interactive prompts\n\tusersPath, rolesPath, err := internal.DefaultUserConfigPath(\"users.json\")\n\tif err != nil {\n\t\tfmt.Printf(\"\\n❌ Setup failed: %v\\n\", err)\n\t\treturn\n\t}\n\trolesPath, err = internal.DefaultUserConfigPath(\"roles.json\")\n\tif err != nil {\n\t\tfmt.Printf(\"\\n❌ Setup failed: %v\\n\", err)\n\t\treturn\n\t}\n\n\t	_, token, err := internal.HandleFirstRunSetup(usersPath, rolesPath)t
 
 	http://www.apache.org/licenses/LICENSE-2.0
 
@@ -195,8 +195,19 @@ func performFirstTimeSetup() {
 
 	fmt.Println("\nCreating admin user...")
 
-	// Use the clean first-run setup function that returns the token
-	_, token, err := internal.DoFirstRunSetupWithToken()
+	// Use the consolidated first-run setup function
+	usersPath, err := internal.DefaultUserConfigPath("users.json")
+	if err != nil {
+		fmt.Printf("\n❌ Setup failed: %v\n", err)
+		return
+	}
+	rolesPath, err := internal.DefaultUserConfigPath("roles.json")
+	if err != nil {
+		fmt.Printf("\n❌ Setup failed: %v\n", err)
+		return
+	}
+
+	_, token, err := internal.HandleFirstRunSetup(usersPath, rolesPath)
 	if err != nil {
 		fmt.Printf("\n❌ Setup failed: %v\n", err)
 		return

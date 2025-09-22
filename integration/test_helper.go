@@ -19,6 +19,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -64,6 +65,9 @@ func (h *TestHelper) initializeFirstRun() {
 	// Trigger first-run with a clean environment
 	cmd := exec.Command(h.binaryPath, "list", "keys")
 	cmd.Env = h.cleanEnv()
+
+	// Provide "Y" as input to the first-run prompt
+	cmd.Stdin = strings.NewReader("Y\n")
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {

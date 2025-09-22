@@ -17,7 +17,9 @@ limitations under the License.
 package cmd
 
 import (
+	"errors"
 	"fmt"
+	"os"
 	"simple-secrets/internal"
 
 	"github.com/spf13/cobra"
@@ -31,11 +33,21 @@ type CLIServiceHelper struct {
 
 // NewCLIServiceHelper creates a new CLI service helper with composable operations
 func NewCLIServiceHelper() (*CLIServiceHelper, error) {
-	// Use functional options pattern - much cleaner than config structs
-	service, err := internal.NewService(
+	options := []internal.ServiceOption{
 		internal.WithStorageBackend(internal.NewFilesystemBackend()),
-	)
+	}
+
+	// Check for test/config directory override (needed for test isolation)
+	if configDir := getConfigDirOverride(); configDir != "" {
+		options = append(options, internal.WithConfigDir(configDir))
+	}
+
+	service, err := internal.NewService(options...)
 	if err != nil {
+		// Handle first-run required with helpful message
+		if errors.Is(err, internal.ErrFirstRunRequired) {
+			return nil, fmt.Errorf("%s", internal.GetFirstRunMessage())
+		}
 		return nil, fmt.Errorf("failed to create service: %w", err)
 	}
 
@@ -126,4 +138,10 @@ func GetCLIServiceHelper() (*CLIServiceHelper, error) {
 		globalCLIHelper = helper
 	}
 	return globalCLIHelper, nil
+}
+
+// getConfigDirOverride checks for config directory override from environment
+// This ensures test isolation works properly
+func getConfigDirOverride() string {
+	return os.Getenv("SIMPLE_SECRETS_CONFIG_DIR")
 }

@@ -16,21 +16,21 @@ limitations under the License.
 
 package internal
 
-import "fmt"
+import (
+	"fmt"
+	"os"
+)
 
-// ServiceConfig provides injectable configuration for the service layer
+// ServiceConfig holds configuration for service operations
 type ServiceConfig struct {
-	// StorageBackend allows injection of different storage implementations
 	StorageBackend StorageBackend
-
-	// ConfigDir overrides the default configuration directory
-	ConfigDir string
+	ConfigDir      string // Override default config directory (for testing/deployment)
 }
 
-// ServiceOption configures service creation using functional options pattern
+// ServiceOption configures the service
 type ServiceOption func(*ServiceConfig)
 
-// WithStorageBackend sets a custom storage backend
+// WithStorageBackend sets the storage backend
 func WithStorageBackend(backend StorageBackend) ServiceOption {
 	return func(config *ServiceConfig) {
 		config.StorageBackend = backend
@@ -48,7 +48,7 @@ func WithConfigDir(dir string) ServiceOption {
 func NewServiceConfig(options ...ServiceOption) *ServiceConfig {
 	config := &ServiceConfig{
 		StorageBackend: NewFilesystemBackend(),
-		ConfigDir:      "", // Use default
+		ConfigDir:      "", // Use default unless overridden
 	}
 
 	for _, option := range options {
@@ -94,13 +94,15 @@ type Service struct {
 func NewService(options ...ServiceOption) (*Service, error) {
 	config := NewServiceConfig(options...)
 
-	// Create focused operation implementations
-	secretOps, err := newSecretOperations(config)
+	// Create auth operations FIRST to handle first-run setup
+	// This ensures first-run detection happens before any files are created
+	authOps, err := newAuthOperations(config)
 	if err != nil {
 		return nil, err
 	}
 
-	authOps, err := newAuthOperations(config)
+	// Create other operations after auth setup
+	secretOps, err := newSecretOperations(config)
 	if err != nil {
 		return nil, err
 	}
@@ -183,18 +185,20 @@ func newAuthOperations(config *ServiceConfig) (AuthOperations, error) {
 		rolesPath := config.ConfigDir + "/roles.json"
 
 		users, err := loadUsers(usersPath)
-		if err != nil {
+		if os.IsNotExist(err) {
+			// Return first-run error instead of auto-triggering setup
+			return nil, ErrFirstRunRequired
+		} else if err != nil {
 			return nil, err
+		} else {
+			permissions, err := loadRoles(rolesPath)
+			if err != nil {
+				return nil, err
+			}
+			userStore = createUserStore(users, permissions)
 		}
-
-		permissions, err := loadRoles(rolesPath)
-		if err != nil {
-			return nil, err
-		}
-
-		userStore = createUserStore(users, permissions)
 	} else {
-		userStore, _, _, err = LoadUsers()
+		userStore, err = LoadUsersOrShowFirstRunMessage()
 		if err != nil {
 			return nil, err
 		}
