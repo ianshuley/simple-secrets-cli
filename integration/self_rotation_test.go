@@ -16,75 +16,65 @@ limitations under the License.
 package main
 
 import (
-	"os/exec"
 	"strings"
 	"testing"
+
+	"simple-secrets/integration/testing_framework"
 )
 
 func TestSelfTokenRotationBothWays(t *testing.T) {
-	tmp := t.TempDir()
-
-	// First run to create admin and extract token
-	cmd := exec.Command(cliBin, "list", "keys")
-	cmd.Env = testEnv(tmp)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("first run failed: %v\n%s", err, out)
-	}
-	adminToken := ExtractToken(string(out))
-	if adminToken == "" {
-		t.Fatalf("could not extract admin token from output: %s", out)
-	}
+	env := testing_framework.NewEnvironment(t)
+	defer env.Cleanup()
 
 	// Create a reader user for testing
-	cmd = exec.Command(cliBin, "create-user", "reader-test", "reader")
-	cmd.Env = append(testEnv(tmp), "SIMPLE_SECRETS_TOKEN="+adminToken)
-	out, err = cmd.CombinedOutput()
+	output, err := env.CLI().Users().Create("reader-test", "reader")
 	if err != nil {
-		t.Fatalf("create-user failed: %v\n%s", err, out)
+		t.Fatalf("create-user failed: %v\n%s", err, output)
 	}
-	readerToken := ExtractTokenFromCreateUser(string(out))
+	readerToken := testing_framework.ParseTokenFromCreateUser(string(output))
 	if readerToken == "" {
-		t.Fatalf("could not extract reader token from output: %s", out)
+		t.Fatalf("could not extract reader token from output: %s", output)
 	}
 
+	// Create a CLI runner for the reader user
+	readerCLI := testing_framework.NewCLIRunnerWithToken(env, readerToken)
+
 	// Test 1: Reader can rotate own token without specifying username
-	cmd = exec.Command(cliBin, "rotate", "token")
-	cmd.Env = append(testEnv(tmp), "SIMPLE_SECRETS_TOKEN="+readerToken)
-	out, err = cmd.CombinedOutput()
+	output, err = readerCLI.Rotate().SelfToken()
 	if err != nil {
-		t.Fatalf("self token rotation (no username) failed: %v\n%s", err, out)
+		t.Fatalf("self token rotation (no username) failed: %v\n%s", err, output)
 	}
-	if !strings.Contains(string(out), "Your token has been rotated successfully") {
-		t.Errorf("expected self-rotation success message, got: %s", out)
+	if !strings.Contains(string(output), "Your token has been rotated successfully") {
+		t.Errorf("expected self-rotation success message, got: %s", output)
 	}
 
 	// Extract new token and verify it works
-	newReaderToken := ExtractTokenFromSelfRotation(string(out))
+	newReaderToken := testing_framework.ParseTokenFromSelfRotation(string(output))
 	if newReaderToken == "" {
-		t.Fatalf("could not extract new reader token from output: %s", out)
+		t.Fatalf("could not extract new reader token from output: %s", output)
 	}
 
+	// Update the CLI runner with new token
+	readerCLI = testing_framework.NewCLIRunnerWithToken(env, newReaderToken)
+
 	// Test 2: Reader can rotate own token by specifying their username
-	cmd = exec.Command(cliBin, "rotate", "token", "reader-test")
-	cmd.Env = append(testEnv(tmp), "SIMPLE_SECRETS_TOKEN="+newReaderToken)
-	out, err = cmd.CombinedOutput()
+	output, err = readerCLI.Rotate().Token("reader-test")
 	if err != nil {
-		t.Fatalf("self token rotation (with username) failed: %v\n%s", err, out)
+		t.Fatalf("self token rotation (with username) failed: %v\n%s", err, output)
 	}
-	if !strings.Contains(string(out), "Your token has been rotated successfully") {
-		t.Errorf("expected self-rotation success message, got: %s", out)
+	if !strings.Contains(string(output), "Your token has been rotated successfully") {
+		t.Errorf("expected self-rotation success message, got: %s", output)
 	}
 
 	// Test 3: Verify reader still cannot rotate other users' tokens
-	finalReaderToken := ExtractTokenFromSelfRotation(string(out))
-	cmd = exec.Command(cliBin, "rotate", "token", "admin")
-	cmd.Env = append(testEnv(tmp), "SIMPLE_SECRETS_TOKEN="+finalReaderToken)
-	out, err = cmd.CombinedOutput()
+	finalReaderToken := testing_framework.ParseTokenFromSelfRotation(string(output))
+	readerCLI = testing_framework.NewCLIRunnerWithToken(env, finalReaderToken)
+
+	output, err = readerCLI.Rotate().Token("admin")
 	if err == nil {
-		t.Fatalf("expected reader to fail when rotating admin token, but succeeded: %s", out)
+		t.Fatalf("expected reader to fail when rotating admin token, but succeeded: %s", output)
 	}
-	if !strings.Contains(string(out), "permission denied") {
-		t.Errorf("expected permission denied error, got: %s", out)
+	if !strings.Contains(string(output), "permission denied") {
+		t.Errorf("expected permission denied error, got: %s", output)
 	}
 }

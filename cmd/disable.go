@@ -24,15 +24,17 @@ import (
 
 // disableCmd represents the disable command
 var disableCmd = &cobra.Command{
-	Use:   "disable [token|secret] [username|key]",
+	Use:   "disable [token|user|secret] [username|key]",
 	Short: "Disable user tokens or secrets",
 	Long: `Disable different types of resources in the system:
   • token <username> - Disable a user's token (admin only)
+  • user <username>  - Disable a user's token (alias for 'token')
   • secret <key>     - Mark a secret as disabled
 
 Disabled tokens cannot be used for authentication.
 Disabled secrets are hidden from normal operations but can be re-enabled.`,
 	Example: `  simple-secrets disable token alice    # Disable alice's token
+  simple-secrets disable user alice     # Same as above (alias)
   simple-secrets disable secret api-key  # Disable a secret`,
 	Args: cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -42,12 +44,12 @@ Disabled secrets are hidden from normal operations but can be re-enabled.`,
 		}
 
 		switch args[0] {
-		case "token":
+		case "token", "user": // Accept both "token" and "user" as aliases
 			return disableToken(cmd, args[1])
 		case "secret":
 			return disableSecret(cmd, args[1])
 		default:
-			return NewUnknownTypeError("disable", args[0], "'token' or 'secret'")
+			return NewUnknownTypeError("disable", args[0], "'token', 'user', or 'secret'")
 		}
 	},
 }
