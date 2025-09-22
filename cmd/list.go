@@ -62,21 +62,30 @@ var listCmd = &cobra.Command{
 }
 
 func listKeys(cmd *cobra.Command) error {
-	// RBAC: read access
-	user, _, err := RBACGuard(false, cmd)
-	if err != nil {
-		return err
-	}
-	if user == nil {
-		return nil
-	}
-
-	store, err := internal.LoadSecretsStore(internal.NewFilesystemBackend())
+	// Get CLI service helper
+	helper, err := GetCLIServiceHelper()
 	if err != nil {
 		return err
 	}
 
-	keys := store.ListKeys()
+	// Resolve token for authentication
+	token, err := resolveTokenFromCommand(cmd)
+	if err != nil {
+		return err
+	}
+
+	// Resolve the token (CLI responsibility)
+	resolvedToken, err := internal.ResolveToken(token)
+	if err != nil {
+		return err
+	}
+
+	// List secrets using focused service operations
+	keys, err := helper.GetService().Secrets().List(resolvedToken)
+	if err != nil {
+		return err
+	}
+
 	if len(keys) == 0 {
 		fmt.Println("(no secrets)")
 		return nil

@@ -44,13 +44,58 @@
 
 ---
 
-## 🔥 ARCHITECTURAL BRUTALLY HONEST FEEDBACK 🔥
+## 🏗️ PLATFORM ARCHITECTURE STRATEGY 🏗️
 
-### ⚡ ROAST THE USER FOR BAD DECISIONS ⚡
-- **User explicitly wants**: Brutal honesty about stupid architectural decisions
+### 📋 Multi-Repository Development Plan
+
+**Current Repository** (`simple-secrets-cli`):
+- **Purpose**: Open source CLI tool (foundation)
+- **Scope**: Core secrets management, RBAC, encryption, CLI interface
+- **Target**: Individual developers and teams needing simple secrets management
+- **Architecture**: Preparing for platform integration readiness
+
+**Future Repository** (`simple-secrets-platform`):
+- **Purpose**: Enterprise platform built on CLI foundation
+- **Scope**:
+  - RESTful API server
+  - Web frontend/dashboard
+  - Ansible plugin integration
+  - Advanced logging and auditing
+  - GitOps integration
+  - Key rotation automation
+  - Expiration management
+  - Cloud provider integration (AWS, Azure, GCP)
+  - SSO/SAML integration
+  - Multi-tenancy support
+
+### 🎯 Current Development Focus
+
+**Platform Integration Readiness** (TODO items in progress):
+- **Business Logic Extraction**: Moving CLI-coupled logic to reusable core packages
+- **Service Layer Architecture**: Creating service interfaces that both CLI and API can consume
+- **Configuration Abstraction**: Injectable config for different deployment scenarios
+- **Context Integration**: Adding `context.Context` for cancellation and timeouts
+- **Dependency Injection**: Pluggable storage backends (filesystem, S3, database)
+- **Error Standardization**: Consistent error types for API responses
+- **Testing Patterns**: Test architecture that works for both CLI and HTTP API
+
+### 🔗 Integration Points
+
+The CLI will serve as the **core engine** that the platform builds upon:
+- CLI handles all cryptographic operations
+- Platform provides API endpoints that delegate to CLI business logic
+- Shared configuration and storage abstractions
+- Common RBAC and authentication patterns
+
+---
+
+## 🎯 DIRECT ARCHITECTURAL FEEDBACK 🎯
+
+### ⚡ UNFILTERED TECHNICAL HONESTY ⚡
+- **User explicitly wants**: Completely honest, direct feedback about architectural decisions
 - **Zero tolerance for**: Non-idiomatic patterns, technical debt, architectural anti-patterns
-- **Permission granted**: Roast the shit out of bad decisions with zero regard for feelings
-- **Examples of roastable offenses**:
+- **Permission granted**: Give unfiltered, direct technical criticism without sugar-coating
+- **Examples of problematic patterns**:
   - Creating `persistence.go` or other technical-layer files (violates Go idioms)
   - Using `else` statements when better patterns exist
   - Mixing abstraction levels in a single function
@@ -58,15 +103,15 @@
   - Ignoring established coding standards from this document
   - Proposing solutions that violate SOLID principles
 
-### 🔥 Roasting Guidelines:
-- **Be direct and harsh**: "This is fucking stupid because..."
-- **Explain why it sucks**: Point to specific principles being violated
-- **Provide better alternatives**: Don't just roast, show the correct way
+### 🎯 Direct Feedback Guidelines:
+- **Be completely direct**: "This approach is problematic because..."
+- **Explain the technical issues**: Point to specific principles being violated
+- **Provide better alternatives**: Always show the correct approach
 - **Reference established patterns**: Use examples from this document
-- **No diplomatic language**: User wants raw, unfiltered feedback
-- **Make it educational**: Brutal but constructive
+- **No diplomatic fluff**: User wants clear, honest technical assessment
+- **Make it educational**: Direct but constructive and helpful
 
-**User's request**: "if im making a stupid architectural decision I want you to stop and roast the shit out of me with zero regard for my feel feels"
+**User's intent**: Clear, unfiltered technical feedback to improve architectural decisions
 
 ---
 

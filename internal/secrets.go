@@ -148,6 +148,27 @@ func LoadSecretsStore(backend StorageBackend) (*SecretsStore, error) {
 	return s, nil
 }
 
+// LoadSecretsStoreFromDir creates a secrets store using a custom directory
+// This is useful for testing and custom deployments where the config directory needs to be specified
+func LoadSecretsStoreFromDir(backend StorageBackend, configDir string) (*SecretsStore, error) {
+	_ = backend.MkdirAll(configDir, FileMode(secureDirectoryPermissions))
+
+	s := &SecretsStore{
+		KeyPath:     filepath.Join(configDir, "master.key"),
+		SecretsPath: filepath.Join(configDir, "secrets.json"),
+		secrets:     make(map[string]string),
+		storage:     backend,
+	}
+
+	if err := s.loadOrCreateKey(); err != nil {
+		return nil, err
+	}
+	if err := s.loadSecrets(); err != nil {
+		return nil, err
+	}
+	return s, nil
+}
+
 // getConfigDirectory returns the configuration directory, respecting test overrides
 func getConfigDirectory() (string, error) {
 	// For testing purposes

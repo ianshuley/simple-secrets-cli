@@ -225,6 +225,29 @@ func (us *UserStore) UpdateUserRole(username, newRole string) error {
 	return fmt.Errorf("user %q not found", username)
 }
 
+// RotateUserToken generates a new token for a user
+func (us *UserStore) RotateUserToken(username string) (string, error) {
+	us.mu.Lock()
+	defer us.mu.Unlock()
+
+	for _, u := range us.users {
+		if u.Username == username {
+			// Generate new token
+			token, err := generateSecureToken()
+			if err != nil {
+				return "", fmt.Errorf("failed to generate token: %w", err)
+			}
+
+			// Update the user's token hash
+			u.TokenHash = HashToken(token)
+
+			return token, nil
+		}
+	}
+
+	return "", fmt.Errorf("user %q not found", username)
+}
+
 // Private helper functions
 
 // createUserStore constructs a UserStore with the given users and permissions
