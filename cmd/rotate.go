@@ -92,7 +92,12 @@ func rotateMasterKey(cmd *cobra.Command) error {
 
 // validateMasterKeyRotationAccess checks RBAC permissions for master key rotation
 func validateMasterKeyRotationAccess(cmd *cobra.Command) (*internal.User, *internal.SecretsStore, error) {
-	user, _, err := RBACGuard(true, cmd)
+	helper, err := GetCLIServiceHelper()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	user, _, err := helper.AuthenticateCommand(cmd, true)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -160,7 +165,12 @@ func rotateSelfToken(cmd *cobra.Command) error {
 
 func rotateToken(cmd *cobra.Command, targetUsername string) error {
 	// First, check if this is actually self-rotation (user specified their own username)
-	currentUser, _, err := RBACGuard(false, cmd) // Don't require write access yet
+	helper, err := GetCLIServiceHelper()
+	if err != nil {
+		return err
+	}
+
+	currentUser, _, err := helper.AuthenticateCommand(cmd, false) // Don't require write access yet
 	if err != nil {
 		return err
 	}
@@ -208,7 +218,12 @@ func printBackupLocation(backupDir string) {
 
 // validateTokenRotationAccess checks permissions and loads necessary data for token rotation
 func validateTokenRotationAccess(cmd *cobra.Command, targetUsername string) (*internal.User, string, []*internal.User, error) {
-	currentUser, store, err := RBACGuard(true, cmd)
+	helper, err := GetCLIServiceHelper()
+	if err != nil {
+		return nil, "", nil, err
+	}
+
+	currentUser, store, err := helper.AuthenticateCommand(cmd, true)
 	if err != nil {
 		return nil, "", nil, err
 	}
@@ -235,7 +250,12 @@ func validateTokenRotationAccess(cmd *cobra.Command, targetUsername string) (*in
 
 // validateSelfTokenRotationAccess checks permissions for self token rotation
 func validateSelfTokenRotationAccess(cmd *cobra.Command) (*internal.User, string, []*internal.User, error) {
-	currentUser, store, err := RBACGuard(false, cmd) // Use false - we check specific permission below
+	helper, err := GetCLIServiceHelper()
+	if err != nil {
+		return nil, "", nil, err
+	}
+
+	currentUser, store, err := helper.AuthenticateCommand(cmd, false) // Use false - we check specific permission below
 	if err != nil {
 		return nil, "", nil, err
 	}

@@ -75,7 +75,12 @@ type UserInput struct {
 
 // validateUserCreationAccess checks RBAC permissions for user creation
 func validateUserCreationAccess(cmd *cobra.Command) (*internal.User, *internal.UserStore, error) {
-	user, store, err := RBACGuard(true, cmd)
+	helper, err := GetCLIServiceHelper()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	user, store, err := helper.AuthenticateCommand(cmd, true)
 	if err != nil {
 		return nil, nil, err
 	}

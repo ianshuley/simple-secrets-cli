@@ -39,13 +39,13 @@ var restoreDatabaseCmd = &cobra.Command{
 	Example: "simple-secrets restore-database\nsimple-secrets restore-database rotate-20240901-143022",
 	Args:    cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// Check if token flag was explicitly set to empty string
-		if flag := cmd.Flag("token"); flag != nil && flag.Changed && TokenFlag == "" {
-			return ErrAuthenticationRequired
+		helper, err := GetCLIServiceHelper()
+		if err != nil {
+			return err
 		}
 
 		// RBAC: write access (this is a destructive operation)
-		user, _, err := RBACGuard(true, cmd)
+		user, _, err := helper.AuthenticateCommand(cmd, true)
 		if err != nil {
 			return err
 		}

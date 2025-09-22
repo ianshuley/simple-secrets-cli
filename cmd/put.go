@@ -155,7 +155,13 @@ Or save your token in ~/.simple-secrets/config.json:
 }
 
 func executePutCommand(args *putArguments) error {
-	user, err := authenticatePutUser(args.token)
+	helper, err := GetCLIServiceHelper()
+	if err != nil {
+		return err
+	}
+
+	// Use direct token authentication (put handles token parsing manually)
+	user, _, err := helper.AuthenticateToken(args.token, true)
 	if err != nil {
 		return err
 	}
@@ -167,24 +173,21 @@ func executePutCommand(args *putArguments) error {
 		return err
 	}
 
-	store, err := internal.LoadSecretsStore(internal.NewFilesystemBackend())
-	if err != nil {
-		return err
+	service := helper.GetService()
+	
+	// Check if secret exists for backup
+	existing, _ := service.Secrets().Get(args.token, args.key)
+	if existing != "" {
+		backupExistingSecret(nil, args.key) // TODO: Implement backup in service layer
 	}
 
-	backupExistingSecret(store, args.key)
-
-	if err := store.Put(args.key, args.value); err != nil {
+	err = service.Secrets().Put(args.token, args.key, args.value)
+	if err != nil {
 		return err
 	}
 
 	fmt.Printf("Secret %q stored.\n", args.key)
 	return nil
-}
-
-func authenticatePutUser(token string) (*internal.User, error) {
-	user, _, err := AuthenticateWithToken(true, token)
-	return user, err
 }
 
 // validatePutKeyName ensures secret keys meet security and usability requirements:

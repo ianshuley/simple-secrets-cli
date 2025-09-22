@@ -33,19 +33,9 @@ func testEnv(tmp string) []string {
 }
 
 func TestConsolidatedListCommands(t *testing.T) {
-	tmp := t.TempDir()
-
-	// First run to create admin and extract token
-	cmd := exec.Command(cliBin, "list", "keys")
-	cmd.Env = testEnv(tmp)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("first run failed: %v\n%s", err, out)
-	}
-	token := ExtractToken(string(out))
-	if token == "" {
-		t.Fatalf("could not extract admin token from output: %s", out)
-	}
+	// Create isolated test helper
+	helper := NewTestHelper(t)
+	defer helper.Cleanup()
 
 	tests := []struct {
 		name     string
@@ -84,10 +74,7 @@ func TestConsolidatedListCommands(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cmd := exec.Command(cliBin, tt.args...)
-			envWithToken := append(testEnv(tmp), "SIMPLE_SECRETS_TOKEN="+token)
-			cmd.Env = envWithToken
-			out, err := cmd.CombinedOutput()
+			out, err := helper.RunCommand(tt.args...)
 
 			if tt.wantErr {
 				if err == nil {

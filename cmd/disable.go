@@ -167,7 +167,12 @@ func prepareSecretDisableContext(cmd *cobra.Command, key string) (*SecretDisable
 
 // validateTokenDisableAccess checks RBAC permissions for token disabling
 func validateTokenDisableAccess(cmd *cobra.Command) (*internal.User, *internal.UserStore, error) {
-	user, store, err := RBACGuard(true, cmd)
+	helper, err := GetCLIServiceHelper()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	user, store, err := helper.AuthenticateCommand(cmd, true)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -184,7 +189,12 @@ func validateTokenDisableAccess(cmd *cobra.Command) (*internal.User, *internal.U
 
 // validateSecretDisableAccess checks RBAC permissions for secret disabling
 func validateSecretDisableAccess(cmd *cobra.Command) (*internal.User, *internal.UserStore, error) {
-	user, store, err := RBACGuard(true, cmd)
+	helper, err := GetCLIServiceHelper()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	user, store, err := helper.AuthenticateCommand(cmd, true)
 	if err != nil {
 		return nil, nil, err
 	}

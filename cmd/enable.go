@@ -104,7 +104,12 @@ func prepareSecretEnableContext(cmd *cobra.Command, key string) (*SecretEnableCo
 
 // validateSecretEnableAccess checks RBAC permissions for secret enabling
 func validateSecretEnableAccess(cmd *cobra.Command) (*internal.User, *internal.UserStore, error) {
-	user, store, err := RBACGuard(true, cmd)
+	helper, err := GetCLIServiceHelper()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	user, store, err := helper.AuthenticateCommand(cmd, true)
 	if err != nil {
 		return nil, nil, err
 	}

@@ -18,8 +18,6 @@ package cmd
 import (
 	"fmt"
 
-	"simple-secrets/internal"
-
 	"github.com/spf13/cobra"
 )
 
@@ -31,13 +29,12 @@ var deleteCmd = &cobra.Command{
 	Example: "simple-secrets delete db_password",
 	Args:    cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// Check if token flag was explicitly set to empty string
-		if flag := cmd.Flag("token"); flag != nil && flag.Changed && TokenFlag == "" {
-			return ErrAuthenticationRequired
+		helper, err := GetCLIServiceHelper()
+		if err != nil {
+			return err
 		}
 
-		// RBAC: write access
-		user, _, err := RBACGuard(true, cmd)
+		user, _, err := helper.AuthenticateCommand(cmd, true)
 		if err != nil {
 			return err
 		}
@@ -46,13 +43,10 @@ var deleteCmd = &cobra.Command{
 		}
 
 		key := args[0]
+		token, _ := cmd.Flags().GetString("token")
 
-		store, err := internal.LoadSecretsStore(internal.NewFilesystemBackend())
-		if err != nil {
-			return err
-		}
-
-		if err := store.Delete(key); err != nil {
+		service := helper.GetService()
+		if err := service.Secrets().Delete(token, key); err != nil {
 			return err
 		}
 

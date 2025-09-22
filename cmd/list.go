@@ -100,7 +100,12 @@ func listKeys(cmd *cobra.Command) error {
 
 func listBackups(cmd *cobra.Command) error {
 	// RBAC: read access
-	user, _, err := RBACGuard(false, cmd)
+	helper, err := GetCLIServiceHelper()
+	if err != nil {
+		return err
+	}
+
+	user, _, err := helper.AuthenticateCommand(cmd, false)
 	if err != nil {
 		return err
 	}
@@ -135,7 +140,12 @@ func listBackups(cmd *cobra.Command) error {
 
 func listUsers(cmd *cobra.Command) error {
 	// RBAC: admin required for user management
-	user, store, err := RBACGuard(true, cmd)
+	helper, err := GetCLIServiceHelper()
+	if err != nil {
+		return err
+	}
+
+	user, store, err := helper.AuthenticateCommand(cmd, true)
 	if err != nil {
 		return err
 	}
@@ -189,7 +199,12 @@ func listUsers(cmd *cobra.Command) error {
 
 func listDisabledSecrets(cmd *cobra.Command) error {
 	// RBAC: read access
-	user, _, err := RBACGuard(false, cmd)
+	helper, err := GetCLIServiceHelper()
+	if err != nil {
+		return err
+	}
+
+	user, _, err := helper.AuthenticateCommand(cmd, false)
 	if err != nil {
 		return err
 	}

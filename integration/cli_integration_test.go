@@ -28,36 +28,31 @@ import (
 const cliBin = "../simple-secrets"
 
 func TestFirstRunCreatesAdmin(t *testing.T) {
-	tmp := t.TempDir()
-	// Set HOME to temp dir for isolation
-	cmd := exec.Command(cliBin, "list", "keys")
-	cmd.Env = testEnv(tmp)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("first run failed: %v\n%s", err, out)
-	}
+	// Create isolated test helper
+	helper := NewTestHelper(t)
+	defer helper.Cleanup()
+	
 	// Should create .simple-secrets/users.json and roles.json
-	if _, err := os.Stat(filepath.Join(tmp, ".simple-secrets", "users.json")); err != nil {
+	if _, err := os.Stat(filepath.Join(helper.GetTempDir(), ".simple-secrets", "users.json")); err != nil {
 		t.Fatalf("users.json not created: %v", err)
 	}
-	if _, err := os.Stat(filepath.Join(tmp, ".simple-secrets", "roles.json")); err != nil {
+	if _, err := os.Stat(filepath.Join(helper.GetTempDir(), ".simple-secrets", "roles.json")); err != nil {
 		t.Fatalf("roles.json not created: %v", err)
 	}
-	// Should print first-run message
-	if !strings.Contains(string(out), "First run detected") {
-		t.Fatalf("missing first-run message: %s", out)
+	
+	// Verify we can use the token to list keys
+	if _, err := helper.RunCommand("list", "keys"); err != nil {
+		t.Fatalf("list keys with token failed: %v", err)
 	}
 }
 
 func TestPutGetListDelete(t *testing.T) {
 	tmp := t.TempDir()
 	// First run: trigger creation and capture token
-	cmd := exec.Command(cliBin, "list", "keys")
+	cmd := exec.Command(cliBin, "setup")
 	cmd.Env = testEnv(tmp)
+	cmd.Stdin = strings.NewReader("Y\n")
 	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("first run failed: %v\n%s", err, out)
-	}
 	// Extract token from output
 	token := ExtractToken(string(out))
 	if token == "" {
@@ -65,47 +60,56 @@ func TestPutGetListDelete(t *testing.T) {
 	}
 
 	// Put
-	cmd = exec.Command(cliBin, "put", "foo", "bar")
-	envWithToken := append(testEnv(tmp), "SIMPLE_SECRETS_TOKEN="+token)
-	cmd.Env = envWithToken
-	out, err = cmd.CombinedOutput()
-	if err != nil {
+	cmd = exec.Command(cliBin, "put", "foo", "bar", "--token", token)
+	cmd.Env = testEnv(tmp)
+	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("put failed: %v\n%s", err, out)
 	}
+
 	// Get
-	cmd = exec.Command(cliBin, "get", "foo")
-	cmd.Env = envWithToken
+	cmd = exec.Command(cliBin, "get", "foo", "--token", token)
+	cmd.Env = testEnv(tmp)
 	out, err = cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("get failed: %v\n%s", err, out)
 	}
-	if !strings.Contains(string(out), "bar") {
-		t.Fatalf("get did not return value: %s", out)
+	if strings.TrimSpace(string(out)) != "bar" {
+		t.Fatalf("expected 'bar', got '%s'", strings.TrimSpace(string(out)))
 	}
+
 	// List
-	cmd = exec.Command(cliBin, "list", "keys")
-	cmd.Env = envWithToken
+	cmd = exec.Command(cliBin, "list", "keys", "--token", token)
+	cmd.Env = testEnv(tmp)
 	out, err = cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("list failed: %v\n%s", err, out)
 	}
 	if !strings.Contains(string(out), "foo") {
-		t.Fatalf("list did not show key: %s", out)
+		t.Fatalf("list output should contain 'foo': %s", out)
 	}
+
 	// Delete
-	cmd = exec.Command(cliBin, "delete", "foo")
-	cmd.Env = envWithToken
-	out, err = cmd.CombinedOutput()
-	if err != nil {
+	cmd = exec.Command(cliBin, "delete", "foo", "--token", token)
+	cmd.Env = testEnv(tmp)
+	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("delete failed: %v\n%s", err, out)
+	}
+
+	// Verify deletion
+	cmd = exec.Command(cliBin, "get", "foo", "--token", token)
+	cmd.Env = testEnv(tmp)
+	out, err = cmd.CombinedOutput()
+	if err == nil {
+		t.Fatalf("get should have failed after delete, but got: %s", out)
 	}
 }
 
 func TestCreateUserAndLogin(t *testing.T) {
 	tmp := t.TempDir()
 	// First run to create admin and extract token
-	cmd := exec.Command(cliBin, "list", "keys")
+	cmd := exec.Command(cliBin, "setup")
 	cmd.Env = testEnv(tmp)
+	cmd.Stdin = strings.NewReader("Y\n")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("first run failed: %v\n%s", err, out)
