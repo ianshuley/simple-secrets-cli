@@ -1,5 +1,15 @@
 # TODO List
 
+## 🚨 CRITICAL BUG - Fix Next Session
+
+- [ ] **URGENT: Fix nil pointer panic in put command after rotation**
+  - **Location**: `SecretsStore.Get()` method in `internal/secrets.go:314`
+  - **Symptom**: Panic when storing secrets after master key rotation
+  - **Error**: `invalid memory address or nil pointer dereference` in `sync/atomic.(*Int32).Add`
+  - **Impact**: Put operations fail completely after any rotation
+  - **Test**: Reproduce with rotation_restore_test.go (commented out)
+  - **Priority**: HIGH - Rotation is a core security feature
+
 ## Platform Integration Readiness (Future v2.0 API Development)
 
 ### Business Logic Extraction
