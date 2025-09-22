@@ -174,7 +174,7 @@ func executePutCommand(args *putArguments) error {
 	}
 
 	service := helper.GetService()
-	
+
 	// Check if secret exists for backup
 	existing, _ := service.Secrets().Get(args.token, args.key)
 	if existing != "" {

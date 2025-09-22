@@ -31,7 +31,7 @@ func TestFirstRunCreatesAdmin(t *testing.T) {
 	// Create isolated test helper
 	helper := NewTestHelper(t)
 	defer helper.Cleanup()
-	
+
 	// Should create .simple-secrets/users.json and roles.json
 	if _, err := os.Stat(filepath.Join(helper.GetTempDir(), ".simple-secrets", "users.json")); err != nil {
 		t.Fatalf("users.json not created: %v", err)
@@ -39,7 +39,7 @@ func TestFirstRunCreatesAdmin(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(helper.GetTempDir(), ".simple-secrets", "roles.json")); err != nil {
 		t.Fatalf("roles.json not created: %v", err)
 	}
-	
+
 	// Verify we can use the token to list keys
 	if _, err := helper.RunCommand("list", "keys"); err != nil {
 		t.Fatalf("list keys with token failed: %v", err)
