@@ -4,9 +4,10 @@
 
 ### Business Logic Extraction
 
-- [ ] **Extract CLI-coupled logic**: Move business logic from `cmd/` package to core packages
-- [ ] **Configuration abstraction**: Create injectable `Config` struct for storage paths
-- [ ] **Service layer**: Create service layer that CLI and future API can both consume
+- [x] **Extract CLI-coupled logic**: ✅ COMPLETED - Service layer created with focused interfaces
+- [x] **Service layer**: ✅ COMPLETED - Created `Service` with `SecretOperations`, `AuthOperations`, `UserOperations` interfaces
+- [x] **Configuration abstraction**: ✅ COMPLETED - `ServiceConfig` with functional options (`WithStorageBackend`, `WithConfigDir`)
+- [ ] **Migrate remaining CLI commands**: Update `put`, `delete`, `disable`, `enable`, `rotate`, `create_user`, `restore` to use new service layer
 - [ ] **Error abstraction**: Standardize error types for consistent API responses
 
 ### Advanced Features
