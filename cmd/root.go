@@ -3,7 +3,7 @@ Copyright © 2025 Ian Shuley
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
-You may obtain a copy of the License\t// Use the main first-run setup function with interactive prompts\n\tusersPath, rolesPath, err := internal.DefaultUserConfigPath(\"users.json\")\n\tif err != nil {\n\t\tfmt.Printf(\"\\n❌ Setup failed: %v\\n\", err)\n\t\treturn\n\t}\n\trolesPath, err = internal.DefaultUserConfigPath(\"roles.json\")\n\tif err != nil {\n\t\tfmt.Printf(\"\\n❌ Setup failed: %v\\n\", err)\n\t\treturn\n\t}\n\n\t	_, token, err := internal.HandleFirstRunSetup(usersPath, rolesPath)t
+You may obtain a copy of the License at
 
 	http://www.apache.org/licenses/LICENSE-2.0
 
