@@ -182,6 +182,11 @@ make release VERSION=v1.0.0
 simple-secrets put KEY VALUE
 simple-secrets add KEY VALUE  # alias
 
+# Generate secure secrets automatically
+simple-secrets put KEY --generate           # Generate 32-character secret
+simple-secrets put KEY -g                   # Short flag variant
+simple-secrets put KEY --generate --length 64  # Custom length
+
 # Retrieve secrets
 simple-secrets get KEY
 
@@ -196,6 +201,31 @@ simple-secrets disable secret KEY
 simple-secrets enable secret KEY
 simple-secrets list disabled
 ```
+
+#### Generate Secure Secrets
+
+The `--generate` flag automatically creates cryptographically secure secrets:
+
+```bash
+# Generate a 32-character secret (default)
+simple-secrets put api-key --generate
+# Output:
+# Secret "api-key" stored.
+# Kj9#mX2w@pL8vR3qN7z!F5sT4uY6eA1c
+
+# Generate with custom length
+simple-secrets put db-password --generate --length 64
+
+# Short flag variant
+simple-secrets put jwt-secret -g --length 128
+```
+
+**Generated Secret Specifications:**
+- Uses `crypto/rand` for cryptographically secure randomness
+- Character set: `A-Z`, `a-z`, `0-9`, `!@#$%^&*()-_=+` (URL-safe)
+- Default length: 32 characters
+- Custom length: Use `--length N` flag
+- Cannot combine with manual values (error if both provided)
 
 #### Working with Complex Values
 
