@@ -9,6 +9,7 @@
   - **Solution 3**: Removed redundant `backupExistingSecret(nil, key)` call in CLI layer
   - **Result**: All rotation tests now pass, race conditions eliminated
   - **Validation**: `rotation_restore_test.go` uncommented and passes completely
+  - **Regression Protection**: Added race condition regression tests to `.testing-framework.md`
 
 ## Platform Integration Readiness (Future v2.0 API Development)
 
