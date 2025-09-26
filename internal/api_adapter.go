@@ -18,6 +18,7 @@ package internal
 
 import (
 	"fmt"
+	"os"
 	"simple-secrets/pkg/api"
 )
 
@@ -174,4 +175,55 @@ func (sa *ServiceAdapter) Restore(backupDir string) error {
 
 func (sa *ServiceAdapter) RotateMasterKey(backupDir string) error {
 	return sa.secrets.RotateMasterKey(backupDir)
+}
+
+// RotateSelfToken generates a new token for the authenticated user
+func (sa *ServiceAdapter) RotateSelfToken(currentUser *api.User) (string, error) {
+	return sa.RotateToken(currentUser.Username)
+}
+
+// RestoreSecret restores an individual secret from its backup
+func (sa *ServiceAdapter) RestoreSecret(secretKey string) error {
+	// Get backup path
+	backupPath := sa.secrets.GetBackupPath(secretKey)
+
+	// Read backup file
+	data, err := os.ReadFile(backupPath)
+	if err != nil {
+		return fmt.Errorf("backup file not found for secret %q", secretKey)
+	}
+
+	// Decrypt backup
+	decryptedValue, err := sa.secrets.DecryptBackup(string(data))
+	if err != nil {
+		return fmt.Errorf("failed to decrypt backup for secret %q: %v", secretKey, err)
+	}
+
+	// Restore the secret
+	return sa.secrets.Put(secretKey, decryptedValue)
+}
+
+// RestoreDatabase restores the entire database from a rotation backup
+func (sa *ServiceAdapter) RestoreDatabase(backupID string) error {
+	return sa.secrets.RestoreFromBackup(backupID)
+}
+
+// ListBackups returns information about available backups
+func (sa *ServiceAdapter) ListBackups() ([]*api.BackupInfo, error) {
+	backups, err := sa.secrets.ListRotationBackups()
+	if err != nil {
+		return nil, err
+	}
+
+	var result []*api.BackupInfo
+	for _, backup := range backups {
+		result = append(result, &api.BackupInfo{
+			ID:          backup.Name,
+			Type:        "rotation",
+			Timestamp:   backup.Timestamp.Format("2006-01-02 15:04:05"),
+			Description: fmt.Sprintf("Master key rotation backup: %s", backup.Name),
+		})
+	}
+
+	return result, nil
 }

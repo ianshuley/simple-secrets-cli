@@ -70,19 +70,25 @@ Token rotation options:
 }
 
 func rotateMasterKey(cmd *cobra.Command) error {
-	user, store, err := validateMasterKeyRotationAccess(cmd)
+	helper, err := GetCLIServiceHelper()
+	if err != nil {
+		return err
+	}
+
+	user, _, err := helper.AuthenticateCommand(cmd, true)
 	if err != nil {
 		return err
 	}
 	if user == nil {
-		return nil // First run detected, message already printed
+		return nil // First run message already printed
 	}
 
 	if !rotateNewYes && !confirmMasterKeyRotation() {
 		return nil
 	}
 
-	if err := store.RotateMasterKey(rotateNewBackupDir); err != nil {
+	service := helper.GetService()
+	if err := service.Admin().RotateMasterKey(rotateNewBackupDir); err != nil {
 		return err
 	}
 
@@ -146,20 +152,25 @@ func printMasterKeyRotationSuccess() {
 }
 
 func rotateSelfToken(cmd *cobra.Command) error {
-	context, err := prepareTokenRotationContext(cmd, true) // self=true
+	helper, err := GetCLIServiceHelper()
 	if err != nil {
 		return err
 	}
-	if context == nil {
-		return nil // First run or access denied
+	currentUser, _, err := helper.AuthenticateCommand(cmd, false)
+	if err != nil {
+		return err
+	}
+	if currentUser == nil {
+		return nil // First run message already shown
 	}
 
-	newToken, err := executeTokenRotation(context)
+	service := helper.GetService()
+	newToken, err := service.Users().RotateSelfToken(currentUser)
 	if err != nil {
 		return err
 	}
 
-	printSelfTokenRotationSuccess(context.TargetUsername, context.TargetUser.Role, newToken)
+	printSelfTokenRotationSuccess(currentUser.Username, currentUser.Role, newToken)
 	return nil
 }
 
@@ -406,11 +417,12 @@ func printTokenRotationSuccess(username string, role internal.Role, newToken str
 // printSelfTokenRotationSuccess displays the self-rotation success message and instructions
 func printSelfTokenRotationSuccess(username string, role internal.Role, newToken string) {
 	fmt.Printf("\n✅ Your token has been rotated successfully!\n")
-	fmt.Printf("New token: %s\n", newToken)
 	fmt.Println()
 	printSelfTokenRotationWarnings()
 	fmt.Println()
 	printSelfTokenUsageInstructions()
+	fmt.Println()
+	fmt.Printf("New token: %s\n", newToken)
 }
 
 // printTokenRotationWarnings displays important warnings about the token rotation

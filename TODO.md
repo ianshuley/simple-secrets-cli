@@ -19,9 +19,11 @@
 - [x] **Service layer**: ✅ COMPLETED - Created `Service` with `SecretOperations`, `AuthOperations`, `UserOperations` interfaces
 - [x] **Configuration abstraction**: ✅ COMPLETED - `ServiceConfig` with functional options (`WithStorageBackend`, `WithConfigDir`)
 - [x] **Migrate core CLI commands**: ✅ COMPLETED - Successfully migrated `disable` (secret & user token), `enable` (secret), and `create_user` to service layer architecture
-- [ ] **Complete rotation/restore service migration**: Extend service layer with missing operations and migrate CLI commands:
+- [x] **Complete rotation/restore service migration**: ✅ COMPLETED - Extended service layer with missing operations and migrated CLI commands:
   - `RotateSelfToken()`, `RestoreSecret()`, `RestoreDatabase()`, `ListBackups()` → service interfaces ✅ EXTENDED
-  - Implement in `ServiceAdapter` → migrate CLI commands to use service layer
+  - Implement in `ServiceAdapter` → migrate CLI commands to use service layer ✅ COMPLETED
+  - All rotation/restore CLI commands now use service layer instead of direct internal calls
+  - Service architecture ready for platform API integration
 - [ ] **Error abstraction**: Standardize error types for consistent API responses
 
 ### Advanced Features

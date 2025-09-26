@@ -266,6 +266,8 @@ func (us *UserStore) RotateUserToken(username string) (string, error) {
 
 			// Update the user's token hash
 			u.TokenHash = HashToken(token)
+			now := time.Now()
+			u.TokenRotatedAt = &now
 
 			return token, nil
 		}

@@ -58,6 +58,24 @@ Disabled secrets are hidden from normal operations but can be re-enabled.`,
 }
 
 func disableToken(cmd *cobra.Command, username string) error {
+	helper, err := GetCLIServiceHelper()
+	if err != nil {
+		return err
+	}
+
+	// Check permissions first before showing confirmation prompt
+	currentUser, store, err := helper.AuthenticateCommand(cmd, true)
+	if err != nil {
+		return err
+	}
+	if currentUser == nil {
+		return nil
+	}
+
+	if !currentUser.Can("manage-users", store.Permissions()) {
+		return NewPermissionDeniedError("manage-users")
+	}
+
 	// Show detailed help for the disable token operation
 	fmt.Println("⚠️  User Token Disable Operation")
 	fmt.Println("• This will disable the specified user's authentication token immediately")
@@ -70,11 +88,6 @@ func disableToken(cmd *cobra.Command, username string) error {
 	if !confirmTokenDisable() {
 		fmt.Println("❌ Token disable operation cancelled.")
 		return nil
-	}
-
-	helper, err := GetCLIServiceHelper()
-	if err != nil {
-		return err
 	}
 
 	token, err := resolveTokenFromCommand(cmd)

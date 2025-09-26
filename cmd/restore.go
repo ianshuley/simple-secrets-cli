@@ -17,9 +17,6 @@ package cmd
 
 import (
 	"fmt"
-	"os"
-
-	"simple-secrets/internal"
 
 	"github.com/spf13/cobra"
 )
@@ -72,25 +69,8 @@ func restoreSecret(cmd *cobra.Command, secretKey string) error {
 		return nil
 	}
 
-	store, err := internal.LoadSecretsStore(internal.NewFilesystemBackend())
-	if err != nil {
-		return err
-	}
-
-	// Use store's backup path method to respect config directory
-	backupPath := store.GetBackupPath(secretKey)
-	data, err := os.ReadFile(backupPath)
-	if err != nil {
-		return fmt.Errorf("could not read backup: %w", err)
-	}
-
-	// Backup files are encrypted, so decrypt them first
-	decryptedValue, err := store.DecryptBackup(string(data))
-	if err != nil {
-		return fmt.Errorf("failed to decrypt backup file: %w", err)
-	}
-
-	if err := store.Put(secretKey, decryptedValue); err != nil {
+	service := helper.GetService()
+	if err := service.Admin().RestoreSecret(secretKey); err != nil {
 		return err
 	}
 
@@ -113,12 +93,8 @@ func restoreDatabase(cmd *cobra.Command, backupName string) error {
 		return nil
 	}
 
-	store, err := internal.LoadSecretsStore(internal.NewFilesystemBackend())
-	if err != nil {
-		return err
-	}
-
-	if err := store.RestoreFromBackup(backupName); err != nil {
+	service := helper.GetService()
+	if err := service.Admin().RestoreDatabase(backupName); err != nil {
 		return fmt.Errorf("failed to restore database: %w", err)
 	}
 

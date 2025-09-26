@@ -17,8 +17,11 @@ limitations under the License.
 package internal
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
+
+	"simple-secrets/pkg/api"
 )
 
 // ServiceConfig holds configuration for service operations
@@ -80,6 +83,7 @@ type UserOperations interface {
 	DeleteUser(adminToken, username string) error
 	ListUsers(adminToken string) ([]*User, error)
 	RotateToken(token, username string) (string, error)
+	RotateSelfToken(currentUser *User) (string, error)
 	DisableUser(token, username string) error
 }
 
@@ -89,34 +93,88 @@ type Service struct {
 	secrets SecretOperations
 	auth    AuthOperations
 	users   UserOperations
+	admin   api.AdminOperations
 }
 
 // NewService creates a service with functional options
 func NewService(options ...ServiceOption) (*Service, error) {
 	config := NewServiceConfig(options...)
 
-	// Create auth operations FIRST to handle first-run setup
-	// This ensures first-run detection happens before any files are created
-	authOps, err := newAuthOperations(config)
+	// Create shared stores first
+	var secretsStore *SecretsStore
+	var userStore *UserStore
+	var err error
+
+	// Create secrets store
+	if config.ConfigDir != "" {
+		secretsStore, err = LoadSecretsStoreFromDir(config.StorageBackend, config.ConfigDir)
+	} else {
+		secretsStore, err = LoadSecretsStore(config.StorageBackend)
+	}
 	if err != nil {
 		return nil, err
 	}
 
-	// Create other operations after auth setup
-	secretOps, err := newSecretOperations(config)
-	if err != nil {
-		return nil, err
+	// Create user store
+	if config.ConfigDir != "" {
+		usersPath := config.ConfigDir + "/users.json"
+		rolesPath := config.ConfigDir + "/roles.json"
+
+		users, err := loadUsers(usersPath)
+		if os.IsNotExist(err) {
+			return nil, ErrFirstRunRequired
+		} else if err != nil {
+			return nil, err
+		} else {
+			permissions, err := loadRoles(rolesPath)
+			if err != nil {
+				return nil, err
+			}
+			userStore = createUserStore(users, permissions)
+		}
+	} else {
+		userStore, err = LoadUsersOrShowFirstRunMessage()
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	userOps, err := newUserOperations(config)
-	if err != nil {
-		return nil, err
+	// Create auth operations
+	authOps := &authOperations{
+		userStore: userStore,
 	}
+
+	// Create other operations using shared stores
+	secretOps := &secretOperations{
+		store: secretsStore,
+		auth:  authOps,
+	}
+
+	// Determine config directory for file paths
+	configDir := config.ConfigDir
+	if configDir == "" {
+		defaultDir, err := GetSimpleSecretsPath()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get config directory: %w", err)
+		}
+		configDir = defaultDir
+	}
+
+	userOps := &userOperations{
+		userStore: userStore,
+		auth:      authOps,
+		usersPath: configDir + "/users.json",
+		rolesPath: configDir + "/roles.json",
+	}
+
+	// Create admin operations using shared stores
+	adminOps := NewServiceAdapter(secretsStore, userStore)
 
 	return &Service{
 		secrets: secretOps,
 		auth:    authOps,
 		users:   userOps,
+		admin:   adminOps,
 	}, nil
 }
 
@@ -135,6 +193,11 @@ func (s *Service) Users() UserOperations {
 	return s.users
 }
 
+// Admin returns the admin operations interface
+func (s *Service) Admin() api.AdminOperations {
+	return s.admin
+}
+
 // Implementation structs for the focused interfaces
 type secretOperations struct {
 	store *SecretsStore
@@ -148,81 +211,8 @@ type authOperations struct {
 type userOperations struct {
 	userStore *UserStore
 	auth      AuthOperations
-}
-
-// newSecretOperations creates the secret operations implementation
-func newSecretOperations(config *ServiceConfig) (SecretOperations, error) {
-	var store *SecretsStore
-	var err error
-
-	if config.ConfigDir != "" {
-		store, err = LoadSecretsStoreFromDir(config.StorageBackend, config.ConfigDir)
-	} else {
-		store, err = LoadSecretsStore(config.StorageBackend)
-	}
-
-	if err != nil {
-		return nil, err
-	}
-
-	auth, err := newAuthOperations(config)
-	if err != nil {
-		return nil, err
-	}
-
-	return &secretOperations{
-		store: store,
-		auth:  auth,
-	}, nil
-}
-
-// newAuthOperations creates the auth operations implementation
-func newAuthOperations(config *ServiceConfig) (AuthOperations, error) {
-	var userStore *UserStore
-	var err error
-
-	if config.ConfigDir != "" {
-		usersPath := config.ConfigDir + "/users.json"
-		rolesPath := config.ConfigDir + "/roles.json"
-
-		users, err := loadUsers(usersPath)
-		if os.IsNotExist(err) {
-			// Return first-run error instead of auto-triggering setup
-			return nil, ErrFirstRunRequired
-		} else if err != nil {
-			return nil, err
-		} else {
-			permissions, err := loadRoles(rolesPath)
-			if err != nil {
-				return nil, err
-			}
-			userStore = createUserStore(users, permissions)
-		}
-	} else {
-		userStore, err = LoadUsersOrShowFirstRunMessage()
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return &authOperations{
-		userStore: userStore,
-	}, nil
-}
-
-// newUserOperations creates the user operations implementation
-func newUserOperations(config *ServiceConfig) (UserOperations, error) {
-	userStore, err := newAuthOperations(config)
-	if err != nil {
-		return nil, err
-	}
-
-	auth := userStore.(*authOperations)
-
-	return &userOperations{
-		userStore: auth.userStore,
-		auth:      auth,
-	}, nil
+	usersPath string
+	rolesPath string
 }
 
 // Implementation of SecretOperations interface
@@ -307,7 +297,17 @@ func (u *userOperations) CreateUser(adminToken, username, role string) (string, 
 		return "", fmt.Errorf("permission denied: admin role required")
 	}
 
-	return u.userStore.CreateUser(username, role)
+	newToken, err := u.userStore.CreateUser(username, role)
+	if err != nil {
+		return "", err
+	}
+
+	// Save the updated users to disk
+	if err := u.saveUsers(); err != nil {
+		return "", fmt.Errorf("failed to save user changes: %w", err)
+	}
+
+	return newToken, nil
 }
 
 func (u *userOperations) DeleteUser(adminToken, username string) error {
@@ -324,7 +324,12 @@ func (u *userOperations) DeleteUser(adminToken, username string) error {
 		return fmt.Errorf("permission denied: admin role required")
 	}
 
-	return u.userStore.DeleteUser(username)
+	if err := u.userStore.DeleteUser(username); err != nil {
+		return err
+	}
+
+	// Save the updated users to disk
+	return u.saveUsers()
 }
 
 func (u *userOperations) ListUsers(adminToken string) ([]*User, error) {
@@ -351,7 +356,17 @@ func (u *userOperations) RotateToken(token, username string) (string, error) {
 		return "", fmt.Errorf("permission denied: can only rotate own token")
 	}
 
-	return u.userStore.RotateUserToken(username)
+	newToken, err := u.userStore.RotateUserToken(username)
+	if err != nil {
+		return "", err
+	}
+
+	// Save the updated users to disk
+	if err := u.saveUsers(); err != nil {
+		return "", fmt.Errorf("failed to save user changes: %w", err)
+	}
+
+	return newToken, nil
 }
 
 func (u *userOperations) DisableUser(token, username string) error {
@@ -364,5 +379,34 @@ func (u *userOperations) DisableUser(token, username string) error {
 		return fmt.Errorf("permission denied: require rotate-tokens permission to disable user tokens")
 	}
 
-	return u.userStore.DisableUserToken(username)
+	if err := u.userStore.DisableUserToken(username); err != nil {
+		return err
+	}
+
+	// Save the updated users to disk
+	return u.saveUsers()
+}
+
+func (u *userOperations) RotateSelfToken(currentUser *User) (string, error) {
+	newToken, err := u.userStore.RotateUserToken(currentUser.Username)
+	if err != nil {
+		return "", err
+	}
+
+	// Save the updated users to disk
+	if err := u.saveUsers(); err != nil {
+		return "", fmt.Errorf("failed to save user changes: %w", err)
+	}
+
+	return newToken, nil
+}
+
+// saveUsers persists the current user list to disk
+func (u *userOperations) saveUsers() error {
+	users := u.userStore.Users()
+	data, err := json.MarshalIndent(users, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal users: %w", err)
+	}
+	return AtomicWriteFile(u.usersPath, data, 0600)
 }
