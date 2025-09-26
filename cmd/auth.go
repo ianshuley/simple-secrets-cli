@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"simple-secrets/internal"
+	"simple-secrets/pkg/errors"
 
 	"github.com/spf13/cobra"
 )
@@ -146,29 +147,29 @@ func GenerateSecureToken() (string, error) {
 }
 
 // ErrAuthenticationRequired returns a standard authentication required error
-var ErrAuthenticationRequired = fmt.Errorf("authentication required: token cannot be empty")
+var ErrAuthenticationRequired = errors.NewAuthError("token cannot be empty")
 
 // Common error constructors to reduce duplication
 func NewPermissionDeniedError(permission string) error {
-	return fmt.Errorf("permission denied: need '%s' permission", permission)
+	return errors.NewPermissionError("need '" + permission + "' permission")
 }
 
 func NewWritePermissionError() error {
-	return fmt.Errorf("permission denied: need 'write'")
+	return errors.NewPermissionError("need 'write'")
 }
 
 func NewSecretNotFoundError() error {
-	return fmt.Errorf("secret not found")
+	return errors.NewNotFoundError("secret", "")
 }
 
 func NewDisabledSecretNotFoundError() error {
-	return fmt.Errorf("disabled secret not found")
+	return errors.NewNotFoundError("disabled secret", "")
 }
 
 func NewUserNotFoundError(username string) error {
-	return fmt.Errorf("user '%s' not found", username)
+	return errors.NewNotFoundError("user", username)
 }
 
 func NewUnknownTypeError(typeName, value, validOptions string) error {
-	return fmt.Errorf("unknown %s type: %s. Use %s", typeName, value, validOptions)
+	return errors.NewValidationError(typeName, "unknown "+typeName+" type: "+value+". Use "+validOptions)
 }

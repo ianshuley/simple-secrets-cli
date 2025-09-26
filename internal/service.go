@@ -18,11 +18,11 @@ package internal
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 	"path/filepath"
 
 	"simple-secrets/pkg/api"
+	"simple-secrets/pkg/errors"
 )
 
 // ServiceConfig holds configuration for service operations
@@ -156,7 +156,7 @@ func NewService(options ...ServiceOption) (*Service, error) {
 	if configDir == "" {
 		defaultDir, err := GetSimpleSecretsPath()
 		if err != nil {
-			return nil, fmt.Errorf("failed to get config directory: %w", err)
+			return nil, errors.NewStorageError("config directory resolution", err.Error())
 		}
 		configDir = defaultDir
 	}
@@ -287,7 +287,7 @@ func (a *authOperations) ValidateAccess(token string, needWrite bool) error {
 	}
 
 	if needWrite && !user.Can("write", a.userStore.Permissions()) {
-		return fmt.Errorf("permission denied: need 'write' permission")
+		return errors.NewPermissionError("need 'write' permission")
 	}
 
 	return nil
@@ -305,7 +305,7 @@ func (u *userOperations) CreateUser(adminToken, username, role string) (string, 
 	}
 
 	if admin.Role != "admin" {
-		return "", fmt.Errorf("permission denied: admin role required")
+		return "", errors.NewPermissionError("admin role required")
 	}
 
 	newToken, err := u.userStore.CreateUser(username, role)
@@ -332,7 +332,7 @@ func (u *userOperations) DeleteUser(adminToken, username string) error {
 	}
 
 	if admin.Role != "admin" {
-		return fmt.Errorf("permission denied: admin role required")
+		return errors.NewPermissionError("admin role required")
 	}
 
 	if err := u.userStore.DeleteUser(username); err != nil {
@@ -350,7 +350,7 @@ func (u *userOperations) ListUsers(adminToken string) ([]*User, error) {
 	}
 
 	if admin.Role != "admin" {
-		return nil, fmt.Errorf("permission denied: admin role required")
+		return nil, errors.NewPermissionError("admin role required")
 	}
 
 	return u.userStore.Users(), nil
@@ -364,7 +364,7 @@ func (u *userOperations) RotateToken(token, username string) (string, error) {
 
 	// Users can rotate their own tokens, admins can rotate any
 	if user.Username != username && user.Role != "admin" {
-		return "", fmt.Errorf("permission denied: can only rotate own token")
+		return "", errors.NewPermissionError("can only rotate own token")
 	}
 
 	newToken, err := u.userStore.RotateUserToken(username)
@@ -387,7 +387,7 @@ func (u *userOperations) DisableUser(token, username string) error {
 	}
 
 	if !user.Can("rotate-tokens", u.userStore.Permissions()) {
-		return fmt.Errorf("permission denied: require rotate-tokens permission to disable user tokens")
+		return errors.NewPermissionError("require rotate-tokens permission to disable user tokens")
 	}
 
 	if err := u.userStore.DisableUserToken(username); err != nil {
@@ -417,7 +417,7 @@ func (u *userOperations) saveUsers() error {
 	users := u.userStore.Users()
 	data, err := json.MarshalIndent(users, "", "  ")
 	if err != nil {
-		return fmt.Errorf("failed to marshal users: %w", err)
+		return errors.NewStorageError("marshal users", err.Error())
 	}
 	return AtomicWriteFile(u.usersPath, data, 0600)
 }
@@ -425,7 +425,7 @@ func (u *userOperations) saveUsers() error {
 // saveUsersWithError wraps saveUsers with consistent error messaging
 func (u *userOperations) saveUsersWithError() error {
 	if err := u.saveUsers(); err != nil {
-		return fmt.Errorf("failed to save user changes: %w", err)
+		return errors.NewStorageError("save user changes", err.Error())
 	}
 	return nil
 }
