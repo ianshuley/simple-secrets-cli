@@ -16,8 +16,11 @@ limitations under the License.
 package cmd
 
 import (
+	"bufio"
 	"fmt"
+	"os"
 	"simple-secrets/internal"
+	"strings"
 
 	"github.com/spf13/cobra"
 )
@@ -55,185 +58,86 @@ Disabled secrets are hidden from normal operations but can be re-enabled.`,
 }
 
 func disableToken(cmd *cobra.Command, username string) error {
-	context, err := prepareTokenDisableContext(cmd, username)
+	// Show detailed help for the disable token operation
+	fmt.Println("⚠️  User Token Disable Operation")
+	fmt.Println("• This will disable the specified user's authentication token immediately")
+	fmt.Println("• The user will no longer be able to authenticate until a new token is generated")
+	fmt.Println("• Use 'rotate token' to generate a new token for this user")
+	fmt.Printf("• Target user: '%s'\n", username)
+	fmt.Println()
+
+	// Get confirmation for token disable operation
+	if !confirmTokenDisable() {
+		fmt.Println("❌ Token disable operation cancelled.")
+		return nil
+	}
+
+	helper, err := GetCLIServiceHelper()
 	if err != nil {
 		return err
 	}
-	if context == nil {
-		return nil // First run or access denied
-	}
 
-	if err := executeTokenDisable(context); err != nil {
+	token, err := resolveTokenFromCommand(cmd)
+	if err != nil {
 		return err
 	}
 
-	printTokenDisableSuccess(username)
+	resolvedToken, err := internal.ResolveToken(token)
+	if err != nil {
+		return err
+	}
+
+	if err := helper.GetService().Users().DisableUser(resolvedToken, username); err != nil {
+		return err
+	}
+
+	fmt.Printf("✅ Token disabled for user '%s'\n", username)
+	fmt.Println("• The user can no longer authenticate with their current token")
+	fmt.Println("• Use 'rotate token' to generate a new token for this user")
 	return nil
 }
 
 func disableSecret(cmd *cobra.Command, key string) error {
-	context, err := prepareSecretDisableContext(cmd, key)
+	helper, err := GetCLIServiceHelper()
 	if err != nil {
 		return err
 	}
-	if context == nil {
-		return nil // First run or access denied
-	}
 
-	if err := executeSecretDisable(context); err != nil {
+	// Resolve token for authentication
+	token, err := resolveTokenFromCommand(cmd)
+	if err != nil {
 		return err
 	}
 
-	printSecretDisableSuccess(key)
-	return nil
-}
-
-// TokenDisableContext holds data needed for token disabling
-type TokenDisableContext struct {
-	RequestingUser *internal.User
-	TargetUser     *internal.User
-	TargetUsername string
-	TargetIndex    int
-	UsersPath      string
-	Users          []*internal.User
-}
-
-// SecretDisableContext holds data needed for secret disabling
-type SecretDisableContext struct {
-	RequestingUser *internal.User
-	SecretKey      string
-	Store          *internal.SecretsStore
-}
-
-// prepareTokenDisableContext validates access and prepares context for token disabling
-func prepareTokenDisableContext(cmd *cobra.Command, targetUsername string) (*TokenDisableContext, error) {
-	currentUser, _, err := validateTokenDisableAccess(cmd)
+	// Resolve the token (CLI responsibility)
+	resolvedToken, err := internal.ResolveToken(token)
 	if err != nil {
-		return nil, err
-	}
-	if currentUser == nil {
-		return nil, nil
+		return err
 	}
 
-	usersPath, err := internal.DefaultUserConfigPath("users.json")
+	// Use service layer for secret disabling
+	err = helper.GetService().Secrets().Disable(resolvedToken, key)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	users, err := internal.LoadUsersList(usersPath)
-	if err != nil {
-		return nil, err
-	}
-
-	targetIndex, err := findUserIndex(users, targetUsername)
-	if err != nil {
-		return nil, err
-	}
-
-	return &TokenDisableContext{
-		RequestingUser: currentUser,
-		TargetUser:     users[targetIndex],
-		TargetUsername: targetUsername,
-		TargetIndex:    targetIndex,
-		UsersPath:      usersPath,
-		Users:          users,
-	}, nil
-}
-
-// prepareSecretDisableContext validates access and prepares context for secret disabling
-func prepareSecretDisableContext(cmd *cobra.Command, key string) (*SecretDisableContext, error) {
-	user, _, err := validateSecretDisableAccess(cmd)
-	if err != nil {
-		return nil, err
-	}
-	if user == nil {
-		return nil, nil
-	}
-
-	store, err := internal.LoadSecretsStore(internal.NewFilesystemBackend())
-	if err != nil {
-		return nil, err
-	}
-
-	// Check if secret exists
-	if _, err := store.Get(key); err != nil {
-		return nil, NewSecretNotFoundError()
-	}
-
-	return &SecretDisableContext{
-		RequestingUser: user,
-		SecretKey:      key,
-		Store:          store,
-	}, nil
-}
-
-// validateTokenDisableAccess checks RBAC permissions for token disabling
-func validateTokenDisableAccess(cmd *cobra.Command) (*internal.User, *internal.UserStore, error) {
-	helper, err := GetCLIServiceHelper()
-	if err != nil {
-		return nil, nil, err
-	}
-
-	user, store, err := helper.AuthenticateCommand(cmd, true)
-	if err != nil {
-		return nil, nil, err
-	}
-	if user == nil {
-		return nil, nil, nil
-	}
-
-	if !user.Can("rotate-tokens", store.Permissions()) {
-		return nil, nil, NewPermissionDeniedError("rotate-tokens to disable tokens")
-	}
-
-	return user, store, nil
-}
-
-// validateSecretDisableAccess checks RBAC permissions for secret disabling
-func validateSecretDisableAccess(cmd *cobra.Command) (*internal.User, *internal.UserStore, error) {
-	helper, err := GetCLIServiceHelper()
-	if err != nil {
-		return nil, nil, err
-	}
-
-	user, store, err := helper.AuthenticateCommand(cmd, true)
-	if err != nil {
-		return nil, nil, err
-	}
-	if user == nil {
-		return nil, nil, nil
-	}
-
-	if !user.Can("write", store.Permissions()) {
-		return nil, nil, NewPermissionDeniedError("write to disable secrets")
-	}
-
-	return user, store, nil
-}
-
-// executeTokenDisable marks a token as disabled
-func executeTokenDisable(context *TokenDisableContext) error {
-	context.TargetUser.DisableToken()
-	return saveUsersList(context.UsersPath, context.Users)
-}
-
-// executeSecretDisable marks a secret as disabled
-func executeSecretDisable(context *SecretDisableContext) error {
-	return context.Store.DisableSecret(context.SecretKey)
-}
-
-// printTokenDisableSuccess displays success message for token disabling
-func printTokenDisableSuccess(username string) {
-	fmt.Printf("✅ Token disabled for user '%s'\n", username)
-	fmt.Println("• The user can no longer authenticate with their current token")
-	fmt.Println("• Use 'rotate token' to generate a new token for this user")
-}
-
-// printSecretDisableSuccess displays success message for secret disabling
-func printSecretDisableSuccess(key string) {
 	fmt.Printf("✅ Secret '%s' has been disabled\n", key)
 	fmt.Println("• The secret is hidden from normal operations")
 	fmt.Println("• Use 'enable secret' to re-enable this secret")
+	return nil
+}
+
+// confirmTokenDisable prompts the user for confirmation and returns their choice
+func confirmTokenDisable() bool {
+	fmt.Print("Proceed? (type 'yes'): ")
+	in := bufio.NewReader(os.Stdin)
+	line, _ := in.ReadString('\n')
+
+	if strings.TrimSpace(strings.ToLower(line)) != "yes" {
+		fmt.Println("Aborted.")
+		return false
+	}
+	return true
 }
 
 func init() {

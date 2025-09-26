@@ -18,7 +18,6 @@ package cmd
 import (
 	"fmt"
 	"simple-secrets/internal"
-	"slices"
 
 	"github.com/spf13/cobra"
 )
@@ -49,90 +48,32 @@ Re-enabled secrets become available for normal operations again.`,
 }
 
 func enableSecret(cmd *cobra.Command, key string) error {
-	context, err := prepareSecretEnableContext(cmd, key)
-	if err != nil {
-		return err
-	}
-	if context == nil {
-		return nil // First run or access denied
-	}
-
-	if err := executeSecretEnable(context); err != nil {
-		return err
-	}
-
-	printSecretEnableSuccess(key)
-	return nil
-}
-
-// SecretEnableContext holds data needed for secret enabling
-type SecretEnableContext struct {
-	RequestingUser *internal.User
-	SecretKey      string
-	Store          *internal.SecretsStore
-}
-
-// prepareSecretEnableContext validates access and prepares context for secret enabling
-func prepareSecretEnableContext(cmd *cobra.Command, key string) (*SecretEnableContext, error) {
-	user, _, err := validateSecretEnableAccess(cmd)
-	if err != nil {
-		return nil, err
-	}
-	if user == nil {
-		return nil, nil
-	}
-
-	store, err := internal.LoadSecretsStore(internal.NewFilesystemBackend())
-	if err != nil {
-		return nil, err
-	}
-
-	// Check if disabled secret exists
-	disabledSecrets := store.ListDisabledSecrets()
-	found := slices.Contains(disabledSecrets, key)
-
-	if !found {
-		return nil, NewDisabledSecretNotFoundError()
-	}
-
-	return &SecretEnableContext{
-		RequestingUser: user,
-		SecretKey:      key,
-		Store:          store,
-	}, nil
-}
-
-// validateSecretEnableAccess checks RBAC permissions for secret enabling
-func validateSecretEnableAccess(cmd *cobra.Command) (*internal.User, *internal.UserStore, error) {
 	helper, err := GetCLIServiceHelper()
 	if err != nil {
-		return nil, nil, err
+		return err
 	}
 
-	user, store, err := helper.AuthenticateCommand(cmd, true)
+	// Resolve token for authentication
+	token, err := resolveTokenFromCommand(cmd)
 	if err != nil {
-		return nil, nil, err
-	}
-	if user == nil {
-		return nil, nil, nil
+		return err
 	}
 
-	if !user.Can("write", store.Permissions()) {
-		return nil, nil, NewPermissionDeniedError("write to enable secrets")
+	// Resolve the token (CLI responsibility)
+	resolvedToken, err := internal.ResolveToken(token)
+	if err != nil {
+		return err
 	}
 
-	return user, store, nil
-}
+	// Use service layer for secret enabling
+	err = helper.GetService().Secrets().Enable(resolvedToken, key)
+	if err != nil {
+		return err
+	}
 
-// executeSecretEnable re-enables a previously disabled secret
-func executeSecretEnable(context *SecretEnableContext) error {
-	return context.Store.EnableSecret(context.SecretKey)
-}
-
-// printSecretEnableSuccess displays success message for secret enabling
-func printSecretEnableSuccess(key string) {
 	fmt.Printf("✅ Secret '%s' has been re-enabled\n", key)
 	fmt.Println("• The secret is now available for normal operations")
+	return nil
 }
 
 func init() {

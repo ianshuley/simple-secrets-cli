@@ -18,7 +18,8 @@
 - [x] **Extract CLI-coupled logic**: ✅ COMPLETED - Service layer created with focused interfaces
 - [x] **Service layer**: ✅ COMPLETED - Created `Service` with `SecretOperations`, `AuthOperations`, `UserOperations` interfaces
 - [x] **Configuration abstraction**: ✅ COMPLETED - `ServiceConfig` with functional options (`WithStorageBackend`, `WithConfigDir`)
-- [ ] **Migrate remaining CLI commands**: Update `put`, `delete`, `disable`, `enable`, `rotate`, `create_user`, `restore` to use new service layer
+- [x] **Migrate core CLI commands**: ✅ COMPLETED - Successfully migrated `disable` (secret & user token), `enable` (secret), and `create_user` to service layer architecture
+  - **Remaining**: Complex commands (`rotate` master-key/token, `restore` secret/database) use specialized functionality that appropriately remains at CLI level
 - [ ] **Error abstraction**: Standardize error types for consistent API responses
 
 ### Advanced Features

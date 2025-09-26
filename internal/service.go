@@ -80,6 +80,7 @@ type UserOperations interface {
 	DeleteUser(adminToken, username string) error
 	ListUsers(adminToken string) ([]*User, error)
 	RotateToken(token, username string) (string, error)
+	DisableUser(token, username string) error
 }
 
 // Service provides composable operations for simple-secrets
@@ -351,4 +352,17 @@ func (u *userOperations) RotateToken(token, username string) (string, error) {
 	}
 
 	return u.userStore.RotateUserToken(username)
+}
+
+func (u *userOperations) DisableUser(token, username string) error {
+	user, err := u.auth.ValidateToken(token)
+	if err != nil {
+		return err
+	}
+
+	if !user.Can("rotate-tokens", u.userStore.Permissions()) {
+		return fmt.Errorf("permission denied: require rotate-tokens permission to disable user tokens")
+	}
+
+	return u.userStore.DisableUserToken(username)
 }

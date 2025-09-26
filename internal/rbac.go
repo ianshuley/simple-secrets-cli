@@ -274,6 +274,20 @@ func (us *UserStore) RotateUserToken(username string) (string, error) {
 	return "", fmt.Errorf("user %q not found", username)
 }
 
+func (us *UserStore) DisableUserToken(username string) error {
+	us.mu.Lock()
+	defer us.mu.Unlock()
+
+	for _, u := range us.users {
+		if u.Username == username {
+			u.DisableToken()
+			return nil
+		}
+	}
+
+	return fmt.Errorf("user %q not found", username)
+}
+
 // Private helper functions
 
 // createUserStore constructs a UserStore with the given users and permissions
