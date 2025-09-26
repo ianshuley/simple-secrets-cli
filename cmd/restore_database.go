@@ -21,7 +21,7 @@ import (
 	"os"
 	"strings"
 
-	"simple-secrets/internal"
+	"simple-secrets/pkg/api"
 
 	"github.com/spf13/cobra"
 )
@@ -39,13 +39,13 @@ var restoreDatabaseCmd = &cobra.Command{
 	Example: "simple-secrets restore-database\nsimple-secrets restore-database rotate-20240901-143022",
 	Args:    cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// Check if token flag was explicitly set to empty string
-		if flag := cmd.Flag("token"); flag != nil && flag.Changed && TokenFlag == "" {
-			return ErrAuthenticationRequired
+		helper, err := GetCLIServiceHelper()
+		if err != nil {
+			return err
 		}
 
 		// RBAC: write access (this is a destructive operation)
-		user, _, err := RBACGuard(true, cmd)
+		user, _, err := helper.AuthenticateCommand(cmd, true)
 		if err != nil {
 			return err
 		}
@@ -53,10 +53,7 @@ var restoreDatabaseCmd = &cobra.Command{
 			return nil
 		}
 
-		store, err := internal.LoadSecretsStore(internal.NewFilesystemBackend())
-		if err != nil {
-			return err
-		}
+		service := helper.GetService()
 
 		// Determine which backup to restore
 		if len(args) >= 1 {
@@ -65,7 +62,7 @@ var restoreDatabaseCmd = &cobra.Command{
 
 		// Show what backup will be restored
 		if restoreBackupName == "" {
-			backups, err := store.ListRotationBackups()
+			backups, err := service.Admin().ListBackups()
 			if err != nil {
 				return fmt.Errorf("failed to list backups: %w", err)
 			}
@@ -74,13 +71,11 @@ var restoreDatabaseCmd = &cobra.Command{
 				return nil
 			}
 
-			// Find most recent valid backup
-			var mostRecent *internal.BackupInfo
+			// Find most recent backup (assume all returned backups are valid)
+			var mostRecent *api.BackupInfo
 			for _, backup := range backups {
-				if backup.IsValid {
-					mostRecent = &backup
-					break
-				}
+				mostRecent = backup
+				break
 			}
 
 			if mostRecent == nil {
@@ -88,8 +83,9 @@ var restoreDatabaseCmd = &cobra.Command{
 				return nil
 			}
 
-			fmt.Printf("Will restore from most recent backup: %s\n", mostRecent.Name)
-			fmt.Printf("  Created: %s\n", mostRecent.Timestamp.Format("2006-01-02 15:04:05"))
+			fmt.Printf("Will restore from most recent backup: %s\n", mostRecent.ID)
+			fmt.Printf("  Created: %s\n", mostRecent.Timestamp)
+			restoreBackupName = mostRecent.ID
 		}
 
 		// Display backup name for non-most-recent restores
@@ -113,7 +109,7 @@ var restoreDatabaseCmd = &cobra.Command{
 		}
 
 		// Perform the restore
-		if err := store.RestoreFromBackup(restoreBackupName); err != nil {
+		if err := service.Admin().RestoreDatabase(restoreBackupName); err != nil {
 			return fmt.Errorf("restore failed: %w", err)
 		}
 

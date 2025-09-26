@@ -5,3 +5,4 @@ bin/
 # Coverage files
 coverage.out
 *.cover
+test-build

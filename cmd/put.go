@@ -18,11 +18,7 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
-
-	"simple-secrets/internal"
 
 	"github.com/spf13/cobra"
 )
@@ -155,7 +151,13 @@ Or save your token in ~/.simple-secrets/config.json:
 }
 
 func executePutCommand(args *putArguments) error {
-	user, err := authenticatePutUser(args.token)
+	helper, err := GetCLIServiceHelper()
+	if err != nil {
+		return err
+	}
+
+	// Use direct token authentication (put handles token parsing manually)
+	user, _, err := helper.AuthenticateToken(args.token, true)
 	if err != nil {
 		return err
 	}
@@ -167,24 +169,17 @@ func executePutCommand(args *putArguments) error {
 		return err
 	}
 
-	store, err := internal.LoadSecretsStore(internal.NewFilesystemBackend())
+	service := helper.GetService()
+
+	// Backup is handled automatically by the service layer
+
+	err = service.Secrets().Put(args.token, args.key, args.value)
 	if err != nil {
-		return err
-	}
-
-	backupExistingSecret(store, args.key)
-
-	if err := store.Put(args.key, args.value); err != nil {
 		return err
 	}
 
 	fmt.Printf("Secret %q stored.\n", args.key)
 	return nil
-}
-
-func authenticatePutUser(token string) (*internal.User, error) {
-	user, _, err := AuthenticateWithToken(true, token)
-	return user, err
 }
 
 // validatePutKeyName ensures secret keys meet security and usability requirements:
@@ -194,23 +189,6 @@ func authenticatePutUser(token string) (*internal.User, error) {
 // - No shell metacharacters
 func validatePutKeyName(key string) error {
 	return ValidateSecureInput(key, SecretKeyValidationConfig)
-}
-
-func backupExistingSecret(store *internal.SecretsStore, key string) {
-	prev, err := store.Get(key)
-	if err != nil {
-		return // No existing value to backup
-	}
-
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return // Cannot determine backup location
-	}
-
-	backupDir := filepath.Join(home, ".simple-secrets", "backups")
-	_ = os.MkdirAll(backupDir, 0700)
-	backupPath := filepath.Join(backupDir, key+".bak")
-	_ = os.WriteFile(backupPath, []byte(prev), 0600)
 }
 
 var addCmd = &cobra.Command{

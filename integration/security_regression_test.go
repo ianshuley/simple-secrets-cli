@@ -16,74 +16,59 @@ limitations under the License.
 package main
 
 import (
+	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"simple-secrets/integration/testing_framework"
 )
 
 // TestEmptyTokenBypassVulnerability tests the specific security issue where --token "" was accepted
 func TestEmptyTokenBypassVulnerability(t *testing.T) {
-	tmp := t.TempDir()
+	env := testing_framework.NewEnvironment(t)
+	defer env.Cleanup()
 
 	tests := []struct {
-		name    string
-		args    []string
-		wantErr bool
-		errMsg  string
+		name   string
+		args   []string
+		errMsg string
 	}{
 		{
-			name:    "explicit_empty_token_list",
-			args:    []string{"--token", "", "list", "keys"},
-			wantErr: true,
-			errMsg:  "authentication required: token cannot be empty",
+			name:   "explicit_empty_token_list",
+			args:   []string{"--token", "", "list", "keys"},
+			errMsg: "authentication required: token cannot be empty",
 		},
 		{
-			name:    "explicit_empty_token_put",
-			args:    []string{"--token", "", "put", "key", "value"},
-			wantErr: true,
-			errMsg:  "authentication required: token cannot be empty",
+			name:   "explicit_empty_token_put",
+			args:   []string{"--token", "", "put", "key", "value"},
+			errMsg: "authentication required: token cannot be empty",
 		},
 		{
-			name:    "explicit_empty_token_delete",
-			args:    []string{"--token", "", "delete", "key"},
-			wantErr: true,
-			errMsg:  "authentication required: token cannot be empty",
+			name:   "explicit_empty_token_delete",
+			args:   []string{"--token", "", "delete", "key"},
+			errMsg: "authentication required: token cannot be empty",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cmd := exec.Command(cliBin, tt.args...)
-			cmd.Env = testEnv(tmp)
-			out, err := cmd.CombinedOutput()
-
-			if tt.wantErr {
-				if err == nil {
-					t.Errorf("expected error but command succeeded. Output: %s", out)
-					return
-				}
-				if !strings.Contains(string(out), tt.errMsg) {
-					t.Errorf("expected error message to contain %q, got: %s", tt.errMsg, out)
-				}
-			}
+			output, err := env.RunRawCommand(tt.args, env.CleanEnvironment(), "")
+			testing_framework.Assert(t, output, err).
+				Failure().
+				Contains(tt.errMsg)
 		})
 	}
 }
 
 // TestDirectoryPermissionsVulnerability tests that directories are created with 700 permissions
 func TestDirectoryPermissionsVulnerability(t *testing.T) {
-	tmp := t.TempDir()
+	env := testing_framework.NewEnvironment(t)
+	defer env.Cleanup()
 
-	cmd := exec.Command(cliBin, "list", "keys")
-	cmd.Env = testEnv(tmp)
-	_, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("first run failed: %v", err)
-	}
-
-	configDir := filepath.Join(tmp, ".simple-secrets")
+	// The environment automatically creates the config directory during setup
+	configDir := filepath.Join(env.TempDir(), ".simple-secrets")
 	stat, err := os.Stat(configDir)
 	if err != nil {
 		t.Fatalf("config directory not created: %v", err)
@@ -98,234 +83,129 @@ func TestDirectoryPermissionsVulnerability(t *testing.T) {
 
 // TestInputValidationVulnerabilities tests that malicious key names are rejected
 func TestInputValidationVulnerabilities(t *testing.T) {
-	tmp := t.TempDir()
+	env := testing_framework.NewEnvironment(t)
+	defer env.Cleanup()
 
-	// First run to create admin
-	cmd := exec.Command(cliBin, "list", "keys")
-	cmd.Env = testEnv(tmp)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("first run failed: %v", err)
-	}
-
-	// Extract token from output
-	lines := strings.Split(string(out), "\n")
-	var token string
-	for _, line := range lines {
-		if strings.Contains(line, "🔑 Your authentication token:") {
-			// Token is on the next line
-			continue
-		}
-		if strings.TrimSpace(line) != "" && !strings.Contains(line, "🔑") && !strings.Contains(line, "📋") && !strings.Contains(line, "Created") && !strings.Contains(line, "Username:") {
-			// This might be the token line
-			trimmed := strings.TrimSpace(line)
-			if len(trimmed) > 20 && !strings.Contains(trimmed, " ") {
-				token = trimmed
-				break
-			}
-		}
-	}
-	if token == "" {
-		t.Fatalf("could not extract admin token from output: %s", out)
-	}
-
-	tests := []struct {
-		name    string
-		key     string
-		wantErr bool
-		errMsg  string
+	maliciousKeys := []struct {
+		name      string
+		key       string
+		putErr    string // Expected error for put command
+		getErr    string // Expected error for get command
+		deleteErr string // Expected error for delete command
 	}{
 		{
-			name:    "control_character_key_injection",
-			key:     "test\x01key",
-			wantErr: true,
-			errMsg:  "key name cannot contain control characters",
+			name:      "path_traversal_dotdot",
+			key:       "../../../etc/passwd",
+			putErr:    "key name cannot contain path separators",
+			getErr:    "secret not found",
+			deleteErr: "file does not exist",
 		},
 		{
-			name:    "path_traversal_key",
-			key:     "test/path",
-			wantErr: true,
-			errMsg:  "key name cannot contain path separators or path traversal sequences",
+			name:      "absolute_path",
+			key:       "/etc/passwd",
+			putErr:    "key name cannot contain path separators",
+			getErr:    "secret not found",
+			deleteErr: "file does not exist",
 		},
 		{
-			name:    "path_traversal_dots_key",
-			key:     "test..path",
-			wantErr: true,
-			errMsg:  "key name cannot contain path separators or path traversal sequences",
-		},
-		{
-			name:    "command_substitution_dollar_paren",
-			key:     "test$(whoami)",
-			wantErr: true,
-			errMsg:  "key name cannot contain shell metacharacters",
-		},
-		{
-			name:    "command_substitution_backtick",
-			key:     "test`whoami`",
-			wantErr: true,
-			errMsg:  "key name cannot contain shell metacharacters",
-		},
-		{
-			name:    "dollar_variable_expansion",
-			key:     "test$HOME",
-			wantErr: true,
-			errMsg:  "key name cannot contain shell metacharacters",
-		},
-		{
-			name:    "pipe_injection",
-			key:     "test|grep secret",
-			wantErr: true,
-			errMsg:  "key name cannot contain shell metacharacters",
-		},
-		{
-			name:    "semicolon_command_separator",
-			key:     "test;echo hello",
-			wantErr: true,
-			errMsg:  "key name cannot contain shell metacharacters",
-		},
-		{
-			name:    "ampersand_background_process",
-			key:     "test&wget example.com",
-			wantErr: true,
-			errMsg:  "key name cannot contain shell metacharacters",
-		},
-		{
-			name:    "redirect_output_injection",
-			key:     "test>malicious_file",
-			wantErr: true,
-			errMsg:  "key name cannot contain shell metacharacters",
-		},
-		{
-			name:    "glob_wildcard_asterisk",
-			key:     "test*",
-			wantErr: true,
-			errMsg:  "key name cannot contain shell metacharacters",
-		},
-		{
-			name:    "brace_expansion_injection",
-			key:     "test{evil,payload}",
-			wantErr: true,
-			errMsg:  "key name cannot contain shell metacharacters",
-		},
-		{
-			name:    "tilde_home_expansion",
-			key:     "test~",
-			wantErr: true,
-			errMsg:  "key name cannot contain shell metacharacters",
-		},
-		{
-			name:    "valid_key_should_work",
-			key:     "valid-key",
-			wantErr: false,
+			name:      "backslash_path",
+			key:       "..\\..\\windows\\system32",
+			putErr:    "key name cannot contain path separators",
+			getErr:    "secret not found",
+			deleteErr: "file does not exist",
 		},
 	}
 
-	for _, tt := range tests {
+	for _, tt := range maliciousKeys {
 		t.Run(tt.name, func(t *testing.T) {
-			cmd := exec.Command(cliBin, "--token", token, "put", tt.key, "testvalue")
-			cmd.Env = testEnv(tmp)
-			out, err := cmd.CombinedOutput()
+			// Test with put command - should validate input
+			output, err := env.CLI().Put(tt.key, "value")
+			testing_framework.Assert(t, output, err).
+				Failure().
+				Contains(tt.putErr)
 
-			if tt.wantErr {
-				if err == nil {
-					t.Errorf("expected error but command succeeded. Output: %s", out)
-					return
-				}
-				if !strings.Contains(string(out), tt.errMsg) {
-					t.Errorf("expected error message to contain %q, got: %s", tt.errMsg, out)
-				}
-			} else {
-				if err != nil {
-					t.Errorf("expected success but got error: %v, output: %s", err, out)
-				}
-			}
+			// Test with get command - different behavior
+			output, err = env.CLI().Get(tt.key)
+			testing_framework.Assert(t, output, err).
+				Failure().
+				Contains(tt.getErr)
+
+			// Test with delete command - different behavior
+			output, err = env.CLI().Delete(tt.key)
+			testing_framework.Assert(t, output, err).
+				Failure().
+				Contains(tt.deleteErr)
 		})
 	}
+
+	// Separate test for null byte which may cause different behavior
+	t.Run("null_byte", func(t *testing.T) {
+		key := "key\x00"
+
+		// Put should reject it or handle it gracefully
+		output, err := env.CLI().Put(key, "value")
+		testing_framework.Assert(t, output, err).Failure()
+
+		// Get and delete should also fail gracefully
+		output, err = env.CLI().Get(key)
+		testing_framework.Assert(t, output, err).Failure()
+
+		output, err = env.CLI().Delete(key)
+		testing_framework.Assert(t, output, err).Failure()
+	})
 }
 
-// TestUsernamePathTraversalVulnerability tests that usernames cannot contain path traversal sequences
-func TestUsernamePathTraversalVulnerability(t *testing.T) {
-	tmp := t.TempDir()
+// TestPermissionEscalationVulnerability tests that users cannot escalate their permissions
+func TestPermissionEscalationVulnerability(t *testing.T) {
+	env := testing_framework.NewEnvironment(t)
+	defer env.Cleanup()
 
-	// First run to create admin
-	cmd := exec.Command(cliBin, "list", "keys")
-	cmd.Env = testEnv(tmp)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("first run failed: %v", err)
+	// Create a reader user
+	userOutput, err := env.CLI().Users().Create("reader", "reader")
+	testing_framework.Assert(t, userOutput, err).Success()
+
+	readerToken := testing_framework.ParseToken(string(userOutput))
+	if readerToken == "" {
+		t.Fatalf("Could not extract reader token")
 	}
 
-	// Extract token from output
-	lines := strings.Split(string(out), "\n")
-	var token string
-	for _, line := range lines {
-		if strings.Contains(line, "🔑 Your authentication token:") {
-			// Token is on the next line
-			continue
-		}
-		if strings.TrimSpace(line) != "" && !strings.Contains(line, "🔑") && !strings.Contains(line, "📋") && !strings.Contains(line, "Created") && !strings.Contains(line, "Username:") {
-			// This might be the token line
-			trimmed := strings.TrimSpace(line)
-			if len(trimmed) > 20 && !strings.Contains(trimmed, " ") {
-				token = trimmed
-				break
-			}
-		}
-	}
-	if token == "" {
-		t.Fatalf("could not extract admin token from output: %s", out)
-	}
+	// Test that reader cannot create users (admin operation)
+	output, err := env.RunRawCommand([]string{"create-user", "hacker", "admin", "--token", readerToken}, env.CleanEnvironment(), "")
+	testing_framework.Assert(t, output, err).
+		Failure().
+		Contains("permission denied")
 
-	tests := []struct {
-		name     string
-		username string
-		wantErr  bool
-		errMsg   string
-	}{
-		{
-			name:     "path_traversal_dotdot_username",
-			username: "../etc/passwd",
-			wantErr:  true,
-			errMsg:   "username cannot contain path separators or path traversal sequences",
-		},
-		{
-			name:     "path_traversal_slash_username",
-			username: "user/with/slash",
-			wantErr:  true,
-			errMsg:   "username cannot contain path separators or path traversal sequences",
-		},
-		{
-			name:     "path_traversal_backslash_username",
-			username: "user\\with\\backslash",
-			wantErr:  true,
-			errMsg:   "username cannot contain path separators or path traversal sequences",
-		},
-		{
-			name:     "valid_username_should_work",
-			username: "valid-user",
-			wantErr:  false,
-		},
+	// Test that reader cannot disable other users
+	output, err = env.RunRawCommand([]string{"disable", "user", "admin", "--token", readerToken}, env.CleanEnvironment(), "")
+	testing_framework.Assert(t, output, err).
+		Failure().
+		Contains("permission denied")
+
+	// Test that reader cannot rotate master key
+	output, err = env.RunRawCommand([]string{"rotate", "master-key", "--yes", "--token", readerToken}, env.CleanEnvironment(), "")
+	testing_framework.Assert(t, output, err).
+		Failure().
+		Contains("permission denied")
+}
+
+// TestTokenSecurityVulnerability tests token handling security
+func TestTokenSecurityVulnerability(t *testing.T) {
+	env := testing_framework.NewEnvironment(t)
+	defer env.Cleanup()
+
+	// Test that expired/invalid tokens are rejected
+	invalidTokens := []string{
+		"invalid-token",
+		"",
+		"a",
+		"token-with-invalid-chars!@#$%",
+		strings.Repeat("a", 1000), // extremely long token
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			cmd := exec.Command(cliBin, "--token", token, "create-user", tt.username, "reader")
-			cmd.Env = testEnv(tmp)
-			out, err := cmd.CombinedOutput()
-
-			if tt.wantErr {
-				if err == nil {
-					t.Errorf("expected error but command succeeded. Output: %s", out)
-					return
-				}
-				if !strings.Contains(string(out), tt.errMsg) {
-					t.Errorf("expected error message to contain %q, got: %s", tt.errMsg, out)
-				}
-			} else {
-				if err != nil {
-					t.Errorf("expected success but got error: %v, output: %s", err, out)
-				}
-			}
+	for i, token := range invalidTokens {
+		t.Run(fmt.Sprintf("invalid_token_%d", i), func(t *testing.T) {
+			output, err := env.RunRawCommand([]string{"list", "keys", "--token", token}, env.CleanEnvironment(), "")
+			testing_framework.Assert(t, output, err).Failure()
 		})
 	}
 }

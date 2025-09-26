@@ -46,7 +46,33 @@ func LoadUsersList(path string) ([]*User, error) {
 	return loadUsers(path)
 }
 
-// LoadUsers loads users and roles. Returns (store, firstRun, token, error).
+// LoadUsersOrShowFirstRunMessage loads users or returns a first-run error with helpful message
+// This should be used by most commands instead of LoadUsers to avoid unexpected auto-setup
+func LoadUsersOrShowFirstRunMessage() (*UserStore, error) {
+	usersPath, rolesPath, err := resolveConfigPaths()
+	if err != nil {
+		return nil, err
+	}
+
+	users, err := loadUsers(usersPath)
+	if os.IsNotExist(err) {
+		// Return first-run error instead of auto-triggering setup
+		return nil, ErrFirstRunRequired
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	permissions, err := loadRoles(rolesPath)
+	if err != nil {
+		return nil, fmt.Errorf("load roles.json: %w", err)
+	}
+
+	store := createUserStore(users, permissions)
+	return store, nil
+}
+
+// LoadUsers loads users and handles first-run setup (for setup command only)
 // Token is only set when firstRun is true.
 func LoadUsers() (*UserStore, bool, string, error) {
 	usersPath, rolesPath, err := resolveConfigPaths()
@@ -60,7 +86,7 @@ func LoadUsers() (*UserStore, bool, string, error) {
 		if err := validateFirstRunEligibility(); err != nil {
 			return nil, false, "", err
 		}
-		store, token, err := handleFirstRunWithToken(usersPath, rolesPath)
+		store, token, err := HandleFirstRunSetup(usersPath, rolesPath)
 		if err != nil {
 			return nil, false, "", err
 		}
@@ -218,6 +244,45 @@ func (us *UserStore) UpdateUserRole(username, newRole string) error {
 			}
 
 			u.Role = role
+			return nil
+		}
+	}
+
+	return fmt.Errorf("user %q not found", username)
+}
+
+// RotateUserToken generates a new token for a user
+func (us *UserStore) RotateUserToken(username string) (string, error) {
+	us.mu.Lock()
+	defer us.mu.Unlock()
+
+	for _, u := range us.users {
+		if u.Username == username {
+			// Generate new token
+			token, err := generateSecureToken()
+			if err != nil {
+				return "", fmt.Errorf("failed to generate token: %w", err)
+			}
+
+			// Update the user's token hash
+			u.TokenHash = HashToken(token)
+			now := time.Now()
+			u.TokenRotatedAt = &now
+
+			return token, nil
+		}
+	}
+
+	return "", fmt.Errorf("user %q not found", username)
+}
+
+func (us *UserStore) DisableUserToken(username string) error {
+	us.mu.Lock()
+	defer us.mu.Unlock()
+
+	for _, u := range us.users {
+		if u.Username == username {
+			u.DisableToken()
 			return nil
 		}
 	}

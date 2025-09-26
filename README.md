@@ -55,29 +55,29 @@ make purge
 
 ### First-Time Setup
 
-When you first run `simple-secrets`, it will automatically detect this and prompt you to create an admin user:
+To get started with `simple-secrets`, run the setup command to create your admin user:
 
 ```bash
-# Any command requiring authentication will trigger setup
-simple-secrets list keys
+# Run setup to create admin user and get your token
+simple-secrets setup
 
-# Or run setup explicitly
+# Alternative: use the --setup flag
 simple-secrets --setup
 ```
 
 Setup process:
 
-1. **Detects first run** and prompts for admin user creation
+1. **Prompts for confirmation** to create admin user
 2. **Creates admin user** and generates secure authentication token
-3. **Displays token once** - save it securely as it won't be shown again
-4. **Requires re-running** your original command with the token
+3. **Displays token once** - save it securely as it will not be shown again
+4. **You're ready to use simple-secrets** with your new token
 
 ### Basic Usage
 
 ```bash
-# First run: triggers setup and creates admin user
-simple-secrets list keys
-# (Shows setup prompt, creates admin, displays token)
+# First run: setup to create admin user
+simple-secrets setup
+# (Prompts for confirmation, creates admin, displays token)
 
 # Then use the token for actual operations:
 simple-secrets list keys --token YOUR_ADMIN_TOKEN
@@ -96,9 +96,9 @@ simple-secrets get api-key --token YOUR_ADMIN_TOKEN
 
 ## Configuration
 
-### Automatic Setup
+### Configuration File
 
-During first-run, simple-secrets automatically creates a commented `config.json` template with examples:
+You can optionally create a `~/.simple-secrets/config.json` file with the following structure:
 
 ```json
 {
@@ -122,7 +122,7 @@ During first-run, simple-secrets automatically creates a commented `config.json`
 
 1. **Command flag**: `--token YOUR_TOKEN`
 2. **Environment variable**: `export SIMPLE_SECRETS_TOKEN=YOUR_TOKEN`
-3. **Config file**: `~/.simple-secrets/config.json` (auto-created during first-run)
+3. **Config file**: `~/.simple-secrets/config.json` (optional, you can create manually)
 
 **Configuration Options:**
 
@@ -136,7 +136,7 @@ During first-run, simple-secrets automatically creates a commented `config.json`
 
 ```text
 ~/.simple-secrets/
-├── config.json     # Optional configuration (auto-created)
+├── config.json     # Optional configuration
 ├── master.key      # Encryption key (protect this!)
 ├── secrets.json    # Encrypted secrets
 ├── users.json      # User accounts and roles
@@ -320,8 +320,8 @@ rm -rf ~/.simple-secrets/
 # Or if using custom config directory:
 rm -rf $SIMPLE_SECRETS_CONFIG_DIR
 
-# 3. Next command will trigger fresh installation setup
-simple-secrets --setup
+# 3. Run setup to create fresh installation
+simple-secrets setup
 ```
 
 ### 🛟 Recovery Options

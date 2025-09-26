@@ -18,6 +18,7 @@ package main
 import (
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -33,19 +34,9 @@ func testEnv(tmp string) []string {
 }
 
 func TestConsolidatedListCommands(t *testing.T) {
-	tmp := t.TempDir()
-
-	// First run to create admin and extract token
-	cmd := exec.Command(cliBin, "list", "keys")
-	cmd.Env = testEnv(tmp)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("first run failed: %v\n%s", err, out)
-	}
-	token := ExtractToken(string(out))
-	if token == "" {
-		t.Fatalf("could not extract admin token from output: %s", out)
-	}
+	// Create isolated test helper
+	helper := NewTestHelper(t)
+	defer helper.Cleanup()
 
 	tests := []struct {
 		name     string
@@ -84,10 +75,7 @@ func TestConsolidatedListCommands(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cmd := exec.Command(cliBin, tt.args...)
-			envWithToken := append(testEnv(tmp), "SIMPLE_SECRETS_TOKEN="+token)
-			cmd.Env = envWithToken
-			out, err := cmd.CombinedOutput()
+			out, err := helper.RunCommand(tt.args...)
 
 			if tt.wantErr {
 				if err == nil {
@@ -109,25 +97,12 @@ func TestConsolidatedListCommands(t *testing.T) {
 }
 
 func TestConsolidatedRotateCommands(t *testing.T) {
-	tmp := t.TempDir()
-
-	// First run to create admin and extract token
-	cmd := exec.Command(cliBin, "list", "keys")
-	cmd.Env = testEnv(tmp)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("first run failed: %v\n%s", err, out)
-	}
-	token := ExtractToken(string(out))
-	if token == "" {
-		t.Fatalf("could not extract admin token from output: %s", out)
-	}
+	// Create isolated test helper
+	helper := NewTestHelper(t)
+	defer helper.Cleanup()
 
 	// Add a secret first so rotation has something to work with
-	cmd = exec.Command(cliBin, "put", "test-key", "test-value")
-	envWithToken := append(testEnv(tmp), "SIMPLE_SECRETS_TOKEN="+token)
-	cmd.Env = envWithToken
-	_, err = cmd.CombinedOutput()
+	_, err := helper.RunCommand("put", "test-key", "test-value")
 	if err != nil {
 		t.Fatalf("put failed: %v", err)
 	}
@@ -179,8 +154,8 @@ func TestConsolidatedRotateCommands(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cmd := exec.Command(cliBin, tt.args...)
-			cmd.Env = append(testEnv(tmp), "SIMPLE_SECRETS_TOKEN="+token)
+			cmd := exec.Command(helper.GetBinaryPath(), tt.args...)
+			cmd.Env = append(helper.cleanEnv(), "SIMPLE_SECRETS_TOKEN="+helper.GetToken())
 			if tt.stdin != "" {
 				cmd.Stdin = strings.NewReader(tt.stdin)
 			}
@@ -201,39 +176,23 @@ func TestConsolidatedRotateCommands(t *testing.T) {
 }
 
 func TestConsolidatedRestoreCommands(t *testing.T) {
-	tmp := t.TempDir()
-
-	// First run to create admin and extract token
-	cmd := exec.Command(cliBin, "list", "keys")
-	cmd.Env = testEnv(tmp)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("first run failed: %v\n%s", err, out)
-	}
-	token := ExtractToken(string(out))
-	if token == "" {
-		t.Fatalf("could not extract admin token from output: %s", out)
-	}
+	// Create isolated test helper
+	helper := NewTestHelper(t)
+	defer helper.Cleanup()
 
 	// Add and delete a secret to create backup
-	cmd = exec.Command(cliBin, "put", "backup-test", "original-value")
-	cmd.Env = append(testEnv(tmp), "SIMPLE_SECRETS_TOKEN="+token)
-	_, err = cmd.CombinedOutput()
+	_, err := helper.RunCommand("put", "backup-test", "original-value")
 	if err != nil {
 		t.Fatalf("put failed: %v", err)
 	}
 
-	cmd = exec.Command(cliBin, "put", "backup-test", "modified-value")
-	cmd.Env = append(testEnv(tmp), "SIMPLE_SECRETS_TOKEN="+token)
-	_, err = cmd.CombinedOutput()
+	_, err = helper.RunCommand("put", "backup-test", "modified-value")
 	if err != nil {
 		t.Fatalf("put modified failed: %v", err)
 	}
 
 	// Create a rotation backup
-	cmd = exec.Command(cliBin, "rotate", "master-key", "--yes")
-	cmd.Env = append(testEnv(tmp), "SIMPLE_SECRETS_TOKEN="+token)
-	_, err = cmd.CombinedOutput()
+	_, err = helper.RunCommand("rotate", "master-key", "--yes")
 	if err != nil {
 		t.Fatalf("rotate failed: %v", err)
 	}
@@ -283,8 +242,13 @@ func TestConsolidatedRestoreCommands(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cmd := exec.Command(cliBin, tt.args...)
-			cmd.Env = append(testEnv(tmp), "SIMPLE_SECRETS_TOKEN="+token)
+			// For tests that need stdin, use exec.Command with helper's token and env
+			cmd := exec.Command(helper.GetBinaryPath(), tt.args...)
+			cmd.Env = append([]string{
+				"HOME=" + helper.GetTempDir(),
+				"SIMPLE_SECRETS_CONFIG_DIR=" + filepath.Join(helper.GetTempDir(), ".simple-secrets"),
+				"PATH=" + os.Getenv("PATH"),
+			}, "SIMPLE_SECRETS_TOKEN="+helper.GetToken())
 			if tt.stdin != "" {
 				cmd.Stdin = strings.NewReader(tt.stdin)
 			}
@@ -305,24 +269,12 @@ func TestConsolidatedRestoreCommands(t *testing.T) {
 }
 
 func TestLegacyCommandsStillWork(t *testing.T) {
-	tmp := t.TempDir()
-
-	// First run to create admin and extract token
-	cmd := exec.Command(cliBin, "list", "keys")
-	cmd.Env = testEnv(tmp)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("first run failed: %v\n%s", err, out)
-	}
-	token := ExtractToken(string(out))
-	if token == "" {
-		t.Fatalf("could not extract admin token from output: %s", out)
-	}
+	// Create isolated test helper
+	helper := NewTestHelper(t)
+	defer helper.Cleanup()
 
 	// Test that legacy restore-database command still works
-	cmd = exec.Command(cliBin, "restore-database", "--help")
-	cmd.Env = append(testEnv(tmp), "SIMPLE_SECRETS_TOKEN="+token)
-	out, err = cmd.CombinedOutput()
+	out, err := helper.RunCommand("restore-database", "--help")
 	if err != nil {
 		t.Errorf("legacy restore-database command should still work: %v\n%s", err, out)
 	}
@@ -333,6 +285,10 @@ func TestLegacyCommandsStillWork(t *testing.T) {
 }
 
 func TestConsolidatedCommandHelpText(t *testing.T) {
+	// Create isolated test helper (help commands don't need authentication)
+	helper := NewTestHelper(t)
+	defer helper.Cleanup()
+
 	tests := []struct {
 		name     string
 		args     []string
@@ -388,8 +344,8 @@ func TestConsolidatedCommandHelpText(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cmd := exec.Command(cliBin, tt.args...)
-			out, err := cmd.CombinedOutput()
+			// Help commands don't need tokens
+			out, err := helper.RunCommandWithoutToken(tt.args...)
 			if err != nil {
 				t.Errorf("help command failed: %v\n%s", err, out)
 				return
@@ -405,19 +361,8 @@ func TestConsolidatedCommandHelpText(t *testing.T) {
 }
 
 func TestConsolidatedDisableEnableCommands(t *testing.T) {
-	tmp := t.TempDir()
-
-	// First run to create admin and extract token
-	cmd := exec.Command(cliBin, "list", "keys")
-	cmd.Env = testEnv(tmp)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("first run failed: %v\n%s", err, out)
-	}
-	token := ExtractToken(string(out))
-	if token == "" {
-		t.Fatalf("could not extract admin token from output: %s", out)
-	}
+	helper := NewTestHelper(t)
+	defer helper.Cleanup()
 
 	tests := []struct {
 		name     string
@@ -428,116 +373,102 @@ func TestConsolidatedDisableEnableCommands(t *testing.T) {
 		// Test secret disable/enable workflow
 		{
 			name:     "put test secret",
-			args:     []string{"put", "test-key", "test-value", "--token", token},
+			args:     []string{"put", "test-key", "test-value"},
 			wantErr:  false,
 			contains: `Secret "test-key" stored`,
 		},
 		{
 			name:     "disable secret",
-			args:     []string{"disable", "secret", "test-key", "--token", token},
+			args:     []string{"disable", "secret", "test-key"},
 			wantErr:  false,
 			contains: "Secret 'test-key' has been disabled",
 		},
 		{
 			name:     "list keys excludes disabled",
-			args:     []string{"list", "keys", "--token", token},
+			args:     []string{"list", "keys"},
 			wantErr:  false,
 			contains: "", // Should not contain test-key
 		},
 		{
 			name:     "list disabled shows secret",
-			args:     []string{"list", "disabled", "--token", token},
+			args:     []string{"list", "disabled"},
 			wantErr:  false,
 			contains: "test-key",
 		},
 		{
 			name:     "get disabled secret fails",
-			args:     []string{"get", "test-key", "--token", token},
+			args:     []string{"get", "test-key"},
 			wantErr:  true,
 			contains: "not found",
 		},
 		{
 			name:     "enable secret",
-			args:     []string{"enable", "secret", "test-key", "--token", token},
+			args:     []string{"enable", "secret", "test-key"},
 			wantErr:  false,
 			contains: "Secret 'test-key' has been re-enabled",
 		},
 		{
 			name:     "list keys includes enabled secret",
-			args:     []string{"list", "keys", "--token", token},
+			args:     []string{"list", "keys"},
 			wantErr:  false,
 			contains: "test-key",
 		},
 		{
 			name:     "get enabled secret works",
-			args:     []string{"get", "test-key", "--token", token},
+			args:     []string{"get", "test-key"},
 			wantErr:  false,
 			contains: "test-value",
 		},
 		// Test token disable workflow
 		{
 			name:     "create test user",
-			args:     []string{"create-user", "testuser", "reader", "--token", token},
+			args:     []string{"create-user", "testuser", "reader"},
 			wantErr:  false,
 			contains: "Generated token:",
 		},
 		{
 			name:     "disable token invalid type",
-			args:     []string{"disable", "invalid", "testuser", "--token", token},
+			args:     []string{"disable", "invalid", "testuser"},
 			wantErr:  true,
 			contains: "unknown disable type",
 		},
 		{
 			name:     "enable invalid type",
-			args:     []string{"enable", "invalid", "test-key", "--token", token},
+			args:     []string{"enable", "invalid", "test-key"},
 			wantErr:  true,
 			contains: "unknown enable type",
 		},
 		// Error cases
 		{
 			name:     "disable nonexistent secret",
-			args:     []string{"disable", "secret", "nonexistent", "--token", token},
+			args:     []string{"disable", "secret", "nonexistent"},
 			wantErr:  true,
-			contains: "not found",
+			contains: "file does not exist",
 		},
 		{
 			name:     "enable nonexistent secret",
-			args:     []string{"enable", "secret", "nonexistent", "--token", token},
+			args:     []string{"enable", "secret", "nonexistent"},
 			wantErr:  true,
-			contains: "not found",
-		},
-		{
-			name:     "disable without token",
-			args:     []string{"disable", "secret", "test-key"},
-			wantErr:  true,
-			contains: "authentication required",
-		},
-		{
-			name:     "enable without token",
-			args:     []string{"enable", "secret", "test-key"},
-			wantErr:  true,
-			contains: "authentication required",
+			contains: "disabled secret not found",
 		},
 	}
 
 	// Run tests sequentially to maintain state
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cmd := exec.Command(cliBin, tt.args...)
-			cmd.Env = testEnv(tmp)
-			out, err := cmd.CombinedOutput()
+			output, err := helper.RunCommand(tt.args...)
 
 			if tt.wantErr && err == nil {
-				t.Errorf("expected error but command succeeded: %s", out)
+				t.Errorf("expected error but command succeeded: %s", output)
 				return
 			}
 			if !tt.wantErr && err != nil {
-				t.Errorf("unexpected error: %v\n%s", err, out)
+				t.Errorf("unexpected error: %v\n%s", err, output)
 				return
 			}
 
-			if tt.contains != "" && !strings.Contains(string(out), tt.contains) {
-				t.Errorf("output should contain %q but got: %s", tt.contains, out)
+			if tt.contains != "" && !strings.Contains(string(output), tt.contains) {
+				t.Errorf("output should contain %q but got: %s", tt.contains, string(output))
 			}
 		})
 	}

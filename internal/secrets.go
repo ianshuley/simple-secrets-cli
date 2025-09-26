@@ -148,6 +148,27 @@ func LoadSecretsStore(backend StorageBackend) (*SecretsStore, error) {
 	return s, nil
 }
 
+// LoadSecretsStoreFromDir creates a secrets store using a custom directory
+// This is useful for testing and custom deployments where the config directory needs to be specified
+func LoadSecretsStoreFromDir(backend StorageBackend, configDir string) (*SecretsStore, error) {
+	_ = backend.MkdirAll(configDir, FileMode(secureDirectoryPermissions))
+
+	s := &SecretsStore{
+		KeyPath:     filepath.Join(configDir, "master.key"),
+		SecretsPath: filepath.Join(configDir, "secrets.json"),
+		secrets:     make(map[string]string),
+		storage:     backend,
+	}
+
+	if err := s.loadOrCreateKey(); err != nil {
+		return nil, err
+	}
+	if err := s.loadSecrets(); err != nil {
+		return nil, err
+	}
+	return s, nil
+}
+
 // getConfigDirectory returns the configuration directory, respecting test overrides
 func getConfigDirectory() (string, error) {
 	// For testing purposes
@@ -227,29 +248,7 @@ func (s *SecretsStore) backupSecret(key, encryptedValue string) {
 	_ = s.storage.WriteFile(backupPath, []byte(encryptedValue), FileMode(secureFilePermissions))
 }
 
-// encryptWithMasterKey safely encrypts data using the current master key
-// This ensures the key is not stale when used for encryption
-func (s *SecretsStore) encryptWithMasterKey(data []byte) (string, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return encrypt(s.masterKey, data)
-}
-
-// decryptWithMasterKey safely decrypts data using the current master key
-// This ensures the key is not stale when used for decryption
-func (s *SecretsStore) decryptWithMasterKey(encryptedData string) ([]byte, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return decrypt(s.masterKey, encryptedData)
-}
-
 func (s *SecretsStore) Put(key, value string) error {
-	// Encrypt using atomic key access to prevent stale key usage
-	encryptedValue, err := s.encryptWithMasterKey([]byte(value))
-	if err != nil {
-		return err
-	}
-
 	// Acquire file lock to prevent concurrent writes from other processes
 	lock, err := LockFile(s.SecretsPath)
 	if err != nil {
@@ -260,19 +259,24 @@ func (s *SecretsStore) Put(key, value string) error {
 	// For concurrent operations within the same process, we need to be more careful
 	// Load fresh state but merge it with existing in-memory state
 	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	err = s.mergeWithDiskState()
 	if err != nil {
-		s.mu.Unlock()
 		return fmt.Errorf("failed to merge disk state: %w", err)
+	}
+
+	// Encrypt using master key while holding the write lock
+	// Fixed: Previously caused nil pointer panics when rotation occurred between Get/Put operations. See rotation_restore_test.go for regression coverage.
+	encryptedValue, err := encrypt(s.masterKey, []byte(value))
+	if err != nil {
+		return err
 	}
 
 	// Now perform the update with merged state
 	s.ensureBackupExists(key)
 	s.secrets[key] = encryptedValue
-	err = s.saveSecretsLocked()
-	s.mu.Unlock()
-
-	return err
+	return s.saveSecretsLocked()
 }
 
 // ensureBackupExists stores an encrypted backup of the current value (if any) before modification.
@@ -291,15 +295,16 @@ func (s *SecretsStore) ensureBackupExists(key string) {
 
 func (s *SecretsStore) Get(key string) (string, error) {
 	s.mu.RLock()
-	enc, ok := s.secrets[key]
-	s.mu.RUnlock()
+	defer s.mu.RUnlock()
 
+	enc, ok := s.secrets[key]
 	if !ok {
 		return "", ErrNotFound
 	}
 
-	// Use atomic key access to prevent stale key usage
-	pt, err := s.decryptWithMasterKey(enc)
+	// Decrypt directly with master key while holding the read lock
+	// This prevents race conditions with key rotation
+	pt, err := decrypt(s.masterKey, enc)
 	if err != nil {
 		return "", err
 	}
@@ -350,8 +355,12 @@ func (s *SecretsStore) Delete(key string) error {
 
 // DecryptBackup decrypts a backup file's encrypted content
 func (s *SecretsStore) DecryptBackup(encryptedData string) (string, error) {
-	// Use atomic key access to prevent stale key usage
-	decrypted, err := s.decryptWithMasterKey(encryptedData)
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	// Decrypt directly with master key while holding the read lock
+	// This prevents race conditions with key rotation
+	decrypted, err := decrypt(s.masterKey, encryptedData)
 	if err != nil {
 		return "", err
 	}

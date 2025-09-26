@@ -70,19 +70,25 @@ Token rotation options:
 }
 
 func rotateMasterKey(cmd *cobra.Command) error {
-	user, store, err := validateMasterKeyRotationAccess(cmd)
+	helper, err := GetCLIServiceHelper()
+	if err != nil {
+		return err
+	}
+
+	user, _, err := helper.AuthenticateCommand(cmd, true)
 	if err != nil {
 		return err
 	}
 	if user == nil {
-		return nil // First run detected, message already printed
+		return nil // First run message already printed
 	}
 
 	if !rotateNewYes && !confirmMasterKeyRotation() {
 		return nil
 	}
 
-	if err := store.RotateMasterKey(rotateNewBackupDir); err != nil {
+	service := helper.GetService()
+	if err := service.Admin().RotateMasterKey(rotateNewBackupDir); err != nil {
 		return err
 	}
 
@@ -92,7 +98,12 @@ func rotateMasterKey(cmd *cobra.Command) error {
 
 // validateMasterKeyRotationAccess checks RBAC permissions for master key rotation
 func validateMasterKeyRotationAccess(cmd *cobra.Command) (*internal.User, *internal.SecretsStore, error) {
-	user, _, err := RBACGuard(true, cmd)
+	helper, err := GetCLIServiceHelper()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	user, _, err := helper.AuthenticateCommand(cmd, true)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -141,26 +152,36 @@ func printMasterKeyRotationSuccess() {
 }
 
 func rotateSelfToken(cmd *cobra.Command) error {
-	context, err := prepareTokenRotationContext(cmd, true) // self=true
+	helper, err := GetCLIServiceHelper()
 	if err != nil {
 		return err
 	}
-	if context == nil {
-		return nil // First run or access denied
+	currentUser, _, err := helper.AuthenticateCommand(cmd, false)
+	if err != nil {
+		return err
+	}
+	if currentUser == nil {
+		return nil // First run message already shown
 	}
 
-	newToken, err := executeTokenRotation(context)
+	service := helper.GetService()
+	newToken, err := service.Users().RotateSelfToken(currentUser)
 	if err != nil {
 		return err
 	}
 
-	printSelfTokenRotationSuccess(context.TargetUsername, context.TargetUser.Role, newToken)
+	printSelfTokenRotationSuccess(newToken)
 	return nil
 }
 
 func rotateToken(cmd *cobra.Command, targetUsername string) error {
 	// First, check if this is actually self-rotation (user specified their own username)
-	currentUser, _, err := RBACGuard(false, cmd) // Don't require write access yet
+	helper, err := GetCLIServiceHelper()
+	if err != nil {
+		return err
+	}
+
+	currentUser, _, err := helper.AuthenticateCommand(cmd, false) // Don't require write access yet
 	if err != nil {
 		return err
 	}
@@ -208,7 +229,12 @@ func printBackupLocation(backupDir string) {
 
 // validateTokenRotationAccess checks permissions and loads necessary data for token rotation
 func validateTokenRotationAccess(cmd *cobra.Command, targetUsername string) (*internal.User, string, []*internal.User, error) {
-	currentUser, store, err := RBACGuard(true, cmd)
+	helper, err := GetCLIServiceHelper()
+	if err != nil {
+		return nil, "", nil, err
+	}
+
+	currentUser, store, err := helper.AuthenticateCommand(cmd, true)
 	if err != nil {
 		return nil, "", nil, err
 	}
@@ -235,7 +261,12 @@ func validateTokenRotationAccess(cmd *cobra.Command, targetUsername string) (*in
 
 // validateSelfTokenRotationAccess checks permissions for self token rotation
 func validateSelfTokenRotationAccess(cmd *cobra.Command) (*internal.User, string, []*internal.User, error) {
-	currentUser, store, err := RBACGuard(false, cmd) // Use false - we check specific permission below
+	helper, err := GetCLIServiceHelper()
+	if err != nil {
+		return nil, "", nil, err
+	}
+
+	currentUser, store, err := helper.AuthenticateCommand(cmd, false) // Use false - we check specific permission below
 	if err != nil {
 		return nil, "", nil, err
 	}
@@ -384,13 +415,14 @@ func printTokenRotationSuccess(username string, role internal.Role, newToken str
 }
 
 // printSelfTokenRotationSuccess displays the self-rotation success message and instructions
-func printSelfTokenRotationSuccess(username string, role internal.Role, newToken string) {
+func printSelfTokenRotationSuccess(newToken string) {
 	fmt.Printf("\n✅ Your token has been rotated successfully!\n")
-	fmt.Printf("New token: %s\n", newToken)
 	fmt.Println()
 	printSelfTokenRotationWarnings()
 	fmt.Println()
 	printSelfTokenUsageInstructions()
+	fmt.Println()
+	fmt.Printf("New token: %s\n", newToken)
 }
 
 // printTokenRotationWarnings displays important warnings about the token rotation

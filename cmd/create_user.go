@@ -17,11 +17,9 @@ package cmd
 
 import (
 	"bufio"
-	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
-	"time"
 
 	"simple-secrets/internal"
 
@@ -40,29 +38,36 @@ var createUserCmd = &cobra.Command{
 			return ErrAuthenticationRequired
 		}
 
-		user, _, err := validateUserCreationAccess(cmd)
+		helper, err := GetCLIServiceHelper()
 		if err != nil {
 			return err
 		}
-		if user == nil {
-			return nil
+
+		// Resolve token for authentication
+		token, err := resolveTokenFromCommand(cmd)
+		if err != nil {
+			return err
 		}
 
+		// Resolve the token (CLI responsibility)
+		resolvedToken, err := internal.ResolveToken(token)
+		if err != nil {
+			return err
+		}
+
+		// Collect user input
 		userInput, err := collectUserInput(args)
 		if err != nil {
 			return err
 		}
 
-		newUser, token, err := createUserWithToken(userInput)
+		// Use service layer for user creation
+		newToken, err := helper.GetService().Users().CreateUser(resolvedToken, userInput.Username, string(userInput.Role))
 		if err != nil {
 			return err
 		}
 
-		if err := persistNewUser(newUser); err != nil {
-			return err
-		}
-
-		printUserCreationSuccess(userInput.Username, token)
+		printUserCreationSuccess(userInput.Username, newToken)
 		return nil
 	},
 }
@@ -71,22 +76,6 @@ var createUserCmd = &cobra.Command{
 type UserInput struct {
 	Username string
 	Role     internal.Role
-}
-
-// validateUserCreationAccess checks RBAC permissions for user creation
-func validateUserCreationAccess(cmd *cobra.Command) (*internal.User, *internal.UserStore, error) {
-	user, store, err := RBACGuard(true, cmd)
-	if err != nil {
-		return nil, nil, err
-	}
-	if user == nil {
-		return nil, nil, nil
-	}
-	if !user.Can("manage-users", store.Permissions()) {
-		fmt.Fprintln(os.Stderr, "Error: insufficient permissions")
-		return nil, nil, nil
-	}
-	return user, store, nil
 }
 
 // collectUserInput gathers username and role from args or interactive prompts
@@ -136,88 +125,6 @@ func parseRole(roleStr string) (internal.Role, error) {
 	default:
 		return "", fmt.Errorf("invalid role: must be 'admin' or 'reader'")
 	}
-}
-
-// createUserWithToken creates a new user with a secure token
-func createUserWithToken(userInput *UserInput) (*internal.User, string, error) {
-	if err := validateUsernameAvailability(userInput.Username); err != nil {
-		return nil, "", err
-	}
-
-	token, err := generateSecureUserToken()
-	if err != nil {
-		return nil, "", err
-	}
-
-	tokenHash := internal.HashToken(token)
-	now := time.Now()
-
-	newUser := &internal.User{
-		Username:       userInput.Username,
-		TokenHash:      tokenHash,
-		Role:           userInput.Role,
-		TokenRotatedAt: &now,
-	}
-
-	return newUser, token, nil
-}
-
-// validateUsername performs comprehensive username validation
-func validateUsername(username string) error {
-	return ValidateSecureInput(username, UsernameValidationConfig)
-}
-
-// validateUsernameAvailability checks if the username is already taken
-func validateUsernameAvailability(username string) error {
-	// First validate the username format and security
-	if err := validateUsername(username); err != nil {
-		return err
-	}
-
-	usersPath, err := internal.DefaultUserConfigPath("users.json")
-	if err != nil {
-		return err
-	}
-
-	users, err := internal.LoadUsersList(usersPath)
-	if err != nil {
-		return err
-	}
-
-	for _, u := range users {
-		if u.Username == username {
-			return fmt.Errorf("user %q already exists", username)
-		}
-	}
-
-	return nil
-}
-
-// generateSecureUserToken creates a cryptographically secure random token
-func generateSecureUserToken() (string, error) {
-	return GenerateSecureToken()
-}
-
-// persistNewUser saves the new user to the users.json file atomically
-func persistNewUser(newUser *internal.User) error {
-	usersPath, err := internal.DefaultUserConfigPath("users.json")
-	if err != nil {
-		return err
-	}
-
-	users, err := internal.LoadUsersList(usersPath)
-	if err != nil {
-		return err
-	}
-
-	users = append(users, newUser)
-
-	data, err := json.MarshalIndent(users, "", "  ")
-	if err != nil {
-		return err
-	}
-
-	return internal.AtomicWriteFile(usersPath, data, 0600)
 }
 
 // printUserCreationSuccess displays the success message with the new token

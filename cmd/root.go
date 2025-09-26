@@ -195,8 +195,19 @@ func performFirstTimeSetup() {
 
 	fmt.Println("\nCreating admin user...")
 
-	// Use the clean first-run setup function that returns the token
-	_, token, err := internal.DoFirstRunSetupWithToken()
+	// Use the consolidated first-run setup function
+	usersPath, err := internal.DefaultUserConfigPath("users.json")
+	if err != nil {
+		fmt.Printf("\n❌ Setup failed: %v\n", err)
+		return
+	}
+	rolesPath, err := internal.DefaultUserConfigPath("roles.json")
+	if err != nil {
+		fmt.Printf("\n❌ Setup failed: %v\n", err)
+		return
+	}
+
+	_, token, err := internal.HandleFirstRunSetup(usersPath, rolesPath)
 	if err != nil {
 		fmt.Printf("\n❌ Setup failed: %v\n", err)
 		return

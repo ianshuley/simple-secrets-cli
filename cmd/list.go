@@ -62,21 +62,30 @@ var listCmd = &cobra.Command{
 }
 
 func listKeys(cmd *cobra.Command) error {
-	// RBAC: read access
-	user, _, err := RBACGuard(false, cmd)
-	if err != nil {
-		return err
-	}
-	if user == nil {
-		return nil
-	}
-
-	store, err := internal.LoadSecretsStore(internal.NewFilesystemBackend())
+	// Get CLI service helper
+	helper, err := GetCLIServiceHelper()
 	if err != nil {
 		return err
 	}
 
-	keys := store.ListKeys()
+	// Resolve token for authentication
+	token, err := resolveTokenFromCommand(cmd)
+	if err != nil {
+		return err
+	}
+
+	// Resolve the token (CLI responsibility)
+	resolvedToken, err := internal.ResolveToken(token)
+	if err != nil {
+		return err
+	}
+
+	// List secrets using focused service operations
+	keys, err := helper.GetService().Secrets().List(resolvedToken)
+	if err != nil {
+		return err
+	}
+
 	if len(keys) == 0 {
 		fmt.Println("(no secrets)")
 		return nil
@@ -91,7 +100,12 @@ func listKeys(cmd *cobra.Command) error {
 
 func listBackups(cmd *cobra.Command) error {
 	// RBAC: read access
-	user, _, err := RBACGuard(false, cmd)
+	helper, err := GetCLIServiceHelper()
+	if err != nil {
+		return err
+	}
+
+	user, _, err := helper.AuthenticateCommand(cmd, false)
 	if err != nil {
 		return err
 	}
@@ -126,7 +140,12 @@ func listBackups(cmd *cobra.Command) error {
 
 func listUsers(cmd *cobra.Command) error {
 	// RBAC: admin required for user management
-	user, store, err := RBACGuard(true, cmd)
+	helper, err := GetCLIServiceHelper()
+	if err != nil {
+		return err
+	}
+
+	user, store, err := helper.AuthenticateCommand(cmd, true)
 	if err != nil {
 		return err
 	}
@@ -180,7 +199,12 @@ func listUsers(cmd *cobra.Command) error {
 
 func listDisabledSecrets(cmd *cobra.Command) error {
 	// RBAC: read access
-	user, _, err := RBACGuard(false, cmd)
+	helper, err := GetCLIServiceHelper()
+	if err != nil {
+		return err
+	}
+
+	user, _, err := helper.AuthenticateCommand(cmd, false)
 	if err != nil {
 		return err
 	}

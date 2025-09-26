@@ -23,6 +23,14 @@ func extractTokenFromOutput(output string) string {
 	lines := strings.SplitSeq(output, "\n")
 	foundTokenSection := false
 	for outputLine := range lines {
+		// Look for setup command token format
+		if strings.Contains(outputLine, "TOKEN: ") {
+			parts := strings.Split(outputLine, "TOKEN: ")
+			if len(parts) > 1 {
+				return strings.TrimSpace(parts[1])
+			}
+		}
+
 		// Look for the new token section header
 		if strings.Contains(outputLine, "🔑 Your authentication token:") {
 			foundTokenSection = true

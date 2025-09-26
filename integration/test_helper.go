@@ -19,6 +19,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -61,13 +62,16 @@ func NewTestHelper(t *testing.T) *TestHelper {
 func (h *TestHelper) initializeFirstRun() {
 	h.t.Helper()
 
-	// Trigger first-run with a clean environment
-	cmd := exec.Command(h.binaryPath, "list", "keys")
+	// Use explicit setup command (new behavior)
+	cmd := exec.Command(h.binaryPath, "setup")
 	cmd.Env = h.cleanEnv()
+
+	// Provide "Y" as input to the first-run prompt
+	cmd.Stdin = strings.NewReader("Y\n")
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		h.t.Fatalf("first-run initialization failed: %v\n%s", err, output)
+		h.t.Fatalf("first run failed: %v\n%s", err, output)
 	}
 
 	// Extract token from output

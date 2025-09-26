@@ -16,12 +16,42 @@ limitations under the License.
 package internal
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
 	"time"
 )
+
+// ErrFirstRunRequired indicates that first-run setup is needed
+var ErrFirstRunRequired = errors.New("first run setup required")
+
+// GetFirstRunMessage returns a helpful message for users who need to run setup
+func GetFirstRunMessage() string {
+	return `🔐 Welcome to simple-secrets!
+
+This appears to be your first time using simple-secrets.
+To get started, you need to run the initial setup:
+
+    simple-secrets setup
+
+or
+
+    simple-secrets --setup
+
+This will:
+  • Create your admin user
+  • Generate your authentication token
+  • Set up the secure storage
+
+After setup, you can use commands like:
+    simple-secrets put --token <your-token> key value
+    simple-secrets get --token <your-token> key
+    simple-secrets list --token <your-token> keys
+
+For help with configuration, run: simple-secrets help config`
+}
 
 // IsFirstRun checks if this is a fresh installation that needs setup
 func IsFirstRun() (bool, error) {
@@ -35,37 +65,9 @@ func IsFirstRun() (bool, error) {
 	return os.IsNotExist(err), nil
 }
 
-// DoFirstRunSetup creates the initial admin user and returns the user store
-func DoFirstRunSetup() (*UserStore, error) {
-	usersPath, rolesPath, err := resolveConfigPaths()
-	if err != nil {
-		return nil, err
-	}
-
-	fmt.Println("Setting up simple-secrets for first use...")
-	store, created, err := createDefaultUserFile(usersPath, rolesPath)
-	if err != nil {
-		return nil, err
-	}
-	if !created {
-		return nil, fmt.Errorf("setup failed: could not create default user")
-	}
-	return store, nil
-}
-
-// DoFirstRunSetupWithToken creates the initial admin user and returns both store and token
-func DoFirstRunSetupWithToken() (*UserStore, string, error) {
-	usersPath, rolesPath, err := resolveConfigPaths()
-	if err != nil {
-		return nil, "", err
-	}
-
-	fmt.Println("Setting up simple-secrets for first use...")
-	return createDefaultUserFileWithToken(usersPath, rolesPath)
-}
-
-// handleFirstRunWithToken manages the first-run scenario and returns the generated token
-func handleFirstRunWithToken(usersPath, rolesPath string) (*UserStore, string, error) {
+// HandleFirstRunSetup manages the first-run scenario and generates an authentication token
+// Exported for use by cmd package
+func HandleFirstRunSetup(usersPath, rolesPath string) (*UserStore, string, error) {
 	const (
 		firstRunPrompt         = "First run detected - creating default admin user..."
 		passwordManagerWarning = "⚠️  This will generate an authentication token. Have your password manager ready."
@@ -93,6 +95,27 @@ func handleFirstRunWithToken(usersPath, rolesPath string) (*UserStore, string, e
 func UserDeclinedSetup(response string) bool {
 	declineResponses := []string{"n", "N", "no", "NO"}
 	return slices.Contains(declineResponses, response)
+}
+
+// validateFirstRunEligibilityForDir ensures we only run first-run setup in truly clean environments
+// for a specific config directory (used by service layer with custom directories)
+func validateFirstRunEligibilityForDir(configDir string) error {
+	// Check for existing files that would indicate this is NOT a first run
+	// Note: users.json is not checked here since this function is only called when users.json doesn't exist
+	existingFiles := []string{
+		filepath.Join(configDir, "roles.json"),   // roles.json
+		filepath.Join(configDir, "master.key"),   // encryption key
+		filepath.Join(configDir, "secrets.json"), // secrets store
+		filepath.Join(configDir, "backups"),      // backup directory
+	}
+
+	for _, file := range existingFiles {
+		if _, err := os.Stat(file); err == nil {
+			return fmt.Errorf("existing simple-secrets installation detected (found %s). Cannot create new admin user when installation already exists. If this is unexpected, restore it from backup or manually investigate", filepath.Base(file))
+		}
+	}
+
+	return nil
 }
 
 // validateFirstRunEligibility ensures we only run first-run setup in truly clean environments

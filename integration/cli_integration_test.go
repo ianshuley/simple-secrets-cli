@@ -20,116 +20,92 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 	"testing"
+
+	"simple-secrets/integration/testing_framework"
 )
 
-// Path to the CLI binary (adjust if needed)
-const cliBin = "../simple-secrets"
-
 func TestFirstRunCreatesAdmin(t *testing.T) {
-	tmp := t.TempDir()
-	// Set HOME to temp dir for isolation
-	cmd := exec.Command(cliBin, "list", "keys")
-	cmd.Env = testEnv(tmp)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("first run failed: %v\n%s", err, out)
-	}
-	// Should create .simple-secrets/users.json and roles.json
-	if _, err := os.Stat(filepath.Join(tmp, ".simple-secrets", "users.json")); err != nil {
+	// Create isolated test environment with automatic first-run setup
+	env := testing_framework.NewEnvironment(t)
+	defer env.Cleanup()
+
+	// Verify first-run setup created required files
+	usersFile := filepath.Join(env.TempDir(), ".simple-secrets", "users.json")
+	rolesFile := filepath.Join(env.TempDir(), ".simple-secrets", "roles.json")
+
+	if _, err := os.Stat(usersFile); err != nil {
 		t.Fatalf("users.json not created: %v", err)
 	}
-	if _, err := os.Stat(filepath.Join(tmp, ".simple-secrets", "roles.json")); err != nil {
+	if _, err := os.Stat(rolesFile); err != nil {
 		t.Fatalf("roles.json not created: %v", err)
 	}
-	// Should print first-run message
-	if !strings.Contains(string(out), "First run detected") {
-		t.Fatalf("missing first-run message: %s", out)
-	}
+
+	// Verify we can use the CLI with the admin token
+	output, err := env.CLI().List().Keys()
+	testing_framework.Assert(t, output, err).Success()
 }
 
 func TestPutGetListDelete(t *testing.T) {
-	tmp := t.TempDir()
-	// First run: trigger creation and capture token
-	cmd := exec.Command(cliBin, "list", "keys")
-	cmd.Env = testEnv(tmp)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("first run failed: %v\n%s", err, out)
-	}
-	// Extract token from output
-	token := ExtractToken(string(out))
-	if token == "" {
-		t.Fatalf("could not extract admin token from output: %s", out)
-	}
+	// Create isolated test environment
+	env := testing_framework.NewEnvironment(t)
+	defer env.Cleanup()
 
-	// Put
-	cmd = exec.Command(cliBin, "put", "foo", "bar")
-	envWithToken := append(testEnv(tmp), "SIMPLE_SECRETS_TOKEN="+token)
-	cmd.Env = envWithToken
-	out, err = cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("put failed: %v\n%s", err, out)
-	}
-	// Get
-	cmd = exec.Command(cliBin, "get", "foo")
-	cmd.Env = envWithToken
-	out, err = cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("get failed: %v\n%s", err, out)
-	}
-	if !strings.Contains(string(out), "bar") {
-		t.Fatalf("get did not return value: %s", out)
-	}
-	// List
-	cmd = exec.Command(cliBin, "list", "keys")
-	cmd.Env = envWithToken
-	out, err = cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("list failed: %v\n%s", err, out)
-	}
-	if !strings.Contains(string(out), "foo") {
-		t.Fatalf("list did not show key: %s", out)
-	}
-	// Delete
-	cmd = exec.Command(cliBin, "delete", "foo")
-	cmd.Env = envWithToken
-	out, err = cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("delete failed: %v\n%s", err, out)
-	}
+	// Put a secret
+	output, err := env.CLI().Put("foo", "bar")
+	testing_framework.Assert(t, output, err).
+		Success().
+		Contains(`Secret "foo" stored`)
+
+	// Get the secret back
+	output, err = env.CLI().Get("foo")
+	testing_framework.Assert(t, output, err).
+		Success().
+		Equals("bar")
+
+	// List should show the secret
+	output, err = env.CLI().List().Keys()
+	testing_framework.Assert(t, output, err).
+		Success().
+		Contains("foo")
+
+	// Delete the secret
+	output, err = env.CLI().Delete("foo")
+	testing_framework.Assert(t, output, err).Success()
+
+	// Verify deletion - get should fail
+	output, err = env.CLI().Get("foo")
+	testing_framework.Assert(t, output, err).Failure()
 }
 
 func TestCreateUserAndLogin(t *testing.T) {
-	tmp := t.TempDir()
-	// First run to create admin and extract token
-	cmd := exec.Command(cliBin, "list", "keys")
-	cmd.Env = testEnv(tmp)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("first run failed: %v\n%s", err, out)
-	}
-	token := ExtractToken(string(out))
-	if token == "" {
-		t.Fatalf("could not extract admin token from output: %s", out)
-	}
-	// Create user (simulate input)
-	cmd = exec.Command(cliBin, "create-user")
-	envWithToken := append(testEnv(tmp), "SIMPLE_SECRETS_TOKEN="+token)
-	cmd.Env = envWithToken
-	cmd.Stdin = strings.NewReader("bob\nreader\n\n")
-	out, err = cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("create-user failed: %v\n%s", err, out)
-	}
-	if !strings.Contains(string(out), "Generated token") {
-		t.Fatalf("create-user did not print token: %s", out)
-	}
+	// Create isolated test environment
+	env := testing_framework.NewEnvironment(t)
+	defer env.Cleanup()
+
+	// Create a new user
+	output, err := env.CLI().Users().Create("testuser", "reader")
+	testing_framework.Assert(t, output, err).
+		Success().
+		ValidToken()
+
+	// Extract the new user's token
+	userToken := testing_framework.ParseToken(string(output))
+
+	// Verify the user can use their token for read operations
+	// (We'll need to add a WithToken method to CLIRunner for this)
+	out, err := env.RunRawCommand([]string{"list", "keys"},
+		append(env.CleanEnvironment(), "SIMPLE_SECRETS_TOKEN="+userToken), "")
+	testing_framework.Assert(t, out, err).Success()
+
+	// Verify the user cannot write (should fail)
+	out, err = env.RunRawCommand([]string{"put", "test", "value"},
+		append(env.CleanEnvironment(), "SIMPLE_SECRETS_TOKEN="+userToken), "")
+	testing_framework.Assert(t, out, err).Failure()
 }
 
 func TestMain(m *testing.M) {
-	// Build the binary for CLI integration tests - see `cliBin` at top of file
+	// Build the binary for CLI integration tests
 	cmd := exec.Command("go", "build", "-o", "simple-secrets")
 	cmd.Dir = ".." // backend directory
 	if err := cmd.Run(); err != nil {
