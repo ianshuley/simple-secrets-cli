@@ -170,7 +170,7 @@ func rotateSelfToken(cmd *cobra.Command) error {
 		return err
 	}
 
-	printSelfTokenRotationSuccess(currentUser.Username, currentUser.Role, newToken)
+	printSelfTokenRotationSuccess(newToken)
 	return nil
 }
 
