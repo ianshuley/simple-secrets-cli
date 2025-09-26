@@ -132,6 +132,8 @@ You can optionally create a `~/.simple-secrets/config.json` file with the follow
   - Increase (e.g., 3-5) for more recovery options in development/testing
   - Must be a positive integer
 
+> **💡 Quick Reference**: For detailed command syntax and options, use `simple-secrets --help` or `simple-secrets [command] --help` for specific commands. All authentication methods shown above work with every command.
+
 ### File Structure
 
 ```text
@@ -233,6 +235,39 @@ simple-secrets put config '{"database": {"host": "localhost", "port": 5432}}'
 
 # From files
 simple-secrets put ssl-cert "$(cat /path/to/certificate.pem)"
+```
+
+#### Edge Case Examples
+
+These examples show how to handle tricky scenarios and special characters:
+
+```bash
+# Very large secrets (tested up to 100MB)
+simple-secrets put large-config "$(cat large-file.json)"
+
+# Secrets with every special character
+simple-secrets put special-chars '!@#$%^&*()_+-=[]{}|;:",.<>?/~`'
+
+# Secrets that look like CLI flags
+simple-secrets put flag-like-secret '--verbose --debug --config=/path'
+
+# Empty values (useful for flags or toggles)
+simple-secrets put empty-flag ''
+
+# Values with embedded quotes
+simple-secrets put mixed-quotes 'He said "Hello" and I'\''m happy'
+
+# Unicode and international characters
+simple-secrets put unicode-secret 'こんにちは 🔐 测试 café naïve résumé'
+
+# Secrets containing JSON with escaped characters
+simple-secrets put json-escaped '{"message": "Line 1\\nLine 2\\tTabbed", "path": "C:\\\\Windows\\\\System32"}'
+
+# Base64 encoded data (common for binary secrets)
+simple-secrets put binary-data 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='
+
+# Working with secrets that contain shell metacharacters
+simple-secrets put shell-meta 'VAR=$(cmd) && echo $HOME | grep -E "^/.*"'
 ```
 
 ### User Management
