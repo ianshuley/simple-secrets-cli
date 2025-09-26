@@ -25,6 +25,14 @@ type User struct {
 	Role     string
 }
 
+// BackupInfo represents information about available backups
+type BackupInfo struct {
+	ID          string
+	Type        string // "rotation" or "individual"
+	Timestamp   string
+	Description string
+}
+
 // SecretReader provides read-only access to secrets.
 // Perfect for monitoring, ansible fact gathering, or read-only API endpoints.
 type SecretReader interface {
@@ -84,6 +92,9 @@ type UserManager interface {
 
 	// RotateToken generates a new authentication token for a user
 	RotateToken(username string) (newToken string, err error)
+
+	// RotateSelfToken generates a new token for the authenticated user
+	RotateSelfToken(currentUser *User) (newToken string, err error)
 }
 
 // AdminOperations provides high-level administrative functions.
@@ -94,6 +105,15 @@ type AdminOperations interface {
 
 	// Restore restores secrets and configuration from a backup
 	Restore(backupDir string) error
+
+	// RestoreSecret restores an individual secret from its backup
+	RestoreSecret(secretKey string) error
+
+	// RestoreDatabase restores the entire database from a rotation backup
+	RestoreDatabase(backupID string) error
+
+	// ListBackups returns information about available backups
+	ListBackups() ([]*BackupInfo, error)
 
 	// RotateMasterKey rotates the master encryption key (re-encrypts all secrets)
 	RotateMasterKey(backupDir string) error
