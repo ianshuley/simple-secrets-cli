@@ -1,29 +1,9 @@
 # TODO List
 
-## ✅ RESOLVED - Critical Bug Fixed
-
-- [x] **FIXED: nil pointer panic in put command after rotation**
-  - **Root Cause**: Race condition between `Get/Put` operations and master key rotation
-  - **Solution 1**: Eliminated double-locking pattern in `Get()` and `DecryptBackup()` methods
-  - **Solution 2**: Moved encryption inside write lock in `Put()` method to prevent stale key usage
-  - **Solution 3**: Removed redundant `backupExistingSecret(nil, key)` call in CLI layer
-  - **Result**: All rotation tests now pass, race conditions eliminated
-  - **Validation**: `rotation_restore_test.go` uncommented and passes completely
-  - **Regression Protection**: Added race condition regression tests to `.testing-framework.md`
-
 ## Platform Integration Readiness (Future v2.0 API Development)
 
 ### Business Logic Extraction
 
-- [x] **Extract CLI-coupled logic**: ✅ COMPLETED - Service layer created with focused interfaces
-- [x] **Service layer**: ✅ COMPLETED - Created `Service` with `SecretOperations`, `AuthOperations`, `UserOperations` interfaces
-- [x] **Configuration abstraction**: ✅ COMPLETED - `ServiceConfig` with functional options (`WithStorageBackend`, `WithConfigDir`)
-- [x] **Migrate core CLI commands**: ✅ COMPLETED - Successfully migrated `disable` (secret & user token), `enable` (secret), and `create_user` to service layer architecture
-- [x] **Complete rotation/restore service migration**: ✅ COMPLETED - Extended service layer with missing operations and migrated CLI commands:
-  - `RotateSelfToken()`, `RestoreSecret()`, `RestoreDatabase()`, `ListBackups()` → service interfaces ✅ EXTENDED
-  - Implement in `ServiceAdapter` → migrate CLI commands to use service layer ✅ COMPLETED
-  - All rotation/restore CLI commands now use service layer instead of direct internal calls
-  - Service architecture ready for platform API integration
 - [ ] **Error abstraction**: Standardize error types for consistent API responses
 
 ### Advanced Features
