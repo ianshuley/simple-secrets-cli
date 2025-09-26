@@ -415,7 +415,7 @@ func printTokenRotationSuccess(username string, role internal.Role, newToken str
 }
 
 // printSelfTokenRotationSuccess displays the self-rotation success message and instructions
-func printSelfTokenRotationSuccess(username string, role internal.Role, newToken string) {
+func printSelfTokenRotationSuccess(newToken string) {
 	fmt.Printf("\n✅ Your token has been rotated successfully!\n")
 	fmt.Println()
 	printSelfTokenRotationWarnings()
