@@ -267,7 +267,7 @@ func (s *SecretsStore) Put(key, value string) error {
 	}
 
 	// Encrypt using master key while holding the write lock
-	// This prevents race conditions with key rotation
+	// Fixed: Previously caused nil pointer panics when rotation occurred between Get/Put operations. See rotation_restore_test.go for regression coverage.
 	encryptedValue, err := encrypt(s.masterKey, []byte(value))
 	if err != nil {
 		return err

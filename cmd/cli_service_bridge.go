@@ -81,11 +81,10 @@ func (csh *CLIServiceHelper) AuthenticateCommand(cmd *cobra.Command, needWrite b
 		return nil, nil, err
 	}
 
-	// For CLI compatibility, we need to return a UserStore
-	// This is a bridge concern, not a service concern
-	userStore, _, _, err := internal.LoadUsers()
-	if err != nil {
-		return nil, nil, err
+	// For CLI compatibility, get UserStore through service layer
+	userStore := csh.service.GetUserStore()
+	if userStore == nil {
+		return nil, nil, fmt.Errorf("failed to get user store from service")
 	}
 
 	return user, userStore, nil
@@ -111,10 +110,10 @@ func (csh *CLIServiceHelper) AuthenticateToken(token string, needWrite bool) (*i
 		return nil, nil, err
 	}
 
-	// For CLI compatibility, return UserStore
-	userStore, _, _, err := internal.LoadUsers()
-	if err != nil {
-		return nil, nil, err
+	// For CLI compatibility, get UserStore through service layer
+	userStore := csh.service.GetUserStore()
+	if userStore == nil {
+		return nil, nil, fmt.Errorf("failed to get user store from service")
 	}
 
 	return user, userStore, nil

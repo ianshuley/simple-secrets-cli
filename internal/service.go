@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"simple-secrets/pkg/api"
 )
@@ -117,8 +118,8 @@ func NewService(options ...ServiceOption) (*Service, error) {
 
 	// Create user store
 	if config.ConfigDir != "" {
-		usersPath := config.ConfigDir + "/users.json"
-		rolesPath := config.ConfigDir + "/roles.json"
+		usersPath := filepath.Join(config.ConfigDir, "users.json")
+		rolesPath := filepath.Join(config.ConfigDir, "roles.json")
 
 		users, err := loadUsers(usersPath)
 		if os.IsNotExist(err) {
@@ -163,8 +164,8 @@ func NewService(options ...ServiceOption) (*Service, error) {
 	userOps := &userOperations{
 		userStore: userStore,
 		auth:      authOps,
-		usersPath: configDir + "/users.json",
-		rolesPath: configDir + "/roles.json",
+		usersPath: filepath.Join(configDir, "users.json"),
+		rolesPath: filepath.Join(configDir, "roles.json"),
 	}
 
 	// Create admin operations using shared stores
@@ -196,6 +197,16 @@ func (s *Service) Users() UserOperations {
 // Admin returns the admin operations interface
 func (s *Service) Admin() api.AdminOperations {
 	return s.admin
+}
+
+// GetUserStore returns the underlying UserStore for CLI compatibility
+// This is a bridge method to avoid tight coupling in CLI commands
+func (s *Service) GetUserStore() *UserStore {
+	// Access the userStore through the userOperations implementation
+	if userOps, ok := s.users.(*userOperations); ok {
+		return userOps.userStore
+	}
+	return nil
 }
 
 // Implementation structs for the focused interfaces
@@ -303,8 +314,8 @@ func (u *userOperations) CreateUser(adminToken, username, role string) (string, 
 	}
 
 	// Save the updated users to disk
-	if err := u.saveUsers(); err != nil {
-		return "", fmt.Errorf("failed to save user changes: %w", err)
+	if err := u.saveUsersWithError(); err != nil {
+		return "", err
 	}
 
 	return newToken, nil
@@ -329,7 +340,7 @@ func (u *userOperations) DeleteUser(adminToken, username string) error {
 	}
 
 	// Save the updated users to disk
-	return u.saveUsers()
+	return u.saveUsersWithError()
 }
 
 func (u *userOperations) ListUsers(adminToken string) ([]*User, error) {
@@ -362,8 +373,8 @@ func (u *userOperations) RotateToken(token, username string) (string, error) {
 	}
 
 	// Save the updated users to disk
-	if err := u.saveUsers(); err != nil {
-		return "", fmt.Errorf("failed to save user changes: %w", err)
+	if err := u.saveUsersWithError(); err != nil {
+		return "", err
 	}
 
 	return newToken, nil
@@ -384,7 +395,7 @@ func (u *userOperations) DisableUser(token, username string) error {
 	}
 
 	// Save the updated users to disk
-	return u.saveUsers()
+	return u.saveUsersWithError()
 }
 
 func (u *userOperations) RotateSelfToken(currentUser *User) (string, error) {
@@ -394,8 +405,8 @@ func (u *userOperations) RotateSelfToken(currentUser *User) (string, error) {
 	}
 
 	// Save the updated users to disk
-	if err := u.saveUsers(); err != nil {
-		return "", fmt.Errorf("failed to save user changes: %w", err)
+	if err := u.saveUsersWithError(); err != nil {
+		return "", err
 	}
 
 	return newToken, nil
@@ -409,4 +420,12 @@ func (u *userOperations) saveUsers() error {
 		return fmt.Errorf("failed to marshal users: %w", err)
 	}
 	return AtomicWriteFile(u.usersPath, data, 0600)
+}
+
+// saveUsersWithError wraps saveUsers with consistent error messaging
+func (u *userOperations) saveUsersWithError() error {
+	if err := u.saveUsers(); err != nil {
+		return fmt.Errorf("failed to save user changes: %w", err)
+	}
+	return nil
 }
