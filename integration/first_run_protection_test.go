@@ -80,7 +80,8 @@ func TestFirstRunProtectionIntegration(t *testing.T) {
 		tempDir := t.TempDir()
 
 		// Create a minimal test environment manually to avoid auto-initialization
-		env := testing_framework.NewCleanTestEnvironment(t, tempDir, "../simple-secrets")
+		env := &testing_framework.TestEnvironment{}
+		env.SetupCleanEnvironment(t, tempDir, "../simple-secrets")
 		defer env.Cleanup()
 
 		// Try to run a command that should trigger clean first-run
