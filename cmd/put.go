@@ -18,11 +18,7 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
-
-	"simple-secrets/internal"
 
 	"github.com/spf13/cobra"
 )
@@ -175,11 +171,7 @@ func executePutCommand(args *putArguments) error {
 
 	service := helper.GetService()
 
-	// Check if secret exists for backup
-	existing, _ := service.Secrets().Get(args.token, args.key)
-	if existing != "" {
-		backupExistingSecret(nil, args.key) // TODO: Implement backup in service layer
-	}
+	// Backup is handled automatically by the service layer
 
 	err = service.Secrets().Put(args.token, args.key, args.value)
 	if err != nil {
@@ -197,23 +189,6 @@ func executePutCommand(args *putArguments) error {
 // - No shell metacharacters
 func validatePutKeyName(key string) error {
 	return ValidateSecureInput(key, SecretKeyValidationConfig)
-}
-
-func backupExistingSecret(store *internal.SecretsStore, key string) {
-	prev, err := store.Get(key)
-	if err != nil {
-		return // No existing value to backup
-	}
-
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return // Cannot determine backup location
-	}
-
-	backupDir := filepath.Join(home, ".simple-secrets", "backups")
-	_ = os.MkdirAll(backupDir, 0700)
-	backupPath := filepath.Join(backupDir, key+".bak")
-	_ = os.WriteFile(backupPath, []byte(prev), 0600)
 }
 
 var addCmd = &cobra.Command{

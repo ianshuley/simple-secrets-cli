@@ -65,48 +65,47 @@ func TestRotationAndRestoreCommands(t *testing.T) {
 		}
 	})
 
-	// TODO: CRITICAL BUG - This test reveals a panic in put command after rotation
-	// The panic shows: "invalid memory address or nil pointer dereference" in SecretsStore.Get
-	// This needs to be fixed in the main codebase
-	/*
-		// Modify the secret to create a different backup
-		t.Run("modify_secret_for_backup", func(t *testing.T) {
-			output, err := env.CLI().Put("backup-test", "modified-value")
-			if err != nil {
-				t.Fatalf("put modified failed: %v\n%s", err, output)
-			}
-		})
+	// BUG FIX VERIFIED: This test previously revealed a panic in put command after rotation
+	// The panic was: "invalid memory address or nil pointer dereference" in SecretsStore.Get
+	// Fixed by eliminating race condition between rotation and Get/Put operations
 
-		// Create another rotation backup
-		t.Run("create_rotation_backup", func(t *testing.T) {
-			output, err := env.CLI().Rotate().MasterKey()
-			if err != nil {
-				t.Fatalf("second rotate failed: %v\n%s", err, output)
-			}
-		})
+	// Modify the secret to create a different backup
+	t.Run("modify_secret_for_backup", func(t *testing.T) {
+		output, err := env.CLI().Put("backup-test", "modified-value")
+		if err != nil {
+			t.Fatalf("put modified failed: %v\n%s", err, output)
+		}
+	})
 
-		// Test secret restoration
-		t.Run("restore_secret", func(t *testing.T) {
-			output, err := env.CLI().Secrets().Restore("backup-test")
-			if err != nil {
-				t.Fatalf("restore secret failed: %v\n%s", err, output)
-			}
-			if !strings.Contains(string(output), "restored") {
-				t.Errorf("expected restore confirmation, got: %s", output)
-			}
-		})
+	// Create another rotation backup
+	t.Run("create_rotation_backup", func(t *testing.T) {
+		output, err := env.CLI().Rotate().MasterKey()
+		if err != nil {
+			t.Fatalf("second rotate failed: %v\n%s", err, output)
+		}
+	})
 
-		// Verify restored secret has original value
-		t.Run("verify_restored_secret", func(t *testing.T) {
-			output, err := env.CLI().Get("backup-test")
-			if err != nil {
-				t.Fatalf("get restored secret failed: %v\n%s", err, output)
-			}
-			if !strings.Contains(string(output), "original-value") {
-				t.Errorf("expected original value after restore, got: %s", output)
-			}
-		})
-	*/
+	// Test secret restoration
+	t.Run("restore_secret", func(t *testing.T) {
+		output, err := env.CLI().Secrets().Restore("backup-test")
+		if err != nil {
+			t.Fatalf("restore secret failed: %v\n%s", err, output)
+		}
+		if !strings.Contains(string(output), "restored") {
+			t.Errorf("expected restore confirmation, got: %s", output)
+		}
+	})
+
+	// Verify restored secret has original value
+	t.Run("verify_restored_secret", func(t *testing.T) {
+		output, err := env.CLI().Get("backup-test")
+		if err != nil {
+			t.Fatalf("get restored secret failed: %v\n%s", err, output)
+		}
+		if !strings.Contains(string(output), "original-value") {
+			t.Errorf("expected original value after restore, got: %s", output)
+		}
+	})
 
 	// Test error cases
 	t.Run("restore_nonexistent_secret", func(t *testing.T) {
