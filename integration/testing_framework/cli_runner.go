@@ -63,6 +63,21 @@ func (c *CLIRunner) Get(key string) ([]byte, error) {
 	return c.runWithToken([]string{"get", key})
 }
 
+// GetWithClipboard retrieves a secret value and copies it to clipboard
+func (c *CLIRunner) GetWithClipboard(key string) ([]byte, error) {
+	return c.runWithToken([]string{"get", key, "--clipboard"})
+}
+
+// GetSilent retrieves a secret value without printing to stdout
+func (c *CLIRunner) GetSilent(key string) ([]byte, error) {
+	return c.runWithToken([]string{"get", key, "--silent"})
+}
+
+// GetWithClipboardSilent retrieves a secret value, copies to clipboard, and suppresses stdout
+func (c *CLIRunner) GetWithClipboardSilent(key string) ([]byte, error) {
+	return c.runWithToken([]string{"get", key, "--clipboard", "--silent"})
+}
+
 // Delete removes a secret
 func (c *CLIRunner) Delete(key string) ([]byte, error) {
 	return c.runWithToken([]string{"delete", key})

@@ -20,7 +20,9 @@ import (
 	"fmt"
 	"os"
 	"simple-secrets/internal"
+	"strings"
 
+	"github.com/atotto/clipboard"
 	"github.com/spf13/cobra"
 )
 
@@ -28,7 +30,9 @@ var getCmd = &cobra.Command{
 	Use:     "get [key]",
 	Short:   "Retrieve a secret.",
 	Long:    "Retrieve the value for a given secret key.",
-	Example: "simple-secrets get db_password",
+	Example: `simple-secrets get db_password
+simple-secrets get db_password --clipboard
+simple-secrets get db_password --clipboard --silent`,
 	Args:    cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Get CLI service helper
@@ -59,11 +63,36 @@ var getCmd = &cobra.Command{
 			return err
 		}
 
-		fmt.Println(value)
+		// Get flag values
+		useClipboard, _ := cmd.Flags().GetBool("clipboard")
+		silent, _ := cmd.Flags().GetBool("silent")
+
+		// Handle clipboard functionality
+		if useClipboard {
+			err := clipboard.WriteAll(value)
+			if err != nil {
+				// In environments without clipboard support, provide a warning but continue
+				if strings.Contains(err.Error(), "No clipboard utilities available") {
+					if !silent {
+						fmt.Fprintf(os.Stderr, "Warning: clipboard functionality not available in this environment\n")
+					}
+				} else {
+					return fmt.Errorf("failed to copy to clipboard: %w", err)
+				}
+			}
+		}
+
+		// Handle output (print unless silent)
+		if !silent {
+			fmt.Println(value)
+		}
+
 		return nil
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(getCmd)
+	getCmd.Flags().BoolP("clipboard", "c", false, "copy secret to clipboard")
+	getCmd.Flags().BoolP("silent", "s", false, "suppress output to stdout")
 }
