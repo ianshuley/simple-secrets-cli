@@ -90,8 +90,14 @@ simple-secrets put db-url 'postgresql://user:pass@localhost:5432/db' --token YOU
 simple-secrets put safe-key 'echo $(whoami)'     # ✅ Stores literally: "echo $(whoami)"
 simple-secrets put danger "echo $(whoami)"       # ❌ Executes command before storing!
 
-# Retrieve a secret
+# Retrieve secrets
 simple-secrets get api-key --token YOUR_ADMIN_TOKEN
+
+# Retrieve with clipboard support
+simple-secrets get KEY                        # Print to stdout (default)
+simple-secrets get KEY --clipboard           # Copy to clipboard + print to stdout  
+simple-secrets get KEY --clipboard --silent  # Copy to clipboard only (no stdout)
+simple-secrets get KEY --silent              # No output (for scripts)
 ```
 
 ## Configuration
@@ -184,6 +190,9 @@ simple-secrets add KEY VALUE  # alias
 
 # Retrieve secrets
 simple-secrets get KEY
+simple-secrets get KEY --clipboard           # Copy to clipboard + print to stdout
+simple-secrets get KEY --clipboard --silent  # Copy to clipboard only (no stdout)
+simple-secrets get KEY --silent              # No output (for scripts)
 
 # List secrets
 simple-secrets list keys
@@ -196,6 +205,26 @@ simple-secrets disable secret KEY
 simple-secrets enable secret KEY
 simple-secrets list disabled
 ```
+
+#### Clipboard Integration
+
+The `get` command supports clipboard integration for secure secret retrieval:
+
+```bash
+# Behavior options
+simple-secrets get KEY                        # Print to stdout (default)
+simple-secrets get KEY -c                     # Copy to clipboard + print to stdout  
+simple-secrets get KEY --clipboard            # Copy to clipboard + print to stdout  
+simple-secrets get KEY -c -s                  # Copy to clipboard only (no stdout)
+simple-secrets get KEY --clipboard --silent   # Copy to clipboard only (no stdout)
+simple-secrets get KEY --silent               # No output (useful for scripts)
+```
+
+**Clipboard requirements:**
+- **Linux**: Requires `xsel`, `xclip`, or `wl-clipboard`
+- **macOS**: Built-in clipboard support
+- **Windows**: Built-in clipboard support
+- **Environments without clipboard**: Shows warning but continues successfully
 
 #### Working with Complex Values
 
