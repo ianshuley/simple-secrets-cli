@@ -61,18 +61,18 @@ func generateSecretValue(length int) (string, error) {
 
 	// Character set: A-Z, a-z, 0-9, and URL-safe symbols
 	const charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()-_=+"
-	
+
 	result := make([]byte, length)
 	randomBytes := make([]byte, length)
-	
+
 	if _, err := rand.Read(randomBytes); err != nil {
 		return "", fmt.Errorf("failed to generate random bytes: %w", err)
 	}
-	
+
 	for i, b := range randomBytes {
 		result[i] = charset[int(b)%len(charset)]
 	}
-	
+
 	return string(result), nil
 }
 
@@ -81,7 +81,7 @@ func parsePutArguments(cmd *cobra.Command, args []string) (*putArguments, error)
 	var tokenExplicitlySet bool
 	var generate bool
 	var length int = 32 // Default length
-	
+
 	filteredArgs := extractArgumentsAndFlags(args, &token, &tokenExplicitlySet, &generate, &length)
 
 	if shouldShowHelp(args) {
@@ -158,17 +158,23 @@ func hasLengthValue(args []string, flagPosition int) bool {
 func processLengthFlag(args []string, flagPosition int, length *int) int {
 	valuePosition := flagPosition + 1
 	lengthStr := args[valuePosition]
-	
-	// Parse the length value
-	var parsedLength int
-	if _, err := fmt.Sscanf(lengthStr, "%d", &parsedLength); err != nil || parsedLength <= 0 {
-		// Set to default if invalid, error will be caught later in validation
-		*length = 32
-	} else {
-		*length = parsedLength
+
+	parsedLength := parsePositiveInteger(lengthStr)
+	if parsedLength <= 0 {
+		*length = 32 // Default for invalid values
+		return valuePosition
 	}
-	
-	return valuePosition // Return position of length value to skip it
+
+	*length = parsedLength
+	return valuePosition
+}
+
+func parsePositiveInteger(value string) int {
+	var result int
+	if _, err := fmt.Sscanf(value, "%d", &result); err != nil {
+		return 0
+	}
+	return result
 }
 
 func shouldShowHelp(args []string) bool {
@@ -191,7 +197,7 @@ func validatePutArguments(filteredArgs []string, generate bool) (string, string,
 		}
 		return filteredArgs[0], "", nil // value will be generated later
 	}
-	
+
 	// Without --generate, we need exactly 2 arguments (key and value)
 	if len(filteredArgs) != 2 {
 		return "", "", fmt.Errorf("requires exactly 2 arguments [key] [value], got %d", len(filteredArgs))
@@ -268,12 +274,12 @@ func executePutCommand(args *putArguments) error {
 	}
 
 	fmt.Printf("Secret %q stored.\n", args.key)
-	
+
 	// Print generated value to stdout if it was generated
 	if args.generate {
 		fmt.Println(value)
 	}
-	
+
 	return nil
 }
 

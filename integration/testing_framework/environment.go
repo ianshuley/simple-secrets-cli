@@ -162,17 +162,22 @@ func (e *TestEnvironment) RunRawCommand(args []string, env []string, stdin strin
 	e.t.Helper()
 
 	cmd := exec.Command(e.binaryPath, args...)
-	if env != nil {
-		cmd.Env = env
-	} else {
-		cmd.Env = append(e.CleanEnvironment(), "SIMPLE_SECRETS_TOKEN="+e.adminToken)
-	}
+	cmd.Env = e.resolveEnvironment(env)
 
 	if stdin != "" {
 		cmd.Stdin = strings.NewReader(stdin)
 	}
 
 	return cmd.CombinedOutput()
+}
+
+// resolveEnvironment returns the provided environment or default authenticated environment
+func (e *TestEnvironment) resolveEnvironment(customEnv []string) []string {
+	if customEnv != nil {
+		return customEnv
+	}
+
+	return append(e.CleanEnvironment(), "SIMPLE_SECRETS_TOKEN="+e.adminToken)
 }
 
 // NewCLIRunnerWithToken creates a CLI runner with a custom authentication token

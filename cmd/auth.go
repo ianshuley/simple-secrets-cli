@@ -44,17 +44,12 @@ func RBACGuard(needWrite bool, cmd *cobra.Command) (*internal.User, *internal.Us
 
 // AuthenticateWithToken handles authentication for commands with custom token parsing (like put)
 func AuthenticateWithToken(needWrite bool, token string) (*internal.User, *internal.UserStore, error) {
-	// First check if this is a first-run scenario
-	userStore, firstRun, firstRunToken, err := internal.LoadUsers()
+	userStore, firstRun, firstRunToken, err := loadUserStoreForAuth()
 	if err != nil {
-		// If LoadUsers fails, try the auth-specific path
-		authStore, authErr := internal.LoadUsersForAuth()
-		if authErr != nil {
-			return nil, nil, authErr
-		}
-		userStore = authStore
-		firstRun = false
-	} else if firstRun {
+		return nil, nil, err
+	}
+
+	if firstRun {
 		PrintFirstRunMessage()
 		PrintTokenAtEnd(firstRunToken)
 		return nil, nil, nil
@@ -64,14 +59,31 @@ func AuthenticateWithToken(needWrite bool, token string) (*internal.User, *inter
 	if err != nil {
 		return nil, nil, err
 	}
+
 	user, err := userStore.Lookup(resolvedToken)
 	if err != nil {
 		return nil, nil, err
 	}
+
 	if needWrite && !user.Can("write", userStore.Permissions()) {
 		return nil, nil, NewWritePermissionError()
 	}
+
 	return user, userStore, nil
+}
+
+// loadUserStoreForAuth handles the complex user store loading logic with fallback
+func loadUserStoreForAuth() (*internal.UserStore, bool, string, error) {
+	userStore, firstRun, firstRunToken, err := internal.LoadUsers()
+	if err != nil {
+		authStore, authErr := internal.LoadUsersForAuth()
+		if authErr != nil {
+			return nil, false, "", authErr
+		}
+		return authStore, false, "", nil
+	}
+
+	return userStore, firstRun, firstRunToken, nil
 }
 
 // authenticateUser handles user authentication and first-run detection
