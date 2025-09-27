@@ -42,6 +42,9 @@ type SecretReader interface {
 	// List returns all available secret keys (enabled secrets only)
 	List() []string
 
+	// ListDisabled returns all disabled secret keys
+	ListDisabled() []string
+
 	// IsEnabled checks if a secret is currently enabled
 	IsEnabled(key string) bool
 }
@@ -51,6 +54,9 @@ type SecretReader interface {
 type SecretWriter interface {
 	// Put stores a secret value with the given key
 	Put(key, value string) error
+
+	// Generate creates and stores a random secret value with the given key
+	Generate(key string, length int) (generatedValue string, err error)
 
 	// Delete removes a secret permanently
 	Delete(key string) error

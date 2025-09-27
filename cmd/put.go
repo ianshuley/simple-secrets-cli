@@ -16,7 +16,6 @@ limitations under the License.
 package cmd
 
 import (
-	"crypto/rand"
 	"errors"
 	"fmt"
 	"strings"
@@ -55,27 +54,9 @@ type putArguments struct {
 	length   int
 }
 
-// generateSecretValue creates a cryptographically secure random secret
+// generateSecretValue creates a cryptographically secure random secret (wrapper for internal function)
 func generateSecretValue(length int) (string, error) {
-	if length <= 0 {
-		return "", fmt.Errorf("length must be positive, got %d", length)
-	}
-
-	// Character set: A-Z, a-z, 0-9, and URL-safe symbols
-	const charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()-_=+"
-
-	result := make([]byte, length)
-	randomBytes := make([]byte, length)
-
-	if _, err := rand.Read(randomBytes); err != nil {
-		return "", fmt.Errorf("failed to generate random bytes: %w", err)
-	}
-
-	for i, b := range randomBytes {
-		result[i] = charset[int(b)%len(charset)]
-	}
-
-	return string(result), nil
+	return internal.GenerateSecretValue(length)
 }
 
 func parsePutArguments(cmd *cobra.Command, args []string) (*putArguments, error) {

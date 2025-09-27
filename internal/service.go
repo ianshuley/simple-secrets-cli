@@ -66,8 +66,10 @@ func NewServiceConfig(options ...ServiceOption) *ServiceConfig {
 type SecretOperations interface {
 	Get(token, key string) (string, error)
 	Put(token, key, value string) error
+	Generate(token, key string, length int) (string, error)
 	Delete(token, key string) error
 	List(token string) ([]string, error)
+	ListDisabled(token string) ([]string, error)
 	Enable(token, key string) error
 	Disable(token, key string) error
 }
@@ -223,6 +225,26 @@ func (s *secretOperations) Put(token, key, value string) error {
 	return s.store.Put(key, value)
 }
 
+func (s *secretOperations) Generate(token, key string, length int) (string, error) {
+	if err := s.auth.ValidateAccess(token, true); err != nil {
+		return "", err
+	}
+
+	// Generate the secret value
+	generatedValue, err := GenerateSecretValue(length)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate secret: %w", err)
+	}
+
+	// Store the generated value
+	err = s.store.Put(key, generatedValue)
+	if err != nil {
+		return "", fmt.Errorf("failed to store generated secret: %w", err)
+	}
+
+	return generatedValue, nil
+}
+
 func (s *secretOperations) Delete(token, key string) error {
 	if err := s.auth.ValidateAccess(token, true); err != nil {
 		return err
@@ -237,6 +259,14 @@ func (s *secretOperations) List(token string) ([]string, error) {
 	}
 
 	return s.store.ListKeys(), nil
+}
+
+func (s *secretOperations) ListDisabled(token string) ([]string, error) {
+	if _, err := s.auth.ValidateToken(token); err != nil {
+		return nil, err
+	}
+
+	return s.store.ListDisabledSecrets(), nil
 }
 
 func (s *secretOperations) Enable(token, key string) error {
