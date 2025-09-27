@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"simple-secrets/internal"
 )
 
 var putCmd = &cobra.Command{
@@ -207,7 +208,7 @@ func validatePutArguments(filteredArgs []string, generate bool) (string, string,
 
 func determineAuthTokenWithExplicitFlag(parsedToken string, wasTokenFlagUsed bool) (string, error) {
 	if !wasTokenFlagUsed {
-		return TokenFlag, nil
+		return internal.ResolveToken("")
 	}
 
 	if isEmptyToken(parsedToken) {

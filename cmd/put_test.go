@@ -16,6 +16,7 @@ limitations under the License.
 package cmd
 
 import (
+	"os"
 	"strings"
 	"testing"
 )
@@ -204,6 +205,100 @@ func TestValidatePutArgumentsWithGenerate(t *testing.T) {
 
 			if value != tt.wantValue {
 				t.Errorf("validatePutArguments() value = %q, want %q", value, tt.wantValue)
+			}
+		})
+	}
+}
+
+func TestDetermineAuthTokenWithExplicitFlag(t *testing.T) {
+	// Save original environment
+	originalToken := os.Getenv("SIMPLE_SECRETS_TOKEN")
+	defer func() {
+		if originalToken != "" {
+			os.Setenv("SIMPLE_SECRETS_TOKEN", originalToken)
+		} else {
+			os.Unsetenv("SIMPLE_SECRETS_TOKEN")
+		}
+	}()
+
+	tests := []struct {
+		name               string
+		parsedToken        string
+		wasTokenFlagUsed   bool
+		envToken           string
+		wantToken          string
+		wantErr            bool
+		errContains        string
+	}{
+		{
+			name:             "explicit_flag_takes_precedence",
+			parsedToken:      "flag-token",
+			wasTokenFlagUsed: true,
+			envToken:         "env-token",
+			wantToken:        "flag-token",
+		},
+		{
+			name:             "empty_explicit_flag_errors",
+			parsedToken:      "",
+			wasTokenFlagUsed: true,
+			envToken:         "env-token",
+			wantErr:          true,
+			errContains:      "authentication required: token cannot be empty",
+		},
+		{
+			name:             "whitespace_explicit_flag_errors",
+			parsedToken:      "   ",
+			wasTokenFlagUsed: true,
+			envToken:         "env-token",
+			wantErr:          true,
+			errContains:      "authentication required: token cannot be empty",
+		},
+		{
+			name:             "no_flag_uses_environment",
+			parsedToken:      "",
+			wasTokenFlagUsed: false,
+			envToken:         "env-token-value",
+			wantToken:        "env-token-value",
+		},
+		{
+			name:             "no_flag_no_env_errors",
+			parsedToken:      "",
+			wasTokenFlagUsed: false,
+			envToken:         "",
+			wantErr:          true,
+			errContains:      "authentication required: no token found",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Set up environment
+			if tt.envToken != "" {
+				os.Setenv("SIMPLE_SECRETS_TOKEN", tt.envToken)
+			} else {
+				os.Unsetenv("SIMPLE_SECRETS_TOKEN")
+			}
+
+			token, err := determineAuthTokenWithExplicitFlag(tt.parsedToken, tt.wasTokenFlagUsed)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("determineAuthTokenWithExplicitFlag() expected error but got nil")
+					return
+				}
+				if !strings.Contains(err.Error(), tt.errContains) {
+					t.Errorf("determineAuthTokenWithExplicitFlag() error %q should contain %q", err.Error(), tt.errContains)
+				}
+				return
+			}
+
+			if err != nil {
+				t.Errorf("determineAuthTokenWithExplicitFlag() unexpected error: %v", err)
+				return
+			}
+
+			if token != tt.wantToken {
+				t.Errorf("determineAuthTokenWithExplicitFlag() = %q, want %q", token, tt.wantToken)
 			}
 		})
 	}
