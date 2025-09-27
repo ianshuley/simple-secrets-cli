@@ -70,14 +70,15 @@ func TestDeleteCommandTokenResolution(t *testing.T) {
 			defer func() {
 				if originalToken != "" {
 					os.Setenv("SIMPLE_SECRETS_TOKEN", originalToken)
-				} else {
-					os.Unsetenv("SIMPLE_SECRETS_TOKEN")
+					return
 				}
+				os.Unsetenv("SIMPLE_SECRETS_TOKEN")
 			}()
 
 			if tt.envToken != "" {
 				os.Setenv("SIMPLE_SECRETS_TOKEN", tt.envToken)
-			} else {
+			}
+			if tt.envToken == "" {
 				os.Unsetenv("SIMPLE_SECRETS_TOKEN")
 			}
 
@@ -95,19 +96,21 @@ func TestDeleteCommandTokenResolution(t *testing.T) {
 				// Verify correct token precedence
 				if tt.flagToken != "" && resolvedToken != tt.flagToken {
 					t.Errorf("Expected flag token %q, got %q", tt.flagToken, resolvedToken)
-				} else if tt.flagToken == "" && tt.envToken != "" && resolvedToken != tt.envToken {
+				}
+				if tt.flagToken == "" && tt.envToken != "" && resolvedToken != tt.envToken {
 					t.Errorf("Expected env token %q, got %q", tt.envToken, resolvedToken)
 				}
-			} else {
-				if err == nil {
-					t.Error("Expected error but got none")
-				}
+				return
+			}
 
-				// Critical regression test: should not get "empty token" when no token is provided
-				// Should get "authentication required" message instead
-				if err.Error() == "empty token" {
-					t.Error("Got 'empty token' error - this indicates regression in token resolution logic")
-				}
+			if err == nil {
+				t.Error("Expected error but got none")
+			}
+
+			// Critical regression test: should not get "empty token" when no token is provided
+			// Should get "authentication required" message instead
+			if err.Error() == "empty token" {
+				t.Error("Got 'empty token' error - this indicates regression in token resolution logic")
 			}
 		})
 	}
@@ -122,9 +125,9 @@ func TestDeleteCommandEnvironmentTokenIntegration(t *testing.T) {
 	defer func() {
 		if originalToken != "" {
 			os.Setenv("SIMPLE_SECRETS_TOKEN", originalToken)
-		} else {
-			os.Unsetenv("SIMPLE_SECRETS_TOKEN")
+			return
 		}
+		os.Unsetenv("SIMPLE_SECRETS_TOKEN")
 	}()
 
 	testToken := "test-environment-token-789"
