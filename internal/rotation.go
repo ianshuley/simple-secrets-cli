@@ -428,6 +428,7 @@ func getRotationBackupCount() int {
 		RotationBackupCount *int `json:"rotation_backup_count,omitempty"`
 	}
 	if err := json.Unmarshal(data, &config); err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: config.json is corrupted (%v). Using default rotation_backup_count=%d\n", err, DefaultRotationBackupCount)
 		return DefaultRotationBackupCount // Invalid JSON, use default
 	}
 
