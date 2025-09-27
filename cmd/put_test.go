@@ -222,13 +222,13 @@ func TestDetermineAuthTokenWithExplicitFlag(t *testing.T) {
 	}()
 
 	tests := []struct {
-		name               string
-		parsedToken        string
-		wasTokenFlagUsed   bool
-		envToken           string
-		wantToken          string
-		wantErr            bool
-		errContains        string
+		name             string
+		parsedToken      string
+		wasTokenFlagUsed bool
+		envToken         string
+		wantToken        string
+		wantErr          bool
+		errContains      string
 	}{
 		{
 			name:             "explicit_flag_takes_precedence",

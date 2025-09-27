@@ -21,8 +21,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/spf13/cobra"
 	"simple-secrets/internal"
+
+	"github.com/spf13/cobra"
 )
 
 var putCmd = &cobra.Command{
