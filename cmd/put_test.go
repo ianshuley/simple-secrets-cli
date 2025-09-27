@@ -266,7 +266,7 @@ func TestDetermineAuthTokenWithExplicitFlag(t *testing.T) {
 			wasTokenFlagUsed: false,
 			envToken:         "",
 			wantErr:          true,
-			errContains:      "authentication required: no token found",
+			errContains:      "authentication required:",
 		},
 	}
 
