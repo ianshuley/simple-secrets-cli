@@ -190,6 +190,7 @@ simple-secrets add KEY VALUE  # alias
 simple-secrets put KEY --generate           # Generate 32-character secret
 simple-secrets put KEY -g                   # Short flag variant
 simple-secrets put KEY --generate --length 64  # Custom length
+simple-secrets put KEY -g -l 32             # Short flags for both
 
 # Retrieve secrets
 simple-secrets get KEY
@@ -222,6 +223,9 @@ simple-secrets put db-password --generate --length 64
 
 # Short flag variant
 simple-secrets put jwt-secret -g --length 128
+
+# Both short flags
+simple-secrets put api-token -g -l 64
 ```
 
 **Generated Secret Specifications:**
@@ -229,7 +233,7 @@ simple-secrets put jwt-secret -g --length 128
 - Uses `crypto/rand` for cryptographically secure randomness
 - Character set: `A-Z`, `a-z`, `0-9`, `!@#$%^&*()-_=+` (URL-safe)
 - Default length: 32 characters
-- Custom length: Use `--length N` flag
+- Custom length: Use `--length N` or `-l N` flag
 - Cannot combine with manual values (error if both provided)
 
 #### Working with Complex Values
