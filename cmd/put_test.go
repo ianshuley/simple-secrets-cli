@@ -216,9 +216,9 @@ func TestDetermineAuthTokenWithExplicitFlag(t *testing.T) {
 	defer func() {
 		if originalToken != "" {
 			os.Setenv("SIMPLE_SECRETS_TOKEN", originalToken)
-		} else {
-			os.Unsetenv("SIMPLE_SECRETS_TOKEN")
+			return
 		}
+		os.Unsetenv("SIMPLE_SECRETS_TOKEN")
 	}()
 
 	tests := []struct {
@@ -273,10 +273,9 @@ func TestDetermineAuthTokenWithExplicitFlag(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Set up environment
+			os.Unsetenv("SIMPLE_SECRETS_TOKEN")
 			if tt.envToken != "" {
 				os.Setenv("SIMPLE_SECRETS_TOKEN", tt.envToken)
-			} else {
-				os.Unsetenv("SIMPLE_SECRETS_TOKEN")
 			}
 
 			token, err := determineAuthTokenWithExplicitFlag(tt.parsedToken, tt.wasTokenFlagUsed)
@@ -435,10 +434,11 @@ func TestValidatePutKeyName(t *testing.T) {
 				if err == nil {
 					t.Errorf("validatePutKeyName(%q) expected error, but got none", tt.key)
 				}
-			} else {
-				if err != nil {
-					t.Errorf("validatePutKeyName(%q) unexpected error: %v", tt.key, err)
-				}
+				return
+			}
+
+			if err != nil {
+				t.Errorf("validatePutKeyName(%q) unexpected error: %v", tt.key, err)
 			}
 		})
 	}

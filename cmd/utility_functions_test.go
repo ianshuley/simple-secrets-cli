@@ -114,13 +114,14 @@ func TestParseRole(t *testing.T) {
 				if result != tt.expected {
 					t.Errorf("parseRole(%q) expected role %q, got %q", tt.roleStr, tt.expected, result)
 				}
-			} else {
-				if err != nil {
-					t.Errorf("parseRole(%q) unexpected error: %v", tt.roleStr, err)
-				}
-				if result != tt.expected {
-					t.Errorf("parseRole(%q) expected role %q, got %q", tt.roleStr, tt.expected, result)
-				}
+				return
+			}
+
+			if err != nil {
+				t.Errorf("parseRole(%q) unexpected error: %v", tt.roleStr, err)
+			}
+			if result != tt.expected {
+				t.Errorf("parseRole(%q) expected role %q, got %q", tt.roleStr, tt.expected, result)
 			}
 		})
 	}
