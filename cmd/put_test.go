@@ -303,3 +303,143 @@ func TestDetermineAuthTokenWithExplicitFlag(t *testing.T) {
 		})
 	}
 }
+
+func TestValidatePutKeyName(t *testing.T) {
+	tests := []struct {
+		name        string
+		key         string
+		expectError bool
+	}{
+		{
+			name:        "valid_simple_key",
+			key:         "simple-key",
+			expectError: false,
+		},
+		{
+			name:        "valid_key_with_underscores",
+			key:         "key_with_underscores",
+			expectError: false,
+		},
+		{
+			name:        "valid_alphanumeric_key",
+			key:         "key123",
+			expectError: false,
+		},
+		{
+			name:        "valid_key_with_dots",
+			key:         "config.database.url",
+			expectError: false,
+		},
+		{
+			name:        "key_with_forward_slash_should_error",
+			key:         "app/config/setting",
+			expectError: true, // Path separators not allowed
+		},
+		{
+			name:        "empty_key_should_error",
+			key:         "",
+			expectError: true,
+		},
+		{
+			name:        "key_with_null_byte_should_error",
+			key:         "key\x00with\x00null",
+			expectError: true,
+		},
+		{
+			name:        "key_with_newline_allowed",
+			key:         "key\nwith\nnewline",
+			expectError: false, // LF is in AllowedControlChars
+		},
+		{
+			name:        "key_with_carriage_return_allowed",
+			key:         "key\rwith\rcarriage",
+			expectError: false, // CR is in AllowedControlChars
+		},
+		{
+			name:        "key_with_tab_allowed",
+			key:         "key\twith\ttab",
+			expectError: false, // Tab is in AllowedControlChars
+		},
+		{
+			name:        "key_with_bell_character_should_error",
+			key:         "key\awith\abell",
+			expectError: true,
+		},
+		{
+			name:        "key_with_escape_character_should_error",
+			key:         "key\x1bwith\x1bescape",
+			expectError: true,
+		},
+		{
+			name:        "key_with_path_traversal_should_error",
+			key:         "../../../etc/passwd",
+			expectError: true,
+		},
+		{
+			name:        "key_with_shell_metacharacter_semicolon_should_error",
+			key:         "key;rm -rf /",
+			expectError: true,
+		},
+		{
+			name:        "key_with_shell_metacharacter_pipe_should_error",
+			key:         "key|dangerous",
+			expectError: true,
+		},
+		{
+			name:        "key_with_shell_metacharacter_ampersand_should_error",
+			key:         "key&background",
+			expectError: true,
+		},
+		{
+			name:        "key_with_command_substitution_should_error",
+			key:         "key$(rm -rf /)",
+			expectError: true,
+		},
+		{
+			name:        "key_with_backticks_should_error",
+			key:         "key`rm -rf /`",
+			expectError: true,
+		},
+		{
+			name:        "key_with_redirection_should_error",
+			key:         "key>file",
+			expectError: true,
+		},
+		{
+			name:        "key_with_less_than_should_error",
+			key:         "key<file",
+			expectError: true,
+		},
+		{
+			name:        "valid_key_with_spaces",
+			key:         "key with spaces",
+			expectError: false, // Spaces are allowed in secret keys
+		},
+		{
+			name:        "valid_unicode_key",
+			key:         "key-with-émojis-🔑",
+			expectError: false,
+		},
+		{
+			name:        "valid_long_key",
+			key:         strings.Repeat("a", 500), // Long but valid key
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validatePutKeyName(tt.key)
+
+			if tt.expectError {
+				if err == nil {
+					t.Errorf("validatePutKeyName(%q) expected error, but got none", tt.key)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("validatePutKeyName(%q) unexpected error: %v", tt.key, err)
+				}
+			}
+		})
+	}
+}
