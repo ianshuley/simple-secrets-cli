@@ -212,6 +212,44 @@ func getAvailableBackupNames(cmd *cobra.Command) ([]string, error) {
 	return backupNames, nil
 }
 
+// getAvailableUsernames retrieves all available usernames for completion
+func getAvailableUsernames(cmd *cobra.Command) ([]string, error) {
+	// Get CLI service helper
+	helper, err := GetCLIServiceHelper()
+	if err != nil {
+		return nil, err
+	}
+
+	// Check authentication and permissions
+	user, store, err := helper.AuthenticateCommand(cmd, false)
+	if err != nil {
+		return nil, err
+	}
+	if user == nil {
+		return nil, fmt.Errorf("authentication required")
+	}
+	if !user.Can("manage-users", store.Permissions()) {
+		return nil, fmt.Errorf("permission denied")
+	}
+
+	// Load users list
+	usersPath, err := internal.DefaultUserConfigPath("users.json")
+	if err != nil {
+		return nil, err
+	}
+	users, err := internal.LoadUsersList(usersPath)
+	if err != nil {
+		return nil, err
+	}
+
+	var usernames []string
+	for _, u := range users {
+		usernames = append(usernames, u.Username)
+	}
+
+	return usernames, nil
+}
+
 // handleRootCommand is called when simple-secrets is run without any subcommands
 func handleRootCommand(cmd *cobra.Command, args []string) {
 	versionFlag, _ := cmd.Flags().GetBool("version")

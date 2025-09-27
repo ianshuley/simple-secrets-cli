@@ -125,6 +125,24 @@ var restoreDatabaseCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(restoreDatabaseCmd)
 	restoreDatabaseCmd.Flags().BoolVar(&restoreYes, "yes", false, "Skip confirmation prompt")
+
+	// Add custom completion for restore-database command
+	restoreDatabaseCmd.ValidArgsFunction = completeRestoreDatabaseArgs
+}
+
+// completeRestoreDatabaseArgs provides completion for restore-database command arguments
+func completeRestoreDatabaseArgs(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	if len(args) == 0 {
+		// First argument: backup name - suggest available backup names
+		backups, err := getAvailableBackupNames(cmd)
+		if err != nil {
+			// If we can't get backup names, return no completion
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+		return backups, cobra.ShellCompDirectiveNoFileComp
+	}
+
+	return nil, cobra.ShellCompDirectiveNoFileComp
 }
 
 // determineRestoreSuccessMessage returns the appropriate success message

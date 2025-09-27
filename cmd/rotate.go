@@ -220,9 +220,13 @@ func completeRotateArgs(cmd *cobra.Command, args []string, toComplete string) ([
 	}
 
 	if len(args) == 1 && args[0] == "token" {
-		// Second argument for token rotation: no completion for usernames
-		// (admin can specify username, but we can't predict them)
-		return nil, cobra.ShellCompDirectiveNoFileComp
+		// Second argument for token rotation: complete with available usernames
+		usernames, err := getAvailableUsernames(cmd)
+		if err != nil {
+			// If we can't get usernames (no auth/permissions), return no completion
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+		return usernames, cobra.ShellCompDirectiveNoFileComp
 	}
 
 	return nil, cobra.ShellCompDirectiveNoFileComp
