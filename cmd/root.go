@@ -131,24 +131,10 @@ func runExplicitSetup() {
 // offerAutomaticSetup handles when we detect a fresh installation automatically
 func offerAutomaticSetup() {
 	fmt.Println("\n🔐 Welcome to simple-secrets!")
-	fmt.Println("\nFirst time setup required.")
-	fmt.Println("Ready to create your admin user and authentication token.")
-	fmt.Println("\n⚠️  IMPORTANT: Your admin token will be displayed ONCE.")
-	fmt.Println("   Be ready to copy and store it securely!")
-	fmt.Println("\nOptions:")
-	fmt.Println("  • Run: ./simple-secrets --setup")
-	fmt.Println("  • Or press Enter to continue with setup now")
-	fmt.Println("\nSetup will create encrypted storage in ~/.simple-secrets/")
-
-	fmt.Print("\nContinue with setup? [Y/n]: ")
-
-	var response string
-	fmt.Scanln(&response)
-
-	if internal.UserDeclinedSetup(response) {
-		fmt.Println("\nSetup cancelled. Run './simple-secrets --setup' when ready.")
-		return
-	}
+	fmt.Println("\nFirst time setup detected.")
+	fmt.Println("This will create your admin user and authentication token.")
+	fmt.Println("\nAlternatively, you can run: ./simple-secrets --setup")
+	fmt.Println()
 
 	performFirstTimeSetup()
 }
