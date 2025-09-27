@@ -150,7 +150,17 @@ For more config options, run: simple-secrets help config`)
 		RotationBackupCount *int   `json:"rotation_backup_count,omitempty"` // Number of rotation backups to keep (default: 1)
 	}
 	if err := json.Unmarshal(data, &config); err != nil {
-		return "", fmt.Errorf("failed to parse configuration: %w", err)
+		fmt.Fprintf(os.Stderr, "Warning: config.json is corrupted and will be ignored (%v). Using default configuration.\n", err)
+		fmt.Fprintf(os.Stderr, "To fix: simple-secrets config (shows valid format) or delete %s to auto-recreate\n\n", configPath)
+		// Fall back to no token from config, will prompt for other auth methods
+		return "", errors.New(`authentication required: config.json corrupted, no token found
+
+Set your token via:
+    --token <your-token> (as a flag)
+    SIMPLE_SECRETS_TOKEN=<your-token> (as environment variable)
+    Fix config.json (run: simple-secrets config for valid format)
+
+For more config options, run: simple-secrets help config`)
 	}
 	if config.Token == "" {
 		return "", errors.New(`authentication required: no token found

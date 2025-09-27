@@ -128,7 +128,7 @@ func TestConfirmMasterKeyRotation(t *testing.T) {
 			expected: false,
 		},
 		{
-			name:     "reject with anything else",
+			name:     "reject with non-yes response",
 			input:    "maybe\n",
 			expected: false,
 		},

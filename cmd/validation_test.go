@@ -273,18 +273,11 @@ func TestValidateSecureInput(t *testing.T) {
 			err := ValidateSecureInput(tt.input, tt.config)
 
 			if tt.wantErr {
-				if err == nil {
-					t.Errorf("expected error but got none")
-					return
-				}
-				if tt.errContains != "" && !contains(err.Error(), tt.errContains) {
-					t.Errorf("expected error to contain %q, got: %v", tt.errContains, err)
-				}
-			} else {
-				if err != nil {
-					t.Errorf("expected no error but got: %v", err)
-				}
+				assertExpectedError(t, err, tt.errContains)
+				return
 			}
+
+			assertNoError(t, err)
 		})
 	}
 }
@@ -340,4 +333,27 @@ func TestValidationConfigDefaults(t *testing.T) {
 // contains is a simple helper for string containment checks
 func contains(s, substr string) bool {
 	return strings.Contains(s, substr)
+}
+
+// assertExpectedError validates that an error occurred and optionally contains expected text
+func assertExpectedError(t *testing.T, err error, expectedContent string) {
+	t.Helper()
+
+	if err == nil {
+		t.Errorf("expected error but got none")
+		return
+	}
+
+	if expectedContent != "" && !contains(err.Error(), expectedContent) {
+		t.Errorf("expected error to contain %q, got: %v", expectedContent, err)
+	}
+}
+
+// assertNoError validates that no error occurred
+func assertNoError(t *testing.T, err error) {
+	t.Helper()
+
+	if err != nil {
+		t.Errorf("expected no error but got: %v", err)
+	}
 }

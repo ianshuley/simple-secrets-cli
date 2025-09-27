@@ -243,6 +243,8 @@ func createDefaultUserFileWithToken(usersPath, rolesPath string) (*UserStore, st
 // Documentation and examples are available via 'simple-secrets help config'
 func createDefaultConfigFile() error {
 	configContent := `{
+  "_comment": "For complete configuration documentation and examples, run: simple-secrets config",
+
   "rotation_backup_count": 1
 }`
 

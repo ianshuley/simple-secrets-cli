@@ -107,37 +107,15 @@ func NewService(options ...ServiceOption) (*Service, error) {
 	var err error
 
 	// Create secrets store
-	if config.ConfigDir != "" {
-		secretsStore, err = LoadSecretsStoreFromDir(config.StorageBackend, config.ConfigDir)
-	} else {
-		secretsStore, err = LoadSecretsStore(config.StorageBackend)
-	}
+	secretsStore, err = createSecretsStore(config)
 	if err != nil {
 		return nil, err
 	}
 
 	// Create user store
-	if config.ConfigDir != "" {
-		usersPath := filepath.Join(config.ConfigDir, "users.json")
-		rolesPath := filepath.Join(config.ConfigDir, "roles.json")
-
-		users, err := loadUsers(usersPath)
-		if os.IsNotExist(err) {
-			return nil, ErrFirstRunRequired
-		} else if err != nil {
-			return nil, err
-		} else {
-			permissions, err := loadRoles(rolesPath)
-			if err != nil {
-				return nil, err
-			}
-			userStore = createUserStore(users, permissions)
-		}
-	} else {
-		userStore, err = LoadUsersOrShowFirstRunMessage()
-		if err != nil {
-			return nil, err
-		}
+	userStore, err = createUserStoreFromConfig(config)
+	if err != nil {
+		return nil, err
 	}
 
 	// Create auth operations
@@ -428,4 +406,43 @@ func (u *userOperations) saveUsersWithError() error {
 		return fmt.Errorf("failed to save user changes: %w", err)
 	}
 	return nil
+}
+
+// createSecretsStore creates a secrets store with the appropriate backend and directory
+func createSecretsStore(config *ServiceConfig) (*SecretsStore, error) {
+	if config.ConfigDir != "" {
+		return LoadSecretsStoreFromDir(config.StorageBackend, config.ConfigDir)
+	}
+
+	return LoadSecretsStore(config.StorageBackend)
+}
+
+// createUserStoreFromConfig creates a user store based on the service configuration
+func createUserStoreFromConfig(config *ServiceConfig) (*UserStore, error) {
+	if config.ConfigDir != "" {
+		return loadUserStoreFromConfigDir(config.ConfigDir)
+	}
+
+	return LoadUsersOrShowFirstRunMessage()
+}
+
+// loadUserStoreFromConfigDir loads user store from a specific configuration directory
+func loadUserStoreFromConfigDir(configDir string) (*UserStore, error) {
+	usersPath := filepath.Join(configDir, "users.json")
+	rolesPath := filepath.Join(configDir, "roles.json")
+
+	users, err := loadUsers(usersPath)
+	if os.IsNotExist(err) {
+		return nil, ErrFirstRunRequired
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	permissions, err := loadRoles(rolesPath)
+	if err != nil {
+		return nil, err
+	}
+
+	return createUserStore(users, permissions), nil
 }

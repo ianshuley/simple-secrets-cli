@@ -8,7 +8,9 @@ A secure command-line tool for managing secrets with role-based access control (
 - **👥 Role-Based Access Control**: Admin and reader roles with granular permissions
 - **🔄 Token Management**: Secure token rotation with self-service capabilities
 - **💾 Backup & Restore**: Automatic backups with encrypted restore capabilities
+- **🔧 Secret Lifecycle**: Disable/enable secrets for security management
 - **🎯 Simple CLI**: Intuitive commands for common secret operations
+- **🔑 Flexible Authentication**: Token-based auth via flag, environment, or config file
 - **🚀 Zero Dependencies**: Single binary with no external service requirements
 
 ## Installation
@@ -102,20 +104,22 @@ You can optionally create a `~/.simple-secrets/config.json` file with the follow
 
 ```json
 {
-  // Configuration file for simple-secrets CLI
-  //
-  // This file is optional and allows you to customize behavior.
-  // All settings shown below are examples with their default values.
-  //
-  // To store a personal access token for authentication:
-  // "token": "your-personal-access-token-here",
-  //
-  // To configure how many backup copies are kept during master key rotation:
+  "_comment": "Configuration file for simple-secrets CLI - run 'simple-secrets config' for full documentation",
   "rotation_backup_count": 1
-  //
-  // Note: Individual secret backups are always 1 (previous version) by design.
-  // The rotation_backup_count only affects master key rotation operations.
 }
+```
+
+**Configuration Options:**
+
+- `token`: Personal access token for authentication (optional)
+- `rotation_backup_count`: Number of backup copies kept during master key rotation (default: 1)
+
+**Note:** Individual secret backups are always 1 (previous version) by design. The `rotation_backup_count` only affects master key rotation operations.
+
+For complete configuration documentation and examples, run:
+
+```bash
+simple-secrets config
 ```
 
 ### Authentication Methods
@@ -182,6 +186,11 @@ make release VERSION=v1.0.0
 simple-secrets put KEY VALUE
 simple-secrets add KEY VALUE  # alias
 
+# Generate secure secrets automatically
+simple-secrets put KEY --generate           # Generate 32-character secret
+simple-secrets put KEY -g                   # Short flag variant
+simple-secrets put KEY --generate --length 64  # Custom length
+
 # Retrieve secrets
 simple-secrets get KEY
 
@@ -196,6 +205,32 @@ simple-secrets disable secret KEY
 simple-secrets enable secret KEY
 simple-secrets list disabled
 ```
+
+#### Generate Secure Secrets
+
+The `--generate` flag automatically creates cryptographically secure secrets:
+
+```bash
+# Generate a 32-character secret (default)
+simple-secrets put api-key --generate
+# Output:
+# Secret "api-key" stored.
+# Kj9#mX2w@pL8vR3qN7z!F5sT4uY6eA1c
+
+# Generate with custom length
+simple-secrets put db-password --generate --length 64
+
+# Short flag variant
+simple-secrets put jwt-secret -g --length 128
+```
+
+**Generated Secret Specifications:**
+
+- Uses `crypto/rand` for cryptographically secure randomness
+- Character set: `A-Z`, `a-z`, `0-9`, `!@#$%^&*()-_=+` (URL-safe)
+- Default length: 32 characters
+- Custom length: Use `--length N` flag
+- Cannot combine with manual values (error if both provided)
 
 #### Working with Complex Values
 

@@ -104,11 +104,17 @@ func (a *TestAssertions) NotEmpty() *TestAssertions {
 func (a *TestAssertions) ValidToken() *TestAssertions {
 	a.t.Helper()
 	token := ParseToken(string(a.output))
+
 	if token == "" {
 		a.t.Errorf("could not extract valid token from output: %s", a.output)
-	} else if !AssertTokenFormat(token) {
-		a.t.Errorf("extracted token has invalid format: %q", token)
+		return a
 	}
+
+	if !AssertTokenFormat(token) {
+		a.t.Errorf("extracted token has invalid format: %q", token)
+		return a
+	}
+
 	return a
 }
 

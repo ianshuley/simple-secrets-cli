@@ -53,9 +53,18 @@ type ListCommands struct {
 	cli *CLIRunner
 }
 
-// Put stores a secret value
-func (c *CLIRunner) Put(key, value string) ([]byte, error) {
-	return c.runWithToken([]string{"put", key, value})
+// Put stores a secret value with variable arguments to support flags
+func (c *CLIRunner) Put(key string, args ...string) ([]byte, error) {
+	putArgs := []string{"put", key}
+	putArgs = append(putArgs, args...)
+	return c.runWithToken(putArgs)
+}
+
+// PutRaw executes put command with raw arguments (no key parameter)
+func (c *CLIRunner) PutRaw(args ...string) ([]byte, error) {
+	putArgs := []string{"put"}
+	putArgs = append(putArgs, args...)
+	return c.runWithToken(putArgs)
 }
 
 // Get retrieves a secret value

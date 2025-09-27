@@ -310,16 +310,7 @@ func (s *SecretsStore) ListRotationBackups() ([]BackupInfo, error) {
 		backupPath := filepath.Join(backupRoot, dirName)
 
 		// Parse timestamp from directory name
-		var timestamp time.Time
-		if strings.HasPrefix(dirName, "rotate-") {
-			if ts, err := time.Parse("20060102-150405", strings.TrimPrefix(dirName, "rotate-")); err == nil {
-				timestamp = ts
-			}
-		} else if strings.HasPrefix(dirName, "manual-") {
-			if ts, err := time.Parse("20060102-150405", strings.TrimPrefix(dirName, "manual-")); err == nil {
-				timestamp = ts
-			}
-		}
+		timestamp := parseBackupTimestamp(dirName)
 
 		backup := BackupInfo{
 			Name:      dirName,
@@ -437,6 +428,7 @@ func getRotationBackupCount() int {
 		RotationBackupCount *int `json:"rotation_backup_count,omitempty"`
 	}
 	if err := json.Unmarshal(data, &config); err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: config.json is corrupted (%v). Using default rotation_backup_count=%d\n", err, DefaultRotationBackupCount)
 		return DefaultRotationBackupCount // Invalid JSON, use default
 	}
 
@@ -445,4 +437,32 @@ func getRotationBackupCount() int {
 	}
 
 	return DefaultRotationBackupCount
+}
+
+// parseBackupTimestamp extracts timestamp from backup directory names
+func parseBackupTimestamp(dirName string) time.Time {
+	timestampStr := extractTimestampString(dirName)
+	if timestampStr == "" {
+		return time.Time{} // Zero time for unparseable names
+	}
+
+	timestamp, err := time.Parse("20060102-150405", timestampStr)
+	if err != nil {
+		return time.Time{} // Zero time for invalid timestamps
+	}
+
+	return timestamp
+}
+
+// extractTimestampString extracts the timestamp portion from backup directory names
+func extractTimestampString(dirName string) string {
+	if strings.HasPrefix(dirName, "rotate-") {
+		return strings.TrimPrefix(dirName, "rotate-")
+	}
+
+	if strings.HasPrefix(dirName, "manual-") {
+		return strings.TrimPrefix(dirName, "manual-")
+	}
+
+	return "" // Unknown format
 }
