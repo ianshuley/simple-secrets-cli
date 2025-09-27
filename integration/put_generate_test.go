@@ -22,7 +22,7 @@ import (
 	"simple-secrets/integration/testing_framework"
 )
 
-func TestPutGenertateFlag(t *testing.T) {
+func TestPutGenerateFlag(t *testing.T) {
 	env := testing_framework.NewEnvironment(t)
 	defer env.Cleanup()
 
@@ -103,6 +103,28 @@ func TestPutGenertateFlag(t *testing.T) {
 		}
 	})
 
+	// Test short flags combined (-g -l)
+	t.Run("short_flags_combined", func(t *testing.T) {
+		output, err := cli.Put("test-key-short-length", "-g", "-l", "48")
+		if err != nil {
+			t.Fatalf("put with -g -l failed: %v", err)
+		}
+
+		if !strings.Contains(string(output), `Secret "test-key-short-length" stored.`) {
+			t.Errorf("Expected storage confirmation, got: %s", output)
+		}
+
+		lines := strings.Split(strings.TrimSpace(string(output)), "\n")
+		if len(lines) != 2 {
+			t.Errorf("Expected 2 lines of output, got %d: %v", len(lines), lines)
+		}
+
+		generatedSecret := lines[1]
+		if len(generatedSecret) != 48 {
+			t.Errorf("Expected 48 character secret, got %d: %s", len(generatedSecret), generatedSecret)
+		}
+	})
+
 	// Test character set compliance
 	t.Run("character_set", func(t *testing.T) {
 		output, err := cli.Put("test-charset", "--generate")
@@ -115,7 +137,7 @@ func TestPutGenertateFlag(t *testing.T) {
 
 		// Expected character set: A-Z, a-z, 0-9, !@#$%^&*()-_=+
 		expectedCharset := "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()-_=+"
-		
+
 		for _, char := range generatedSecret {
 			if !strings.ContainsRune(expectedCharset, char) {
 				t.Errorf("Generated secret contains invalid character: %c", char)
@@ -126,7 +148,7 @@ func TestPutGenertateFlag(t *testing.T) {
 	// Test uniqueness
 	t.Run("uniqueness", func(t *testing.T) {
 		secrets := make([]string, 5)
-		
+
 		for i := 0; i < 5; i++ {
 			keyName := "test-unique-" + string(rune('a'+i))
 			output, err := cli.Put(keyName, "--generate")
@@ -169,7 +191,7 @@ func TestPutGenerateErrors(t *testing.T) {
 		}
 	})
 
-	// Test error: generate without key  
+	// Test error: generate without key
 	t.Run("generate_without_key", func(t *testing.T) {
 		output, err := cli.PutRaw("--generate")
 		if err == nil {
