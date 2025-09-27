@@ -19,7 +19,9 @@ import (
 	"fmt"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
+	"unicode"
 
 	"simple-secrets/internal"
 
@@ -246,5 +248,22 @@ func getTokenRotationDisplay(tokenRotatedAt *time.Time) string {
 }
 
 func safeDisplayFormat(key string) string {
-	return strconv.Quote(key)
+	// Only quote if the key contains characters that would cause display issues
+	if needsQuoting(key) {
+		return strconv.Quote(key)
+	}
+	return key
+}
+
+func needsQuoting(s string) bool {
+	// Empty strings don't need quoting for display
+	if s == "" {
+		return false
+	}
+
+	// Check for control characters that would mess up terminal display
+	return strings.ContainsAny(s, "\n\r\t\v\f\a\b") ||
+		strings.ContainsFunc(s, func(r rune) bool {
+			return !unicode.IsPrint(r)
+		})
 }

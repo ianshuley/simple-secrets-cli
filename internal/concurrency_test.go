@@ -56,10 +56,9 @@ func TestConcurrentSecretsOperations(t *testing.T) {
 					if err := store.Put(key, value); err != nil {
 						atomic.AddInt64(&errorCount, 1)
 						t.Errorf("Worker %d: Put failed for %s: %v", workerID, key, err)
-						continue
+					} else {
+						atomic.AddInt64(&successCount, 1)
 					}
-
-					atomic.AddInt64(&successCount, 1)
 				}
 			}(i)
 		}
@@ -213,8 +212,11 @@ func TestConcurrentUserOperations(t *testing.T) {
 				defer wg.Done()
 				for j := range operationsPerGoroutine {
 					// Try both valid and invalid tokens
-					token := selectTestToken(j)
-					_, _ = userStore.Lookup(token)
+					if j%2 == 0 {
+						_, _ = userStore.Lookup("admin-token") // Valid token
+					} else {
+						_, _ = userStore.Lookup("invalid-token") // Invalid token
+					}
 				}
 			}()
 		}
@@ -395,13 +397,4 @@ func TestAtomicFileOperations(t *testing.T) {
 	}
 
 	t.Log("Atomic file operations completed successfully")
-}
-
-// selectTestToken alternates between valid and invalid tokens for testing
-func selectTestToken(index int) string {
-	if index%2 == 0 {
-		return "admin-token" // Valid token
-	}
-
-	return "invalid-token" // Invalid token
 }

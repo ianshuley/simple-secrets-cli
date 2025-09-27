@@ -41,10 +41,9 @@ var versionCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		if showShort {
 			fmt.Println(version.Short())
-			return
+		} else {
+			fmt.Println(version.BuildInfo())
 		}
-
-		fmt.Println(version.BuildInfo())
 	},
 }
 

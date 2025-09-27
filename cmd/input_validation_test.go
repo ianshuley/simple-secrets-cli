@@ -112,11 +112,18 @@ func TestValidateKeyName(t *testing.T) {
 			err := validateKeyName(tt.key)
 
 			if tt.expectError {
-				assertKeyValidationError(t, err, tt.key, tt.errorMsg)
-				return
+				if err == nil {
+					t.Errorf("expected error for key %q, but got none", tt.key)
+					return
+				}
+				if tt.errorMsg != "" && err.Error() != tt.errorMsg {
+					t.Errorf("expected error message %q, got %q", tt.errorMsg, err.Error())
+				}
+			} else {
+				if err != nil {
+					t.Errorf("expected no error for key %q, but got: %v", tt.key, err)
+				}
 			}
-
-			assertKeyValidationSuccess(t, err, tt.key)
 		})
 	}
 }
@@ -125,27 +132,4 @@ func TestValidateKeyName(t *testing.T) {
 func validateKeyName(key string) error {
 	// This mirrors the actual validation logic in put.go
 	return ValidateSecureInput(key, SecretKeyValidationConfig)
-}
-
-// assertKeyValidationError validates that key validation failed with expected message
-func assertKeyValidationError(t *testing.T, err error, key, expectedMsg string) {
-	t.Helper()
-
-	if err == nil {
-		t.Errorf("expected error for key %q, but got none", key)
-		return
-	}
-
-	if expectedMsg != "" && err.Error() != expectedMsg {
-		t.Errorf("expected error message %q, got %q", expectedMsg, err.Error())
-	}
-}
-
-// assertKeyValidationSuccess validates that key validation succeeded
-func assertKeyValidationSuccess(t *testing.T, err error, key string) {
-	t.Helper()
-
-	if err != nil {
-		t.Errorf("expected no error for key %q, but got: %v", key, err)
-	}
 }

@@ -16,12 +16,9 @@ limitations under the License.
 package cmd
 
 import (
-	"crypto/rand"
 	"errors"
 	"fmt"
 	"strings"
-
-	"simple-secrets/internal"
 
 	"github.com/spf13/cobra"
 )
@@ -29,8 +26,8 @@ import (
 var putCmd = &cobra.Command{
 	Use:                   "put [key] [value]",
 	Short:                 "Store a secret securely.",
-	Long:                  "Store a secret value under a key. Overwrites if the key exists. Backs up previous value.\n\nUse quotes for values with spaces or special characters.\n\n⚠️  SECURITY: Use single quotes to prevent shell command execution:\n    ✅ SAFE:      simple-secrets put key 'value with $(command)'\n    ❌ DANGEROUS: simple-secrets put key \"value with $(command)\"\n\nDouble quotes allow shell command substitution which executes before the app runs.\n\nUse --generate to automatically create a cryptographically secure secret:\n    simple-secrets put api-key --generate\n    simple-secrets put api-key --generate --length 64",
-	Example:               "simple-secrets put api-key '--prod-key-abc123'\nsimple-secrets put db_url 'postgresql://user:pass@localhost:5432/db'\nsimple-secrets put script 'echo $(whoami)'  # Stores literally, not executed\n\n# Generate secure secrets automatically\nsimple-secrets put api-key --generate\nsimple-secrets put api-key -g --length 64",
+	Long:                  "Store a secret value under a key. Overwrites if the key exists. Backs up previous value.\n\nUse quotes for values with spaces or special characters.\n\n⚠️  SECURITY: Use single quotes to prevent shell command execution:\n    ✅ SAFE:      simple-secrets put key 'value with $(command)'\n    ❌ DANGEROUS: simple-secrets put key \"value with $(command)\"\n\nDouble quotes allow shell command substitution which executes before the app runs.",
+	Example:               "simple-secrets put api-key '--prod-key-abc123'\nsimple-secrets put db_url 'postgresql://user:pass@localhost:5432/db'\nsimple-secrets put script 'echo $(whoami)'  # Stores literally, not executed",
 	DisableFlagsInUseLine: true,
 	DisableFlagParsing:    true,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -48,49 +45,21 @@ var putCmd = &cobra.Command{
 }
 
 type putArguments struct {
-	key      string
-	value    string
-	token    string
-	generate bool
-	length   int
-}
-
-// generateSecretValue creates a cryptographically secure random secret
-func generateSecretValue(length int) (string, error) {
-	if length <= 0 {
-		return "", fmt.Errorf("length must be positive, got %d", length)
-	}
-
-	// Character set: A-Z, a-z, 0-9, and URL-safe symbols
-	const charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()-_=+"
-
-	result := make([]byte, length)
-	randomBytes := make([]byte, length)
-
-	if _, err := rand.Read(randomBytes); err != nil {
-		return "", fmt.Errorf("failed to generate random bytes: %w", err)
-	}
-
-	for i, b := range randomBytes {
-		result[i] = charset[int(b)%len(charset)]
-	}
-
-	return string(result), nil
+	key   string
+	value string
+	token string
 }
 
 func parsePutArguments(cmd *cobra.Command, args []string) (*putArguments, error) {
 	var token string
 	var tokenExplicitlySet bool
-	var generate bool
-	var length int = 32 // Default length
-
-	filteredArgs := extractArgumentsAndFlags(args, &token, &tokenExplicitlySet, &generate, &length)
+	filteredArgs := extractArgumentsAndFlags(args, &token, &tokenExplicitlySet)
 
 	if shouldShowHelp(args) {
 		return nil, cmd.Help()
 	}
 
-	key, value, err := validatePutArguments(filteredArgs, generate)
+	key, value, err := validatePutArguments(filteredArgs)
 	if err != nil {
 		return nil, err
 	}
@@ -101,28 +70,18 @@ func parsePutArguments(cmd *cobra.Command, args []string) (*putArguments, error)
 	}
 
 	return &putArguments{
-		key:      key,
-		value:    value,
-		token:    resolvedToken,
-		generate: generate,
-		length:   length,
+		key:   key,
+		value: value,
+		token: resolvedToken,
 	}, nil
 }
 
-func extractArgumentsAndFlags(args []string, token *string, tokenExplicitlySet *bool, generate *bool, length *int) []string {
+func extractArgumentsAndFlags(args []string, token *string, tokenExplicitlySet *bool) []string {
 	filteredArgs := []string{}
 
 	for i := 0; i < len(args); i++ {
 		if isTokenFlag(args, i) {
 			i = processTokenFlag(args, i, token, tokenExplicitlySet)
-			continue
-		}
-		if isGenerateFlag(args[i]) {
-			*generate = true
-			continue
-		}
-		if isLengthFlag(args, i) {
-			i = processLengthFlag(args, i, length)
 			continue
 		}
 		filteredArgs = append(filteredArgs, args[i])
@@ -145,40 +104,6 @@ func processTokenFlag(args []string, flagPosition int, token *string, tokenExpli
 	return valuePosition // Return position of token value to skip it
 }
 
-func isGenerateFlag(arg string) bool {
-	return arg == "--generate" || arg == "-g"
-}
-
-func isLengthFlag(args []string, position int) bool {
-	return args[position] == "--length" && hasLengthValue(args, position)
-}
-
-func hasLengthValue(args []string, flagPosition int) bool {
-	return flagPosition+1 < len(args)
-}
-
-func processLengthFlag(args []string, flagPosition int, length *int) int {
-	valuePosition := flagPosition + 1
-	lengthStr := args[valuePosition]
-
-	parsedLength := parsePositiveInteger(lengthStr)
-	if parsedLength <= 0 {
-		*length = 32 // Default for invalid values
-		return valuePosition
-	}
-
-	*length = parsedLength
-	return valuePosition
-}
-
-func parsePositiveInteger(value string) int {
-	var result int
-	if _, err := fmt.Sscanf(value, "%d", &result); err != nil {
-		return 0
-	}
-	return result
-}
-
 func shouldShowHelp(args []string) bool {
 	for _, arg := range args {
 		if arg == "--help" || arg == "-h" {
@@ -188,19 +113,7 @@ func shouldShowHelp(args []string) bool {
 	return false
 }
 
-func validatePutArguments(filteredArgs []string, generate bool) (string, string, error) {
-	if generate {
-		// With --generate, we need exactly 1 argument (key only)
-		if len(filteredArgs) == 0 {
-			return "", "", fmt.Errorf("requires key argument when using --generate flag")
-		}
-		if len(filteredArgs) > 1 {
-			return "", "", fmt.Errorf("cannot provide both --generate flag and manual value")
-		}
-		return filteredArgs[0], "", nil // value will be generated later
-	}
-
-	// Without --generate, we need exactly 2 arguments (key and value)
+func validatePutArguments(filteredArgs []string) (string, string, error) {
 	if len(filteredArgs) != 2 {
 		return "", "", fmt.Errorf("requires exactly 2 arguments [key] [value], got %d", len(filteredArgs))
 	}
@@ -209,7 +122,7 @@ func validatePutArguments(filteredArgs []string, generate bool) (string, string,
 
 func determineAuthTokenWithExplicitFlag(parsedToken string, wasTokenFlagUsed bool) (string, error) {
 	if !wasTokenFlagUsed {
-		return internal.ResolveToken("")
+		return TokenFlag, nil
 	}
 
 	if isEmptyToken(parsedToken) {
@@ -256,32 +169,16 @@ func executePutCommand(args *putArguments) error {
 		return err
 	}
 
-	// Generate secret value if needed
-	value := args.value
-	if args.generate {
-		generatedValue, err := generateSecretValue(args.length)
-		if err != nil {
-			return fmt.Errorf("failed to generate secret: %w", err)
-		}
-		value = generatedValue
-	}
-
 	service := helper.GetService()
 
 	// Backup is handled automatically by the service layer
 
-	err = service.Secrets().Put(args.token, args.key, value)
+	err = service.Secrets().Put(args.token, args.key, args.value)
 	if err != nil {
 		return err
 	}
 
 	fmt.Printf("Secret %q stored.\n", args.key)
-
-	// Print generated value to stdout if it was generated
-	if args.generate {
-		fmt.Println(value)
-	}
-
 	return nil
 }
 

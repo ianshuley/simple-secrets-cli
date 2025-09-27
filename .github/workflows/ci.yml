@@ -47,9 +47,9 @@ jobs:
 
     - name: Run linting (if available)
       run: |
-        command -v golangci-lint &> /dev/null || {
+        if command -v golangci-lint &> /dev/null; then
+          golangci-lint run
+        else
           echo "golangci-lint not available, skipping linting"
-          exit 0
-        }
-        golangci-lint run
+        fi
       continue-on-error: true

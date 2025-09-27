@@ -172,22 +172,22 @@ func TestSafeDisplayFormat(t *testing.T) {
 		{
 			name:     "simple_string",
 			input:    "test-key",
-			expected: `"test-key"`,
+			expected: "test-key",
 		},
 		{
 			name:     "empty_string",
 			input:    "",
-			expected: `""`,
+			expected: "",
 		},
 		{
 			name:     "string_with_spaces",
 			input:    "test key with spaces",
-			expected: `"test key with spaces"`,
+			expected: "test key with spaces",
 		},
 		{
 			name:     "string_with_quotes",
 			input:    `key"with"quotes`,
-			expected: `"key\"with\"quotes"`,
+			expected: `key"with"quotes`,
 		},
 		{
 			name:     "string_with_newlines",
@@ -202,7 +202,7 @@ func TestSafeDisplayFormat(t *testing.T) {
 		{
 			name:     "string_with_backslashes",
 			input:    `key\with\backslashes`,
-			expected: `"key\\with\\backslashes"`,
+			expected: `key\with\backslashes`,
 		},
 		{
 			name:     "string_with_control_characters",
@@ -212,7 +212,7 @@ func TestSafeDisplayFormat(t *testing.T) {
 		{
 			name:     "unicode_string",
 			input:    "key-with-émojis-🔑",
-			expected: `"key-with-émojis-🔑"`,
+			expected: "key-with-émojis-🔑",
 		},
 		{
 			name:     "string_with_carriage_return",
@@ -224,6 +224,31 @@ func TestSafeDisplayFormat(t *testing.T) {
 			input:    "key\"with\nmixed\tspecial\rchars\\",
 			expected: `"key\"with\nmixed\tspecial\rchars\\"`,
 		},
+		{
+			name:     "normal_secret_key",
+			input:    "api-key-prod",
+			expected: "api-key-prod",
+		},
+		{
+			name:     "key_with_underscores",
+			input:    "database_password_123",
+			expected: "database_password_123",
+		},
+		{
+			name:     "key_with_dots",
+			input:    "app.config.secret",
+			expected: "app.config.secret",
+		},
+		{
+			name:     "key_with_bell_character",
+			input:    "key\awith\abell",
+			expected: `"key\awith\abell"`,
+		},
+		{
+			name:     "key_with_backspace",
+			input:    "key\bwith\bbackspace",
+			expected: `"key\bwith\bbackspace"`,
+		},
 	}
 
 	for _, tt := range tests {
@@ -231,6 +256,94 @@ func TestSafeDisplayFormat(t *testing.T) {
 			result := safeDisplayFormat(tt.input)
 			if result != tt.expected {
 				t.Errorf("safeDisplayFormat(%q) expected %q, got %q", tt.input, tt.expected, result)
+			}
+		})
+	}
+}
+
+func TestNeedsQuoting(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected bool
+	}{
+		{
+			name:     "empty_string",
+			input:    "",
+			expected: false,
+		},
+		{
+			name:     "normal_key",
+			input:    "api-key-123",
+			expected: false,
+		},
+		{
+			name:     "key_with_spaces",
+			input:    "key with spaces",
+			expected: false,
+		},
+		{
+			name:     "key_with_quotes",
+			input:    `key"with"quotes`,
+			expected: false,
+		},
+		{
+			name:     "key_with_backslashes",
+			input:    `key\with\backslashes`,
+			expected: false,
+		},
+		{
+			name:     "unicode_characters",
+			input:    "key-with-émojis-🔑",
+			expected: false,
+		},
+		{
+			name:     "newline_character",
+			input:    "key\nwith\nnewline",
+			expected: true,
+		},
+		{
+			name:     "tab_character",
+			input:    "key\twith\ttab",
+			expected: true,
+		},
+		{
+			name:     "carriage_return",
+			input:    "key\rwith\rcarriage",
+			expected: true,
+		},
+		{
+			name:     "bell_character",
+			input:    "key\awith\abell",
+			expected: true,
+		},
+		{
+			name:     "backspace_character",
+			input:    "key\bwith\bbackspace",
+			expected: true,
+		},
+		{
+			name:     "control_characters",
+			input:    "key\x00\x01\x02",
+			expected: true,
+		},
+		{
+			name:     "vertical_tab",
+			input:    "key\vwith\vvtab",
+			expected: true,
+		},
+		{
+			name:     "form_feed",
+			input:    "key\fwith\fff",
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := needsQuoting(tt.input)
+			if result != tt.expected {
+				t.Errorf("needsQuoting(%q) expected %v, got %v", tt.input, tt.expected, result)
 			}
 		})
 	}
