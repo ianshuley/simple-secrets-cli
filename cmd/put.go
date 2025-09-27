@@ -29,8 +29,8 @@ import (
 var putCmd = &cobra.Command{
 	Use:                   "put [key] [value]",
 	Short:                 "Store a secret securely.",
-	Long:                  "Store a secret value under a key. Overwrites if the key exists. Backs up previous value.\n\nUse quotes for values with spaces or special characters.\n\n⚠️  SECURITY: Use single quotes to prevent shell command execution:\n    ✅ SAFE:      simple-secrets put key 'value with $(command)'\n    ❌ DANGEROUS: simple-secrets put key \"value with $(command)\"\n\nDouble quotes allow shell command substitution which executes before the app runs.\n\nUse --generate to automatically create a cryptographically secure secret:\n    simple-secrets put api-key --generate\n    simple-secrets put api-key --generate --length 64",
-	Example:               "simple-secrets put api-key '--prod-key-abc123'\nsimple-secrets put db_url 'postgresql://user:pass@localhost:5432/db'\nsimple-secrets put script 'echo $(whoami)'  # Stores literally, not executed\n\n# Generate secure secrets automatically\nsimple-secrets put api-key --generate\nsimple-secrets put api-key -g --length 64",
+	Long:                  "Store a secret value under a key. Overwrites if the key exists. Backs up previous value.\n\nUse quotes for values with spaces or special characters.\n\n⚠️  SECURITY: Use single quotes to prevent shell command execution:\n    ✅ SAFE:      simple-secrets put key 'value with $(command)'\n    ❌ DANGEROUS: simple-secrets put key \"value with $(command)\"\n\nDouble quotes allow shell command substitution which executes before the app runs.\n\nUse --generate to automatically create a cryptographically secure secret:\n    simple-secrets put api-key --generate\n    simple-secrets put api-key --generate --length 64\n    simple-secrets put api-key -g -l 64",
+	Example:               "simple-secrets put api-key '--prod-key-abc123'\nsimple-secrets put db_url 'postgresql://user:pass@localhost:5432/db'\nsimple-secrets put script 'echo $(whoami)'  # Stores literally, not executed\n\n# Generate secure secrets automatically\nsimple-secrets put api-key --generate\nsimple-secrets put api-key -g --length 64\nsimple-secrets put api-key -g -l 32",
 	DisableFlagsInUseLine: true,
 	DisableFlagParsing:    true,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -150,7 +150,7 @@ func isGenerateFlag(arg string) bool {
 }
 
 func isLengthFlag(args []string, position int) bool {
-	return args[position] == "--length" && hasLengthValue(args, position)
+	return (args[position] == "--length" || args[position] == "-l") && hasLengthValue(args, position)
 }
 
 func hasLengthValue(args []string, flagPosition int) bool {
