@@ -9,3 +9,4 @@ test-build
 coverage.html
 simple-secrets-completion.bash
 simple-secrets-completion.zsh
+RESTRUCTURING_PLAN.md
