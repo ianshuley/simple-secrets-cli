@@ -304,7 +304,27 @@ var addCmd = &cobra.Command{
 	RunE:                  putCmd.RunE, // Same implementation as put
 }
 
+// completePutArgs provides completion for put command arguments
+func completePutArgs(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	if len(args) == 0 {
+		// First argument (key): suggest existing secret names for updates
+		keys, err := getAvailableSecretKeys(cmd)
+		if err != nil {
+			// If we can't get keys, still allow any input (for new secrets)
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+		return keys, cobra.ShellCompDirectiveNoFileComp
+	}
+
+	// Second argument (value): no completion
+	return nil, cobra.ShellCompDirectiveNoFileComp
+}
+
 func init() {
 	rootCmd.AddCommand(putCmd)
 	rootCmd.AddCommand(addCmd)
+
+	// Add completion for secret names on first argument
+	putCmd.ValidArgsFunction = completePutArgs
+	addCmd.ValidArgsFunction = completePutArgs
 }

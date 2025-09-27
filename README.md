@@ -452,7 +452,11 @@ make clean
 
 ## Shell Completion
 
-Enable shell autocompletion for better CLI experience:
+Enable shell autocompletion for better CLI experience. Completion includes:
+
+- **Commands and subcommands**: `get`, `put`, `list keys`, `disable secret`, etc.
+- **Secret names**: Tab-complete existing secret keys for `get`, `delete`, `put`, etc.
+- **Disable/Enable**: Complete with appropriate secret lists (active vs disabled)
 
 ```bash
 # Bash completion
@@ -467,6 +471,8 @@ simple-secrets completion fish > ~/.config/fish/completions/simple-secrets.fish
 # PowerShell completion
 simple-secrets completion powershell > simple-secrets.ps1
 ```
+
+**Note**: Secret name completion requires authentication (set `SIMPLE_SECRETS_TOKEN` or use `--token` flag).
 
 ## Security Considerations
 

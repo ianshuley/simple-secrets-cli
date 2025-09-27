@@ -7,3 +7,5 @@ coverage.out
 *.cover
 test-build
 coverage.html
+simple-secrets-completion.bash
+simple-secrets-completion.zsh

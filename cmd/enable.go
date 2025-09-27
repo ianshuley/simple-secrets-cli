@@ -76,6 +76,28 @@ func enableSecret(cmd *cobra.Command, key string) error {
 	return nil
 }
 
+// completeEnableArgs provides completion for enable command arguments
+func completeEnableArgs(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	if len(args) == 0 {
+		// First argument: suggest enable types
+		return []string{"secret"}, cobra.ShellCompDirectiveNoFileComp
+	}
+
+	if len(args) == 1 && args[0] == "secret" {
+		// Complete with available disabled secret names
+		keys, err := getAvailableDisabledSecrets(cmd)
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+		return keys, cobra.ShellCompDirectiveNoFileComp
+	}
+
+	return nil, cobra.ShellCompDirectiveNoFileComp
+}
+
 func init() {
 	rootCmd.AddCommand(enableCmd)
+
+	// Add custom completion for enable command
+	enableCmd.ValidArgsFunction = completeEnableArgs
 }

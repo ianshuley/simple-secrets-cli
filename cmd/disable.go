@@ -153,6 +153,35 @@ func confirmTokenDisable() bool {
 	return true
 }
 
+// completeDisableArgs provides completion for disable command arguments
+func completeDisableArgs(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	if len(args) == 0 {
+		// First argument: suggest disable types
+		return []string{"token", "user", "secret"}, cobra.ShellCompDirectiveNoFileComp
+	}
+
+	if len(args) == 1 {
+		switch args[0] {
+		case "token", "user":
+			// For token/user disable, we could complete usernames, but that requires admin access
+			// For now, just return no completion
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		case "secret":
+			// Complete with available secret names
+			keys, err := getAvailableSecretKeys(cmd)
+			if err != nil {
+				return nil, cobra.ShellCompDirectiveNoFileComp
+			}
+			return keys, cobra.ShellCompDirectiveNoFileComp
+		}
+	}
+
+	return nil, cobra.ShellCompDirectiveNoFileComp
+}
+
 func init() {
 	rootCmd.AddCommand(disableCmd)
+
+	// Add custom completion for disable command
+	disableCmd.ValidArgsFunction = completeDisableArgs
 }

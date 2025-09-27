@@ -63,4 +63,7 @@ var deleteCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(deleteCmd)
+
+	// Add completion for secret names
+	deleteCmd.ValidArgsFunction = completeSecretNames
 }
