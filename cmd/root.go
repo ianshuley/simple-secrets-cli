@@ -141,6 +141,77 @@ func getAvailableDisabledSecrets(cmd *cobra.Command) ([]string, error) {
 	return disabledSecrets, nil
 }
 
+// getAvailableBackupSecrets retrieves all secret keys that have backups for completion
+func getAvailableBackupSecrets(cmd *cobra.Command) ([]string, error) {
+	// Get CLI service helper
+	helper, err := GetCLIServiceHelper()
+	if err != nil {
+		return nil, err
+	}
+
+	// Authenticate to access backups
+	user, _, err := helper.AuthenticateCommand(cmd, false)
+	if err != nil {
+		return nil, err
+	}
+	if user == nil {
+		return nil, fmt.Errorf("authentication required")
+	}
+
+	store, err := internal.LoadSecretsStore(internal.NewFilesystemBackend())
+	if err != nil {
+		return nil, err
+	}
+
+	// Get all secret keys and check which have backups
+	secretKeys := store.ListKeys()
+	var backedUpSecrets []string
+
+	for _, key := range secretKeys {
+		backupPath := store.GetBackupPath(key)
+		if _, err := os.Stat(backupPath); err == nil {
+			backedUpSecrets = append(backedUpSecrets, key)
+		}
+	}
+
+	return backedUpSecrets, nil
+}
+
+// getAvailableBackupNames retrieves all database backup names for completion
+func getAvailableBackupNames(cmd *cobra.Command) ([]string, error) {
+	// Get CLI service helper
+	helper, err := GetCLIServiceHelper()
+	if err != nil {
+		return nil, err
+	}
+
+	// Authenticate to access backups
+	user, _, err := helper.AuthenticateCommand(cmd, false)
+	if err != nil {
+		return nil, err
+	}
+	if user == nil {
+		return nil, fmt.Errorf("authentication required")
+	}
+
+	store, err := internal.LoadSecretsStore(internal.NewFilesystemBackend())
+	if err != nil {
+		return nil, err
+	}
+
+	backups, err := store.ListRotationBackups()
+	if err != nil {
+		return nil, err
+	}
+
+	var backupNames []string
+	for _, backup := range backups {
+		backupNames = append(backupNames, backup.Name)
+	}
+
+	return backupNames, nil
+}
+
 // handleRootCommand is called when simple-secrets is run without any subcommands
 func handleRootCommand(cmd *cobra.Command, args []string) {
 	versionFlag, _ := cmd.Flags().GetBool("version")

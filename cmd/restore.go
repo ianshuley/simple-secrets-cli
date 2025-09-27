@@ -111,6 +111,38 @@ func restoreDatabase(cmd *cobra.Command, backupName string) error {
 	return nil
 }
 
+// completeRestoreArgs provides completion for restore command arguments
+func completeRestoreArgs(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	if len(args) == 0 {
+		// First argument: suggest restore types
+		return []string{"secret", "database"}, cobra.ShellCompDirectiveNoFileComp
+	}
+
+	if len(args) == 1 {
+		switch args[0] {
+		case "secret":
+			// Second argument for secret restore: complete with backed-up secret names
+			keys, err := getAvailableBackupSecrets(cmd)
+			if err != nil {
+				return nil, cobra.ShellCompDirectiveNoFileComp
+			}
+			return keys, cobra.ShellCompDirectiveNoFileComp
+		case "database":
+			// Second argument for database restore: complete with backup names
+			backups, err := getAvailableBackupNames(cmd)
+			if err != nil {
+				return nil, cobra.ShellCompDirectiveNoFileComp
+			}
+			return backups, cobra.ShellCompDirectiveNoFileComp
+		}
+	}
+
+	return nil, cobra.ShellCompDirectiveNoFileComp
+}
+
 func init() {
 	rootCmd.AddCommand(restoreCmd)
+
+	// Add custom completion for restore command
+	restoreCmd.ValidArgsFunction = completeRestoreArgs
 }

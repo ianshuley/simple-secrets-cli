@@ -27,18 +27,18 @@ import (
 
 // disableCmd represents the disable command
 var disableCmd = &cobra.Command{
-	Use:   "disable [token|user|secret] [username|key]",
+	Use:   "disable [user|token|secret] [username|token|key]",
 	Short: "Disable user tokens or secrets",
 	Long: `Disable different types of resources in the system:
-  • token <username> - Disable a user's token (admin only)
-  • user <username>  - Disable a user's token (alias for 'token')
-  • secret <key>     - Mark a secret as disabled
+  • user <username>     - Disable a user's token by username (admin only)
+  • token <token-value> - Disable a specific token by its value (admin only)
+  • secret <key>        - Mark a secret as disabled
 
 Disabled tokens cannot be used for authentication.
 Disabled secrets are hidden from normal operations but can be re-enabled.`,
-	Example: `  simple-secrets disable token alice    # Disable alice's token
-  simple-secrets disable user alice     # Same as above (alias)
-  simple-secrets disable secret api-key  # Disable a secret`,
+	Example: `  simple-secrets disable user alice            # Disable alice's token by username
+  simple-secrets disable token abc123def456    # Disable specific token by value
+  simple-secrets disable secret api-key        # Disable a secret`,
 	Args: cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Check if token flag was explicitly set to empty string
@@ -47,17 +47,73 @@ Disabled secrets are hidden from normal operations but can be re-enabled.`,
 		}
 
 		switch args[0] {
-		case "token", "user": // Accept both "token" and "user" as aliases
-			return disableToken(cmd, args[1])
+		case "user":
+			return disableUser(cmd, args[1])
+		case "token":
+			return disableTokenByValue(cmd, args[1])
 		case "secret":
 			return disableSecret(cmd, args[1])
 		default:
-			return NewUnknownTypeError("disable", args[0], "'token', 'user', or 'secret'")
+			return NewUnknownTypeError("disable", args[0], "'user', 'token', or 'secret'")
 		}
 	},
 }
 
-func disableToken(cmd *cobra.Command, username string) error {
+func disableUser(cmd *cobra.Command, username string) error {
+	helper, err := GetCLIServiceHelper()
+	if err != nil {
+		return err
+	}
+
+	// Check permissions first before showing confirmation prompt
+	currentUser, store, err := helper.AuthenticateCommand(cmd, true)
+	if err != nil {
+		return err
+	}
+	if currentUser == nil {
+		return nil
+	}
+
+	if !currentUser.Can("manage-users", store.Permissions()) {
+		return NewPermissionDeniedError("manage-users")
+	}
+
+	// Show detailed help for the disable user operation
+	fmt.Println("⚠️  User Token Disable Operation")
+	fmt.Println("• This will disable the specified user's authentication token immediately")
+	fmt.Println("• The user will no longer be able to authenticate until a new token is generated")
+	fmt.Println("• Use 'enable user' to generate a new token for this user")
+	fmt.Printf("• Target user: '%s'\n", username)
+	fmt.Println()
+
+	// Get confirmation for user disable operation
+	if !confirmTokenDisable() {
+		fmt.Println("❌ User disable operation cancelled.")
+		return nil
+	}
+
+	token, err := resolveTokenFromCommand(cmd)
+	if err != nil {
+		return err
+	}
+
+	resolvedToken, err := internal.ResolveToken(token)
+	if err != nil {
+		return err
+	}
+
+	// Disable by username
+	if err := helper.GetService().Users().DisableUser(resolvedToken, username); err != nil {
+		return err
+	}
+
+	fmt.Printf("✅ Token disabled for user '%s'\n", username)
+	fmt.Println("• The user can no longer authenticate with their current token")
+	fmt.Println("• Use 'enable user' to generate a new token for this user")
+	return nil
+}
+
+func disableTokenByValue(cmd *cobra.Command, tokenValue string) error {
 	helper, err := GetCLIServiceHelper()
 	if err != nil {
 		return err
@@ -77,11 +133,11 @@ func disableToken(cmd *cobra.Command, username string) error {
 	}
 
 	// Show detailed help for the disable token operation
-	fmt.Println("⚠️  User Token Disable Operation")
-	fmt.Println("• This will disable the specified user's authentication token immediately")
-	fmt.Println("• The user will no longer be able to authenticate until a new token is generated")
-	fmt.Println("• Use 'rotate token' to generate a new token for this user")
-	fmt.Printf("• Target user: '%s'\n", username)
+	fmt.Println("⚠️  Token Disable Operation")
+	fmt.Println("• This will disable the specified token immediately")
+	fmt.Println("• The owner will no longer be able to authenticate with this token")
+	fmt.Println("• Use 'enable user' to generate a new token for the affected user")
+	fmt.Printf("• Target token: %s...\n", tokenValue[:min(8, len(tokenValue))])
 	fmt.Println()
 
 	// Get confirmation for token disable operation
@@ -100,14 +156,24 @@ func disableToken(cmd *cobra.Command, username string) error {
 		return err
 	}
 
-	if err := helper.GetService().Users().DisableUser(resolvedToken, username); err != nil {
+	// Disable by token value
+	targetUsername, err := helper.GetService().Users().DisableUserByToken(resolvedToken, tokenValue)
+	if err != nil {
 		return err
 	}
 
-	fmt.Printf("✅ Token disabled for user '%s'\n", username)
-	fmt.Println("• The user can no longer authenticate with their current token")
-	fmt.Println("• Use 'rotate token' to generate a new token for this user")
+	fmt.Printf("✅ Token disabled for user '%s'\n", targetUsername)
+	fmt.Println("• The user can no longer authenticate with that token")
+	fmt.Println("• Use 'enable user' to generate a new token for this user")
 	return nil
+}
+
+// min returns the smaller of two integers
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 func disableSecret(cmd *cobra.Command, key string) error {
@@ -157,7 +223,8 @@ func confirmTokenDisable() bool {
 func completeDisableArgs(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 	if len(args) == 0 {
 		// First argument: suggest disable types
-		return []string{"token", "user", "secret"}, cobra.ShellCompDirectiveNoFileComp
+		// "token" now accepts both usernames and token values
+		return []string{"token", "secret"}, cobra.ShellCompDirectiveNoFileComp
 	}
 
 	if len(args) == 1 {

@@ -86,6 +86,8 @@ type UserOperations interface {
 	RotateToken(token, username string) (string, error)
 	RotateSelfToken(currentUser *User) (string, error)
 	DisableUser(token, username string) error
+	DisableUserByToken(adminToken, targetToken string) (string, error)
+	EnableUser(token, username string) (string, error)
 }
 
 // Service provides composable operations for simple-secrets
@@ -374,6 +376,46 @@ func (u *userOperations) DisableUser(token, username string) error {
 
 	// Save the updated users to disk
 	return u.saveUsersWithError()
+}
+
+func (u *userOperations) DisableUserByToken(token, tokenValue string) (string, error) {
+	// Verify authentication and permissions
+	if err := u.auth.ValidateAccess(token, true); err != nil {
+		return "", err
+	}
+
+	// Disable the user by token value
+	username, err := u.userStore.DisableUserByToken(tokenValue)
+	if err != nil {
+		return "", err
+	}
+
+	// Save the updated users to disk
+	if err := u.saveUsersWithError(); err != nil {
+		return "", err
+	}
+
+	return username, nil
+}
+
+func (u *userOperations) EnableUser(token, username string) (string, error) {
+	// Verify authentication and permissions
+	if err := u.auth.ValidateAccess(token, true); err != nil {
+		return "", err
+	}
+
+	// Generate new token for the disabled user
+	newToken, err := u.userStore.EnableUserToken(username)
+	if err != nil {
+		return "", err
+	}
+
+	// Save the updated users to disk
+	if err := u.saveUsersWithError(); err != nil {
+		return "", err
+	}
+
+	return newToken, nil
 }
 
 func (u *userOperations) RotateSelfToken(currentUser *User) (string, error) {

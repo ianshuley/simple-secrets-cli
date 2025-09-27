@@ -290,6 +290,58 @@ func (us *UserStore) DisableUserToken(username string) error {
 	return fmt.Errorf("user %q not found", username)
 }
 
+// DisableUserByToken disables a user by their token value and returns the username (no authentication - used by service layer)
+func (us *UserStore) DisableUserByToken(tokenValue string) (string, error) {
+	us.mu.Lock()
+	defer us.mu.Unlock()
+
+	tokenHash := HashToken(tokenValue)
+	for _, u := range us.users {
+		if u.TokenHash == tokenHash {
+			u.DisableToken()
+			return u.Username, nil
+		}
+	}
+	return "", fmt.Errorf("token not found or already disabled")
+}
+
+// EnableUserToken generates a new token for a disabled user (no authentication - used by service layer)
+func (us *UserStore) EnableUserToken(username string) (string, error) {
+	us.mu.Lock()
+	defer us.mu.Unlock()
+
+	// Find the target user
+	var targetUser *User
+	for _, u := range us.users {
+		if u.Username == username {
+			targetUser = u
+			break
+		}
+	}
+
+	if targetUser == nil {
+		return "", fmt.Errorf("user '%s' not found", username)
+	}
+
+	// Check if user is actually disabled (has empty token hash)
+	if targetUser.TokenHash != "" {
+		return "", fmt.Errorf("user '%s' is not disabled - use 'rotate token' to generate a new token for active users", username)
+	}
+
+	// Generate new token
+	newToken, err := generateSecureToken()
+	if err != nil {
+		return "", fmt.Errorf("generate token: %w", err)
+	}
+
+	// Update user with new token hash
+	targetUser.TokenHash = HashToken(newToken)
+	now := time.Now()
+	targetUser.TokenRotatedAt = &now
+
+	return newToken, nil
+}
+
 // Private helper functions
 
 // createUserStore constructs a UserStore with the given users and permissions

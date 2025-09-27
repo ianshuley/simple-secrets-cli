@@ -234,8 +234,21 @@ func listDisabledSecrets(cmd *cobra.Command) error {
 	return nil
 }
 
+// completeListArgs provides completion for list command arguments
+func completeListArgs(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	if len(args) == 0 {
+		// First argument: suggest list types
+		return []string{"keys", "backups", "users", "disabled"}, cobra.ShellCompDirectiveNoFileComp
+	}
+
+	return nil, cobra.ShellCompDirectiveNoFileComp
+}
+
 func init() {
 	rootCmd.AddCommand(listCmd)
+
+	// Add custom completion for list command
+	listCmd.ValidArgsFunction = completeListArgs
 }
 
 func getTokenRotationDisplay(tokenRotatedAt *time.Time) string {

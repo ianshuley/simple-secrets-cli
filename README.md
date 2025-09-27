@@ -279,8 +279,13 @@ simple-secrets create-user USERNAME ROLE  # admin or reader
 # List users
 simple-secrets list users
 
-# Disable user tokens
-simple-secrets disable token USERNAME
+# Disable user tokens (clear, specific commands)
+simple-secrets disable user USERNAME      # By username
+simple-secrets disable token TOKEN_VALUE  # By token value
+
+# Re-enable disabled users (generate new tokens)
+simple-secrets enable user USERNAME       # Generate new token for user
+simple-secrets enable user USERNAME       # Same as above (alias)
 ```
 
 ### Token Rotation
@@ -415,12 +420,20 @@ simple-secrets enable secret api_key --token <admin-token>
 Disable user tokens for security purposes:
 
 ```bash
-# Disable a user's token (admin only)
-simple-secrets disable token alice --token <admin-token>
+# Disable by username
+simple-secrets disable user alice --token <admin-token>
+
+# Disable by token value
+simple-secrets disable token abc123def456 --token <admin-token>
+
+# Re-enable disabled users (generate new tokens)
+simple-secrets enable user alice --token <admin-token>
 
 # Generate new token for user (recovery)
 simple-secrets rotate token alice --token <admin-token>
 ```
+
+**Clear Command Structure**: Use `disable user` when you know the username, and `disable token` when you have the actual token value. This makes it clear what you're disabling and removes ambiguity.
 
 ## RBAC Permissions
 
@@ -456,6 +469,7 @@ Enable shell autocompletion for better CLI experience. Completion includes:
 
 - **Commands and subcommands**: `get`, `put`, `list keys`, `disable secret`, etc.
 - **Secret names**: Tab-complete existing secret keys for `get`, `delete`, `put`, etc.
+- **User/Token operations**: Context-aware completion for user and token management
 - **Disable/Enable**: Complete with appropriate secret lists (active vs disabled)
 
 ```bash

@@ -148,6 +148,7 @@ For more config options, run: simple-secrets help config`)
 	var config struct {
 		Token               string `json:"token"`
 		RotationBackupCount *int   `json:"rotation_backup_count,omitempty"` // Number of rotation backups to keep (default: 1)
+		AllowTokenReenable  *bool  `json:"allow_token_reenable,omitempty"`  // Allow re-enabling disabled tokens (default: true)
 	}
 	if err := json.Unmarshal(data, &config); err != nil {
 		fmt.Fprintf(os.Stderr, "Warning: config.json is corrupted and will be ignored (%v). Using default configuration.\n", err)
