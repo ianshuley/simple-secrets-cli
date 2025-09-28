@@ -229,7 +229,7 @@ func completeDisableArgs(cmd *cobra.Command, args []string, toComplete string) (
 
 	if len(args) == 1 {
 		switch args[0] {
-		case "token", "user":
+		case "user":
 			// Complete with available usernames (requires admin access)
 			usernames, err := getAvailableUsernames(cmd)
 			if err != nil {
@@ -237,6 +237,9 @@ func completeDisableArgs(cmd *cobra.Command, args []string, toComplete string) (
 				return nil, cobra.ShellCompDirectiveNoFileComp
 			}
 			return usernames, cobra.ShellCompDirectiveNoFileComp
+		case "token":
+			// No completion for token values (they are unpredictable secret values)
+			return nil, cobra.ShellCompDirectiveNoFileComp
 		case "secret":
 			// Complete with available secret names
 			keys, err := getAvailableSecretKeys(cmd)
