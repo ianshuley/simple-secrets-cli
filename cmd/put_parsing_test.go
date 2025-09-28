@@ -147,6 +147,18 @@ func TestIsLengthFlag(t *testing.T) {
 			position: 1,
 			expected: false, // No value after --length
 		},
+		{
+			name:     "short_length_flag_with_value",
+			args:     []string{"-l", "32"},
+			position: 0,
+			expected: true,
+		},
+		{
+			name:     "short_length_flag_at_end_no_value",
+			args:     []string{"key", "-l"},
+			position: 1,
+			expected: false, // No value after -l
+		},
 	}
 
 	for _, tt := range tests {
@@ -320,6 +332,20 @@ func TestProcessLengthFlag(t *testing.T) {
 			flagPosition:         0,
 			expectedLength:       32, // parsePositiveInteger("key") = 0, so default
 			expectedNextPosition: 1,  // Still processes next arg
+		},
+		{
+			name:                 "short_length_with_valid_value",
+			args:                 []string{"-l", "64", "key"},
+			flagPosition:         0,
+			expectedLength:       64,
+			expectedNextPosition: 1,
+		},
+		{
+			name:                 "short_length_with_invalid_value",
+			args:                 []string{"-l", "xyz", "key"},
+			flagPosition:         0,
+			expectedLength:       32, // Default for zero/invalid
+			expectedNextPosition: 1,
 		},
 	}
 

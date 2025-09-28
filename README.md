@@ -190,6 +190,7 @@ simple-secrets add KEY VALUE  # alias
 simple-secrets put KEY --generate           # Generate 32-character secret
 simple-secrets put KEY -g                   # Short flag variant
 simple-secrets put KEY --generate --length 64  # Custom length
+simple-secrets put KEY -g -l 32             # Short flags for both
 
 # Retrieve secrets
 simple-secrets get KEY
@@ -222,6 +223,9 @@ simple-secrets put db-password --generate --length 64
 
 # Short flag variant
 simple-secrets put jwt-secret -g --length 128
+
+# Both short flags
+simple-secrets put api-token -g -l 64
 ```
 
 **Generated Secret Specifications:**
@@ -229,7 +233,7 @@ simple-secrets put jwt-secret -g --length 128
 - Uses `crypto/rand` for cryptographically secure randomness
 - Character set: `A-Z`, `a-z`, `0-9`, `!@#$%^&*()-_=+` (URL-safe)
 - Default length: 32 characters
-- Custom length: Use `--length N` flag
+- Custom length: Use `--length N` or `-l N` flag
 - Cannot combine with manual values (error if both provided)
 
 #### Working with Complex Values
@@ -279,8 +283,13 @@ simple-secrets create-user USERNAME ROLE  # admin or reader
 # List users
 simple-secrets list users
 
-# Disable user tokens
-simple-secrets disable token USERNAME
+# Disable user tokens (clear, specific commands)
+simple-secrets disable user USERNAME      # By username
+simple-secrets disable token TOKEN_VALUE  # By token value
+
+# Re-enable disabled users (generate new tokens)
+simple-secrets enable user USERNAME       # Generate new token for user
+simple-secrets enable user USERNAME       # Same as above (alias)
 ```
 
 ### Token Rotation
@@ -415,12 +424,20 @@ simple-secrets enable secret api_key --token <admin-token>
 Disable user tokens for security purposes:
 
 ```bash
-# Disable a user's token (admin only)
-simple-secrets disable token alice --token <admin-token>
+# Disable by username
+simple-secrets disable user alice --token <admin-token>
+
+# Disable by token value
+simple-secrets disable token abc123def456 --token <admin-token>
+
+# Re-enable disabled users (generate new tokens)
+simple-secrets enable user alice --token <admin-token>
 
 # Generate new token for user (recovery)
 simple-secrets rotate token alice --token <admin-token>
 ```
+
+**Clear Command Structure**: Use `disable user` when you know the username, and `disable token` when you have the actual token value. This makes it clear what you're disabling and removes ambiguity.
 
 ## RBAC Permissions
 
@@ -452,7 +469,12 @@ make clean
 
 ## Shell Completion
 
-Enable shell autocompletion for better CLI experience:
+Enable shell autocompletion for better CLI experience. Completion includes:
+
+- **Commands and subcommands**: `get`, `put`, `list keys`, `disable secret`, etc.
+- **Secret names**: Tab-complete existing secret keys for `get`, `delete`, `put`, etc.
+- **User/Token operations**: Context-aware completion for user and token management
+- **Disable/Enable**: Complete with appropriate secret lists (active vs disabled)
 
 ```bash
 # Bash completion
@@ -467,6 +489,8 @@ simple-secrets completion fish > ~/.config/fish/completions/simple-secrets.fish
 # PowerShell completion
 simple-secrets completion powershell > simple-secrets.ps1
 ```
+
+**Note**: Secret name completion requires authentication (set `SIMPLE_SECRETS_TOKEN` or use `--token` flag).
 
 ## Security Considerations
 

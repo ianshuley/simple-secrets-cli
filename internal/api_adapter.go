@@ -31,6 +31,28 @@ func (s *SecretsStore) List() []string {
 	return s.ListKeys()
 }
 
+// ListDisabled implements api.SecretReader.ListDisabled
+func (s *SecretsStore) ListDisabled() []string {
+	return s.ListDisabledSecrets()
+}
+
+// Generate implements api.SecretWriter.Generate
+func (s *SecretsStore) Generate(key string, length int) (string, error) {
+	// Generate the secret value
+	generatedValue, err := GenerateSecretValue(length)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate secret: %w", err)
+	}
+
+	// Store the generated value
+	err = s.Put(key, generatedValue)
+	if err != nil {
+		return "", fmt.Errorf("failed to store generated secret: %w", err)
+	}
+
+	return generatedValue, nil
+}
+
 // Enable implements api.SecretWriter.Enable
 func (s *SecretsStore) Enable(key string) error {
 	return s.EnableSecret(key)
@@ -72,6 +94,10 @@ func (sa *ServiceAdapter) List() []string {
 	return sa.secrets.List()
 }
 
+func (sa *ServiceAdapter) ListDisabled() []string {
+	return sa.secrets.ListDisabledSecrets()
+}
+
 func (sa *ServiceAdapter) IsEnabled(key string) bool {
 	return sa.secrets.IsEnabled(key)
 }
@@ -79,6 +105,11 @@ func (sa *ServiceAdapter) IsEnabled(key string) bool {
 // SecretWriter interface implementation
 func (sa *ServiceAdapter) Put(key, value string) error {
 	return sa.secrets.Put(key, value)
+}
+
+func (sa *ServiceAdapter) Generate(key string, length int) (string, error) {
+	// Delegate to the underlying SecretsStore implementation
+	return sa.secrets.Generate(key, length)
 }
 
 func (sa *ServiceAdapter) Delete(key string) error {

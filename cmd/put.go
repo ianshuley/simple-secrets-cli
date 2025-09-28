@@ -16,7 +16,6 @@ limitations under the License.
 package cmd
 
 import (
-	"crypto/rand"
 	"errors"
 	"fmt"
 	"strings"
@@ -29,8 +28,8 @@ import (
 var putCmd = &cobra.Command{
 	Use:                   "put [key] [value]",
 	Short:                 "Store a secret securely.",
-	Long:                  "Store a secret value under a key. Overwrites if the key exists. Backs up previous value.\n\nUse quotes for values with spaces or special characters.\n\n⚠️  SECURITY: Use single quotes to prevent shell command execution:\n    ✅ SAFE:      simple-secrets put key 'value with $(command)'\n    ❌ DANGEROUS: simple-secrets put key \"value with $(command)\"\n\nDouble quotes allow shell command substitution which executes before the app runs.\n\nUse --generate to automatically create a cryptographically secure secret:\n    simple-secrets put api-key --generate\n    simple-secrets put api-key --generate --length 64",
-	Example:               "simple-secrets put api-key '--prod-key-abc123'\nsimple-secrets put db_url 'postgresql://user:pass@localhost:5432/db'\nsimple-secrets put script 'echo $(whoami)'  # Stores literally, not executed\n\n# Generate secure secrets automatically\nsimple-secrets put api-key --generate\nsimple-secrets put api-key -g --length 64",
+	Long:                  "Store a secret value under a key. Overwrites if the key exists. Backs up previous value.\n\nUse quotes for values with spaces or special characters.\n\n⚠️  SECURITY: Use single quotes to prevent shell command execution:\n    ✅ SAFE:      simple-secrets put key 'value with $(command)'\n    ❌ DANGEROUS: simple-secrets put key \"value with $(command)\"\n\nDouble quotes allow shell command substitution which executes before the app runs.\n\nUse --generate to automatically create a cryptographically secure secret:\n    simple-secrets put api-key --generate\n    simple-secrets put api-key --generate --length 64\n    simple-secrets put api-key -g -l 64",
+	Example:               "simple-secrets put api-key '--prod-key-abc123'\nsimple-secrets put db_url 'postgresql://user:pass@localhost:5432/db'\nsimple-secrets put script 'echo $(whoami)'  # Stores literally, not executed\n\n# Generate secure secrets automatically\nsimple-secrets put api-key --generate\nsimple-secrets put api-key -g --length 64\nsimple-secrets put api-key -g -l 32",
 	DisableFlagsInUseLine: true,
 	DisableFlagParsing:    true,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -55,27 +54,9 @@ type putArguments struct {
 	length   int
 }
 
-// generateSecretValue creates a cryptographically secure random secret
+// generateSecretValue creates a cryptographically secure random secret (wrapper for internal function)
 func generateSecretValue(length int) (string, error) {
-	if length <= 0 {
-		return "", fmt.Errorf("length must be positive, got %d", length)
-	}
-
-	// Character set: A-Z, a-z, 0-9, and URL-safe symbols
-	const charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()-_=+"
-
-	result := make([]byte, length)
-	randomBytes := make([]byte, length)
-
-	if _, err := rand.Read(randomBytes); err != nil {
-		return "", fmt.Errorf("failed to generate random bytes: %w", err)
-	}
-
-	for i, b := range randomBytes {
-		result[i] = charset[int(b)%len(charset)]
-	}
-
-	return string(result), nil
+	return internal.GenerateSecretValue(length)
 }
 
 func parsePutArguments(cmd *cobra.Command, args []string) (*putArguments, error) {
@@ -150,7 +131,7 @@ func isGenerateFlag(arg string) bool {
 }
 
 func isLengthFlag(args []string, position int) bool {
-	return args[position] == "--length" && hasLengthValue(args, position)
+	return (args[position] == "--length" || args[position] == "-l") && hasLengthValue(args, position)
 }
 
 func hasLengthValue(args []string, flagPosition int) bool {
@@ -304,7 +285,27 @@ var addCmd = &cobra.Command{
 	RunE:                  putCmd.RunE, // Same implementation as put
 }
 
+// completePutArgs provides completion for put command arguments
+func completePutArgs(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	if len(args) == 0 {
+		// First argument (key): suggest existing secret names for updates
+		keys, err := getAvailableSecretKeys(cmd)
+		if err != nil {
+			// If we can't get keys, still allow any input (for new secrets)
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+		return keys, cobra.ShellCompDirectiveNoFileComp
+	}
+
+	// Second argument (value): no completion
+	return nil, cobra.ShellCompDirectiveNoFileComp
+}
+
 func init() {
 	rootCmd.AddCommand(putCmd)
 	rootCmd.AddCommand(addCmd)
+
+	// Add completion for secret names on first argument
+	putCmd.ValidArgsFunction = completePutArgs
+	addCmd.ValidArgsFunction = completePutArgs
 }

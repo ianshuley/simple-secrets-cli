@@ -74,6 +74,182 @@ func init() {
 	rootCmd.Flags().BoolP("version", "v", false, "show version information")
 }
 
+// completeSecretNames provides completion for secret key names
+func completeSecretNames(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	// Try to get the available secret keys for completion
+	keys, err := getAvailableSecretKeys(cmd)
+	if err != nil {
+		// If we can't get keys (e.g., no auth), return no completion
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+
+	return keys, cobra.ShellCompDirectiveNoFileComp
+}
+
+// getAvailableSecretKeys retrieves all available secret keys for completion
+func getAvailableSecretKeys(cmd *cobra.Command) ([]string, error) {
+	// Get CLI service helper
+	helper, err := GetCLIServiceHelper()
+	if err != nil {
+		return nil, err
+	}
+
+	// Try to resolve token for authentication
+	token, err := resolveTokenFromCommand(cmd)
+	if err != nil {
+		return nil, err
+	}
+
+	// Resolve the token (CLI responsibility)
+	resolvedToken, err := internal.ResolveToken(token)
+	if err != nil {
+		return nil, err
+	}
+
+	// List secrets using focused service operations
+	keys, err := helper.GetService().Secrets().List(resolvedToken)
+	if err != nil {
+		return nil, err
+	}
+
+	return keys, nil
+}
+
+// getAvailableDisabledSecrets retrieves all disabled secret keys for completion
+func getAvailableDisabledSecrets(cmd *cobra.Command) ([]string, error) {
+	// Get CLI service helper
+	helper, err := GetCLIServiceHelper()
+	if err != nil {
+		return nil, err
+	}
+
+	// For disabled secrets, we need to access the store directly
+	user, _, err := helper.AuthenticateCommand(cmd, false)
+	if err != nil {
+		return nil, err
+	}
+	if user == nil {
+		return nil, fmt.Errorf("authentication required")
+	}
+
+	store, err := internal.LoadSecretsStore(internal.NewFilesystemBackend())
+	if err != nil {
+		return nil, err
+	}
+
+	disabledSecrets := store.ListDisabledSecrets()
+	return disabledSecrets, nil
+}
+
+// getAvailableBackupSecrets retrieves all secret keys that have backups for completion
+func getAvailableBackupSecrets(cmd *cobra.Command) ([]string, error) {
+	// Get CLI service helper
+	helper, err := GetCLIServiceHelper()
+	if err != nil {
+		return nil, err
+	}
+
+	// Authenticate to access backups
+	user, _, err := helper.AuthenticateCommand(cmd, false)
+	if err != nil {
+		return nil, err
+	}
+	if user == nil {
+		return nil, fmt.Errorf("authentication required")
+	}
+
+	store, err := internal.LoadSecretsStore(internal.NewFilesystemBackend())
+	if err != nil {
+		return nil, err
+	}
+
+	// Get all secret keys and check which have backups
+	secretKeys := store.ListKeys()
+	var backedUpSecrets []string
+
+	for _, key := range secretKeys {
+		backupPath := store.GetBackupPath(key)
+		if _, err := os.Stat(backupPath); err == nil {
+			backedUpSecrets = append(backedUpSecrets, key)
+		}
+	}
+
+	return backedUpSecrets, nil
+}
+
+// getAvailableBackupNames retrieves all database backup names for completion
+func getAvailableBackupNames(cmd *cobra.Command) ([]string, error) {
+	// Get CLI service helper
+	helper, err := GetCLIServiceHelper()
+	if err != nil {
+		return nil, err
+	}
+
+	// Authenticate to access backups
+	user, _, err := helper.AuthenticateCommand(cmd, false)
+	if err != nil {
+		return nil, err
+	}
+	if user == nil {
+		return nil, fmt.Errorf("authentication required")
+	}
+
+	store, err := internal.LoadSecretsStore(internal.NewFilesystemBackend())
+	if err != nil {
+		return nil, err
+	}
+
+	backups, err := store.ListRotationBackups()
+	if err != nil {
+		return nil, err
+	}
+
+	var backupNames []string
+	for _, backup := range backups {
+		backupNames = append(backupNames, backup.Name)
+	}
+
+	return backupNames, nil
+}
+
+// getAvailableUsernames retrieves all available usernames for completion
+func getAvailableUsernames(cmd *cobra.Command) ([]string, error) {
+	// Get CLI service helper
+	helper, err := GetCLIServiceHelper()
+	if err != nil {
+		return nil, err
+	}
+
+	// Check authentication and permissions
+	user, store, err := helper.AuthenticateCommand(cmd, false)
+	if err != nil {
+		return nil, err
+	}
+	if user == nil {
+		return nil, fmt.Errorf("authentication required")
+	}
+	if !user.Can("manage-users", store.Permissions()) {
+		return nil, fmt.Errorf("permission denied")
+	}
+
+	// Load users list
+	usersPath, err := internal.DefaultUserConfigPath("users.json")
+	if err != nil {
+		return nil, err
+	}
+	users, err := internal.LoadUsersList(usersPath)
+	if err != nil {
+		return nil, err
+	}
+
+	var usernames []string
+	for _, u := range users {
+		usernames = append(usernames, u.Username)
+	}
+
+	return usernames, nil
+}
+
 // handleRootCommand is called when simple-secrets is run without any subcommands
 func handleRootCommand(cmd *cobra.Command, args []string) {
 	versionFlag, _ := cmd.Flags().GetBool("version")

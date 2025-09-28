@@ -326,8 +326,8 @@ func TestConsolidatedCommandHelpText(t *testing.T) {
 			args: []string{"disable", "--help"},
 			contains: []string{
 				"Disable different types of resources",
-				"token <username>", "secret <key>",
-				"simple-secrets disable token alice",
+				"user <username>", "secret <key>",
+				"simple-secrets disable user alice",
 				"simple-secrets disable secret api-key",
 			},
 		},

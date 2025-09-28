@@ -75,3 +75,26 @@ func decrypt(key []byte, encrypted string) ([]byte, error) {
 	nonce, body := ct[:n], ct[n:]
 	return gcm.Open(nil, nonce, body, nil)
 }
+
+// GenerateSecretValue creates a cryptographically secure random secret
+func GenerateSecretValue(length int) (string, error) {
+	if length <= 0 {
+		return "", fmt.Errorf("length must be positive, got %d", length)
+	}
+
+	// Character set: A-Z, a-z, 0-9, and URL-safe symbols
+	const charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()-_=+"
+
+	result := make([]byte, length)
+	randomBytes := make([]byte, length)
+
+	if _, err := rand.Read(randomBytes); err != nil {
+		return "", fmt.Errorf("failed to generate random bytes: %w", err)
+	}
+
+	for i, b := range randomBytes {
+		result[i] = charset[int(b)%len(charset)]
+	}
+
+	return string(result), nil
+}

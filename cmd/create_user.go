@@ -133,6 +133,24 @@ func printUserCreationSuccess(username, token string) {
 	fmt.Printf("Generated token: %s\n", token)
 }
 
+// completeCreateUserArgs provides completion for create-user command arguments
+func completeCreateUserArgs(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	if len(args) == 0 {
+		// First argument: username - no completion (user input)
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+
+	if len(args) == 1 {
+		// Second argument: role - suggest valid roles
+		return []string{"admin", "reader"}, cobra.ShellCompDirectiveNoFileComp
+	}
+
+	return nil, cobra.ShellCompDirectiveNoFileComp
+}
+
 func init() {
 	rootCmd.AddCommand(createUserCmd)
+
+	// Add custom completion for create-user command
+	createUserCmd.ValidArgsFunction = completeCreateUserArgs
 }

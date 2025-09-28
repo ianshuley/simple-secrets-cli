@@ -212,11 +212,34 @@ func rotateToken(cmd *cobra.Command, targetUsername string) error {
 	return nil
 }
 
+// completeRotateArgs provides completion for rotate command arguments
+func completeRotateArgs(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	if len(args) == 0 {
+		// First argument: suggest rotation types
+		return []string{"master-key", "token"}, cobra.ShellCompDirectiveNoFileComp
+	}
+
+	if len(args) == 1 && args[0] == "token" {
+		// Second argument for token rotation: complete with available usernames
+		usernames, err := getAvailableUsernames(cmd)
+		if err != nil {
+			// If we can't get usernames (no auth/permissions), return no completion
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+		return usernames, cobra.ShellCompDirectiveNoFileComp
+	}
+
+	return nil, cobra.ShellCompDirectiveNoFileComp
+}
+
 func init() {
 	rotateCmd.Flags().BoolVar(&rotateNewYes, "yes", false, "Skip confirmation prompt for master key rotation")
 	rotateCmd.Flags().StringVar(&rotateNewBackupDir, "backup-dir", "", "Custom backup directory for master key rotation")
 
 	rootCmd.AddCommand(rotateCmd)
+
+	// Add custom completion for rotate command
+	rotateCmd.ValidArgsFunction = completeRotateArgs
 }
 
 func printBackupLocation(backupDir string) {

@@ -249,3 +249,64 @@ func TestFullServiceComposition(t *testing.T) {
 
 	t.Log("All API interface tests passed!")
 }
+
+func TestNewServiceLayerMethods(t *testing.T) {
+	store, userStore := newTempStoreForAPI(t)
+	adapter := NewServiceAdapter(store, userStore)
+
+	// Test Generate functionality
+	t.Run("Generate", func(t *testing.T) {
+		generatedValue, err := adapter.Generate("generated-key", 32)
+		if err != nil {
+			t.Fatalf("Generate failed: %v", err)
+		}
+
+		if len(generatedValue) != 32 {
+			t.Errorf("Generate returned %d characters, expected 32", len(generatedValue))
+		}
+
+		// Verify the secret was actually stored
+		storedValue, err := adapter.Get("generated-key")
+		if err != nil {
+			t.Fatalf("Get after Generate failed: %v", err)
+		}
+		if storedValue != generatedValue {
+			t.Errorf("Stored value %q does not match generated value %q", storedValue, generatedValue)
+		}
+	})
+
+	// Test ListDisabled functionality
+	t.Run("ListDisabled", func(t *testing.T) {
+		// Create a secret and disable it
+		err := adapter.Put("disable-test", "value")
+		if err != nil {
+			t.Fatalf("Put failed: %v", err)
+		}
+
+		err = adapter.Disable("disable-test")
+		if err != nil {
+			t.Fatalf("Disable failed: %v", err)
+		}
+
+		// List disabled secrets
+		disabled := adapter.ListDisabled()
+		found := false
+		for _, key := range disabled {
+			if key == "disable-test" {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("ListDisabled did not return disabled secret 'disable-test', got: %v", disabled)
+		}
+
+		// Verify it's not in the regular list
+		enabled := adapter.List()
+		for _, key := range enabled {
+			if key == "disable-test" {
+				t.Errorf("Disabled secret 'disable-test' should not appear in List(), got: %v", enabled)
+			}
+		}
+	})
+}

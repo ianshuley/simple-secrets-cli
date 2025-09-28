@@ -66,4 +66,7 @@ var getCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(getCmd)
+
+	// Add completion for secret names
+	getCmd.ValidArgsFunction = completeSecretNames
 }

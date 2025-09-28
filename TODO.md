@@ -2,6 +2,23 @@
 
 ## Platform Integration Readiness (Future v2.0 API Development)
 
+### Architecture Refactoring
+
+- [ ] **Package restructuring**: Reorganize code structure for better separation of concerns
+  - Move business logic out of `cmd/` package into reusable service packages
+  - Create `pkg/services/` for core business operations (secrets, auth, users)
+  - Establish clear interfaces between CLI commands and business logic
+  - Extract CLI-specific code (input parsing, output formatting) from business operations
+  - Design package structure that supports both CLI and future HTTP API consumers
+
+- [ ] **Multi-token per user support**: Allow users to have multiple active authentication tokens
+  - Extend user data structure to support multiple tokens per user instead of single token
+  - Update authentication system to validate against any of user's active tokens
+  - Add token management commands: `create-token`, `list-tokens`, `revoke-token` for users
+  - Implement token metadata (creation date, last used, optional description/name)
+  - Update `rotate token` command to work with multiple tokens (specify which to rotate)
+  - Design token lifecycle management (automatic cleanup of expired/unused tokens)
+
 ### Business Logic Extraction
 
 - [ ] **Error abstraction**: Standardize error types for consistent API responses
