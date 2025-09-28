@@ -108,19 +108,8 @@ func (sa *ServiceAdapter) Put(key, value string) error {
 }
 
 func (sa *ServiceAdapter) Generate(key string, length int) (string, error) {
-	// Generate the secret value using the same logic as CLI
-	generatedValue, err := GenerateSecretValue(length)
-	if err != nil {
-		return "", fmt.Errorf("failed to generate secret: %w", err)
-	}
-
-	// Store the generated value
-	err = sa.secrets.Put(key, generatedValue)
-	if err != nil {
-		return "", fmt.Errorf("failed to store generated secret: %w", err)
-	}
-
-	return generatedValue, nil
+	// Delegate to the underlying SecretsStore implementation
+	return sa.secrets.Generate(key, length)
 }
 
 func (sa *ServiceAdapter) Delete(key string) error {
