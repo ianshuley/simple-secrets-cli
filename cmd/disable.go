@@ -224,7 +224,7 @@ func completeDisableArgs(cmd *cobra.Command, args []string, toComplete string) (
 	if len(args) == 0 {
 		// First argument: suggest disable types
 		// "token" now accepts both usernames and token values
-		return []string{"token", "secret"}, cobra.ShellCompDirectiveNoFileComp
+		return []string{"user", "token", "secret"}, cobra.ShellCompDirectiveNoFileComp
 	}
 
 	if len(args) == 1 {
