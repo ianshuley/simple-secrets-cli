@@ -3,9 +3,14 @@ Copyright © 2025 Ian Shuley
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
 
-	http://www.apache.org/licenses/LICENSE-2.0
+	You may obtain a copy of 		{
+				name:     "string_with_quotes",
+				input:    `key with "quotes"`,
+				expected: `key with "quotes"`,
+			},icense at
+
+		http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -158,79 +163,6 @@ func TestGetTokenRotationDisplay(t *testing.T) {
 			result := getTokenRotationDisplay(tt.timestamp)
 			if result != tt.expected {
 				t.Errorf("getTokenRotationDisplay() expected %q, got %q", tt.expected, result)
-			}
-		})
-	}
-}
-
-func TestSafeDisplayFormat(t *testing.T) {
-	tests := []struct {
-		name     string
-		input    string
-		expected string
-	}{
-		{
-			name:     "simple_string",
-			input:    "test-key",
-			expected: `"test-key"`,
-		},
-		{
-			name:     "empty_string",
-			input:    "",
-			expected: `""`,
-		},
-		{
-			name:     "string_with_spaces",
-			input:    "test key with spaces",
-			expected: `"test key with spaces"`,
-		},
-		{
-			name:     "string_with_quotes",
-			input:    `key"with"quotes`,
-			expected: `"key\"with\"quotes"`,
-		},
-		{
-			name:     "string_with_newlines",
-			input:    "key\nwith\nnewlines",
-			expected: `"key\nwith\nnewlines"`,
-		},
-		{
-			name:     "string_with_tabs",
-			input:    "key\twith\ttabs",
-			expected: `"key\twith\ttabs"`,
-		},
-		{
-			name:     "string_with_backslashes",
-			input:    `key\with\backslashes`,
-			expected: `"key\\with\\backslashes"`,
-		},
-		{
-			name:     "string_with_control_characters",
-			input:    "key\x00\x01\x02",
-			expected: `"key\x00\x01\x02"`,
-		},
-		{
-			name:     "unicode_string",
-			input:    "key-with-émojis-🔑",
-			expected: `"key-with-émojis-🔑"`,
-		},
-		{
-			name:     "string_with_carriage_return",
-			input:    "key\rwith\rcarriage",
-			expected: `"key\rwith\rcarriage"`,
-		},
-		{
-			name:     "mixed_special_characters",
-			input:    "key\"with\nmixed\tspecial\rchars\\",
-			expected: `"key\"with\nmixed\tspecial\rchars\\"`,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := safeDisplayFormat(tt.input)
-			if result != tt.expected {
-				t.Errorf("safeDisplayFormat(%q) expected %q, got %q", tt.input, tt.expected, result)
 			}
 		})
 	}

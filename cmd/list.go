@@ -18,7 +18,6 @@ package cmd
 import (
 	"fmt"
 	"sort"
-	"strconv"
 	"time"
 
 	"simple-secrets/internal"
@@ -91,9 +90,7 @@ func listKeys(cmd *cobra.Command) error {
 		return nil
 	}
 	for _, k := range keys {
-		// Escape special characters to prevent multiline display issues
-		escaped := safeDisplayFormat(k)
-		fmt.Println(escaped)
+		fmt.Println(k)
 	}
 	return nil
 }
@@ -225,8 +222,7 @@ func listDisabledSecrets(cmd *cobra.Command) error {
 
 	fmt.Printf("Disabled secrets (%d):\n", len(disabledSecrets))
 	for _, key := range disabledSecrets {
-		escaped := safeDisplayFormat(key)
-		fmt.Printf("  🚫 %s\n", escaped)
+		fmt.Printf("  🚫 %s\n", key)
 	}
 	fmt.Println()
 	fmt.Println("Use 'enable secret <key>' to re-enable a disabled secret.")
@@ -256,8 +252,4 @@ func getTokenRotationDisplay(tokenRotatedAt *time.Time) string {
 		return "Unknown (legacy user)"
 	}
 	return tokenRotatedAt.Format("2006-01-02 15:04:05")
-}
-
-func safeDisplayFormat(key string) string {
-	return strconv.Quote(key)
 }
