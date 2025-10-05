@@ -168,5 +168,3 @@ func TestGenerateBackupName(t *testing.T) {
 		t.Errorf("Generated backup name should be parseable, got error: %v", err)
 	}
 }
-
-
