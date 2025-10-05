@@ -1,6 +1,7 @@
 package rotation
 
 import (
+	"strings"
 	"testing"
 	"time"
 )
@@ -68,7 +69,7 @@ func TestBackupInfo_String(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			result := tt.backup.String()
 			for _, expected := range tt.expectsContains {
-				if !containsString(result, expected) {
+				if !strings.Contains(result, expected) {
 					t.Errorf("Expected string %q to contain %q", result, expected)
 				}
 			}
@@ -157,7 +158,7 @@ func TestParseBackupTimestamp(t *testing.T) {
 
 func TestGenerateBackupName(t *testing.T) {
 	name := GenerateBackupName("rotate")
-	if !containsString(name, "rotate-") {
+	if !strings.Contains(name, "rotate-") {
 		t.Errorf("Expected generated name to contain 'rotate-', got %q", name)
 	}
 
@@ -168,16 +169,4 @@ func TestGenerateBackupName(t *testing.T) {
 	}
 }
 
-// Helper function
-func containsString(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(substr) == 0 || indexOf(s, substr) >= 0)
-}
 
-func indexOf(s, substr string) int {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return i
-		}
-	}
-	return -1
-}

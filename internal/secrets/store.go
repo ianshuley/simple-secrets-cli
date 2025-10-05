@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 
+	"simple-secrets/pkg/crypto"
 	"simple-secrets/pkg/errors"
 	"simple-secrets/pkg/secrets"
 )
@@ -188,16 +189,49 @@ func (s *StoreImpl) Disable(ctx context.Context, key string) error {
 
 // RotateMasterKey generates a new master encryption key and re-encrypts all secrets
 func (s *StoreImpl) RotateMasterKey(ctx context.Context, backupDir string) error {
-	// For master key rotation during platform migration, we delegate to the working
-	// SecretsStore implementation that has the proven rotation logic.
-	// This ensures functionality while the platform services architecture is completed.
-
-	// Create old-style secrets store with working rotation implementation
-	oldStore, err := LoadSecretsStore(NewFilesystemBackend())
+	// Generate a new master key
+	newKey, err := crypto.GenerateKey()
 	if err != nil {
-		return fmt.Errorf("failed to load secrets store for rotation: %w", err)
+		return fmt.Errorf("failed to generate new master key: %w", err)
 	}
 
-	// Delegate to the working rotation implementation
-	return oldStore.RotateMasterKey(backupDir)
+	// List all secrets to re-encrypt
+	allSecrets, err := s.repo.List(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to list secrets for re-encryption: %w", err)
+	}
+
+	// Store old crypto service for decryption
+	oldCrypto := s.crypto
+
+	// Create new crypto service with new key
+	newCrypto := NewCryptoService(newKey)
+
+	// Re-encrypt all secrets with new key
+	for _, secret := range allSecrets {
+		// Decrypt with old key
+		plaintext, err := oldCrypto.Decrypt(secret.Value)
+		if err != nil {
+			return fmt.Errorf("failed to decrypt secret %s with old key: %w", secret.Key, err)
+		}
+
+		// Encrypt with new key
+		newEncryptedValue, err := newCrypto.Encrypt(plaintext)
+		if err != nil {
+			return fmt.Errorf("failed to encrypt secret %s with new key: %w", secret.Key, err)
+		}
+
+		// Update secret with new encrypted value
+		secret.UpdateValue(newEncryptedValue, len(plaintext))
+
+		// Store updated secret
+		if err := s.repo.Store(ctx, secret); err != nil {
+			return fmt.Errorf("failed to store re-encrypted secret %s: %w", secret.Key, err)
+		}
+	}
+
+	// Update crypto service to use new key
+	s.crypto = newCrypto
+
+	return nil
 }

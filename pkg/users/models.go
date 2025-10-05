@@ -188,6 +188,9 @@ func NewToken(name, hash string) *Token {
 // generateID generates a random ID for users and tokens
 func generateID() string {
 	bytes := make([]byte, 16)
-	rand.Read(bytes)
+	if _, err := rand.Read(bytes); err != nil {
+		// Handle error: return empty string if random generation fails
+		return ""
+	}
 	return hex.EncodeToString(bytes)
 }
