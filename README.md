@@ -155,7 +155,7 @@ export SIMPLE_SECRETS_TOKEN=your-token-here
 # Custom data directory
 export SIMPLE_SECRETS_DATA_DIR=/custom/path/to/data
 
-# Custom config directory  
+# Custom config directory
 export SIMPLE_SECRETS_CONFIG_DIR=/custom/path/to/config
 ```
 
