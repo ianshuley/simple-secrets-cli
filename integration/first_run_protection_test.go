@@ -56,7 +56,7 @@ func TestFirstRunProtectionIntegration(t *testing.T) {
 
 		// Setup: create only secrets.json to simulate partial installation
 		secretsPath := filepath.Join(env.ConfigDir(), "secrets.json")
-		err := os.WriteFile(secretsPath, []byte(`{"secrets":[]}`), 0600)
+		err := os.WriteFile(secretsPath, []byte(`{}`), 0600)
 		if err != nil {
 			t.Fatalf("failed to create secrets.json: %v", err)
 		}
@@ -111,7 +111,7 @@ func TestFirstRunProtectionIntegration(t *testing.T) {
 			t.Fatalf("failed to create master.key: %v", err)
 		}
 
-		err = os.WriteFile(secretsPath, []byte(`{"secrets":[]}`), 0600)
+		err = os.WriteFile(secretsPath, []byte(`{}`), 0600)
 		if err != nil {
 			t.Fatalf("failed to create secrets.json: %v", err)
 		}

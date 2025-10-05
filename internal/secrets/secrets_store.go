@@ -28,6 +28,7 @@ import (
 
 	"simple-secrets/internal/auth"
 	"simple-secrets/pkg/crypto"
+	secretsmodels "simple-secrets/pkg/secrets"
 )
 
 // Using FileMode from repository.go
@@ -120,9 +121,9 @@ type SecretsStore struct {
 	KeyPath     string
 	SecretsPath string
 	masterKey   []byte
-	secrets     map[string]string // key -> base64(ciphertext)
-	mu          sync.RWMutex      // protects secrets map and masterKey
-	storage     StorageBackend    // injectable storage backend
+	secrets     map[string]secretsmodels.Secret // key -> Secret object with metadata
+	mu          sync.RWMutex                    // protects secrets map and masterKey
+	storage     StorageBackend                  // injectable storage backend
 }
 
 // LoadSecretsStore creates ~/.simple-secrets, loads key + secrets
@@ -137,7 +138,7 @@ func LoadSecretsStore(backend StorageBackend) (*SecretsStore, error) {
 	s := &SecretsStore{
 		KeyPath:     filepath.Join(dir, "master.key"),
 		SecretsPath: filepath.Join(dir, "secrets.json"),
-		secrets:     make(map[string]string),
+		secrets:     make(map[string]secretsmodels.Secret),
 		storage:     backend,
 	}
 
@@ -158,7 +159,7 @@ func LoadSecretsStoreFromDir(backend StorageBackend, configDir string) (*Secrets
 	s := &SecretsStore{
 		KeyPath:     filepath.Join(configDir, "master.key"),
 		SecretsPath: filepath.Join(configDir, "secrets.json"),
-		secrets:     make(map[string]string),
+		secrets:     make(map[string]secretsmodels.Secret),
 		storage:     backend,
 	}
 
@@ -194,18 +195,24 @@ func (s *SecretsStore) loadSecrets() error {
 	return nil
 }
 
+// SecretsFileFormat represents the JSON structure saved to disk
+type SecretsFileFormat struct {
+	Secrets map[string]secretsmodels.Secret `json:"secrets"`
+	Version string                          `json:"version"`
+}
+
 // loadSecretsFromDisk loads secrets from disk without modifying in-memory state
-func (s *SecretsStore) loadSecretsFromDisk() (map[string]string, error) {
+func (s *SecretsStore) loadSecretsFromDisk() (map[string]secretsmodels.Secret, error) {
 	if !s.storage.Exists(s.SecretsPath) {
-		return make(map[string]string), nil
+		return make(map[string]secretsmodels.Secret), nil
 	}
 	b, err := s.storage.ReadFile(s.SecretsPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read secrets database from %s: %w", s.SecretsPath, err)
 	}
 
-	var secrets map[string]string
-	if err := json.Unmarshal(b, &secrets); err != nil {
+	var fileFormat SecretsFileFormat
+	if err := json.Unmarshal(b, &fileFormat); err != nil {
 		return nil, fmt.Errorf("secrets database appears to be corrupted (JSON parse error: %v). "+
 			"Recovery options: "+
 			"Restore from backup: ./simple-secrets restore-database; "+
@@ -214,12 +221,21 @@ func (s *SecretsStore) loadSecretsFromDisk() (map[string]string, error) {
 			"Do not delete ~/.simple-secrets/ - your backups contain recoverable data", err)
 	}
 
-	return secrets, nil
+	if fileFormat.Secrets == nil {
+		return make(map[string]secretsmodels.Secret), nil
+	}
+
+	return fileFormat.Secrets, nil
 }
 
 // saveSecretsLocked saves secrets to disk, assumes caller holds lock
 func (s *SecretsStore) saveSecretsLocked() error {
-	b, err := json.MarshalIndent(s.secrets, "", "  ")
+	fileFormat := SecretsFileFormat{
+		Secrets: s.secrets,
+		Version: "", // Version can be used by platform layer for migrations
+	}
+
+	b, err := json.MarshalIndent(fileFormat, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to serialize secrets for saving: %w", err)
 	}
@@ -244,10 +260,10 @@ func (s *SecretsStore) mergeWithDiskState() error {
 }
 
 // backupSecret creates an encrypted backup of a secret
-func (s *SecretsStore) backupSecret(key, encryptedValue string) {
+func (s *SecretsStore) backupSecret(key string, secret secretsmodels.Secret) {
 	backupPath := s.getBackupPath(key)
 	s.createBackupDirectory()
-	_ = s.storage.WriteFile(backupPath, []byte(encryptedValue), FileMode(secureFilePermissions))
+	_ = s.storage.WriteFile(backupPath, secret.Value, FileMode(secureFilePermissions))
 }
 
 func (s *SecretsStore) Put(key, value string) error {
@@ -277,7 +293,27 @@ func (s *SecretsStore) Put(key, value string) error {
 
 	// Now perform the update with merged state
 	s.ensureBackupExists(key)
-	s.secrets[key] = encryptedValue
+
+	// Create Secret object with metadata
+	now := time.Now()
+	secret := secretsmodels.Secret{
+		Key:   key,
+		Value: []byte(encryptedValue), // Store encrypted value as bytes
+		Metadata: secretsmodels.SecretMetadata{
+			Key:        key,
+			CreatedAt:  now,
+			ModifiedAt: now,
+			Disabled:   false,
+			Size:       len(value), // Store size of plaintext for display
+		},
+	}
+
+	// If updating existing secret, preserve creation time
+	if existing, exists := s.secrets[key]; exists {
+		secret.Metadata.CreatedAt = existing.Metadata.CreatedAt
+	}
+
+	s.secrets[key] = secret
 	return s.saveSecretsLocked()
 }
 
@@ -299,14 +335,19 @@ func (s *SecretsStore) Get(key string) (string, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	enc, ok := s.secrets[key]
+	secret, ok := s.secrets[key]
 	if !ok {
 		return "", ErrNotFound
 	}
 
+	// Check if secret is disabled
+	if secret.IsDisabled() {
+		return "", ErrNotFound // Treat disabled secrets as not found
+	}
+
 	// Decrypt directly with master key while holding the read lock
 	// This prevents race conditions with key rotation
-	pt, err := crypto.Decrypt(s.masterKey, enc)
+	pt, err := crypto.Decrypt(s.masterKey, string(secret.Value))
 	if err != nil {
 		return "", err
 	}
@@ -316,8 +357,8 @@ func (s *SecretsStore) Get(key string) (string, error) {
 func (s *SecretsStore) ListKeys() []string {
 	s.mu.RLock()
 	keys := make([]string, 0, len(s.secrets))
-	for k := range s.secrets {
-		if !strings.HasPrefix(k, disabledPrefix) {
+	for k, secret := range s.secrets {
+		if secret.IsEnabled() { // Only list enabled secrets
 			keys = append(keys, k)
 		}
 	}
@@ -387,25 +428,17 @@ func (s *SecretsStore) DisableSecret(key string) error {
 		return fmt.Errorf("failed to merge disk state: %w", err)
 	}
 
-	enc, ok := s.secrets[key]
+	secret, ok := s.secrets[key]
 	if !ok {
 		return ErrNotFound
 	}
 
 	// Create backup before disabling
-	s.backupSecret(key, enc)
+	s.backupSecret(key, secret)
 
-	// Mark as disabled using JSON encoding to handle keys with special characters
-	timestamp := time.Now().UnixNano()
-	keyData := map[string]any{
-		"timestamp": timestamp,
-		"key":       key,
-	}
-	keyJSON, _ := json.Marshal(keyData)
-	disabledKey := disabledPrefix + string(keyJSON)
-
-	s.secrets[disabledKey] = enc
-	delete(s.secrets, key)
+	// Mark as disabled using metadata
+	secret.Disable() // This updates ModifiedAt and sets Disabled=true
+	s.secrets[key] = secret
 
 	return s.saveSecretsLocked()
 }
@@ -480,17 +513,18 @@ func (s *SecretsStore) EnableSecret(key string) error {
 		return fmt.Errorf("failed to merge disk state: %w", err)
 	}
 
-	// Build a map of original keys to their disabled keys for efficient lookup
-	disabledMap := s.buildDisabledSecretsMap()
-
-	disabledKey, found := disabledMap[key]
-	if !found {
-		return fmt.Errorf("disabled secret not found")
+	secret, ok := s.secrets[key]
+	if !ok {
+		return fmt.Errorf("secret not found")
 	}
 
-	// Move back to original key
-	s.secrets[key] = s.secrets[disabledKey]
-	delete(s.secrets, disabledKey)
+	if secret.IsEnabled() {
+		return fmt.Errorf("secret is already enabled")
+	}
+
+	// Mark as enabled using metadata
+	secret.Enable() // This updates ModifiedAt and sets Disabled=false
+	s.secrets[key] = secret
 
 	return s.saveSecretsLocked()
 }
@@ -498,12 +532,13 @@ func (s *SecretsStore) EnableSecret(key string) error {
 // ListDisabledSecrets returns a list of disabled secret keys
 func (s *SecretsStore) ListDisabledSecrets() []string {
 	s.mu.RLock()
-	disabledMap := s.buildDisabledSecretsMap()
-	s.mu.RUnlock()
+	defer s.mu.RUnlock()
 
-	disabled := make([]string, 0, len(disabledMap))
-	for originalKey := range disabledMap {
-		disabled = append(disabled, originalKey)
+	disabled := make([]string, 0)
+	for key, secret := range s.secrets {
+		if secret.IsDisabled() {
+			disabled = append(disabled, key)
+		}
 	}
 
 	sort.Strings(disabled)
@@ -515,9 +550,8 @@ func (s *SecretsStore) IsEnabled(key string) bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	// Check if the key exists in enabled state
-	_, exists := s.secrets[key]
-	return exists
+	secret, exists := s.secrets[key]
+	return exists && secret.IsEnabled()
 }
 
 // CreateBackup creates a backup of the current secrets and master key

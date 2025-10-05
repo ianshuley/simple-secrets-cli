@@ -24,6 +24,8 @@ import (
 	"strings"
 	"time"
 
+	secretsmodels "simple-secrets/pkg/secrets"
+
 	"simple-secrets/internal/auth"
 	"simple-secrets/pkg/crypto"
 )
@@ -38,8 +40,8 @@ const (
 // decryptAllSecrets decrypts all secrets with the current master key
 func (s *SecretsStore) decryptAllSecrets() (map[string][]byte, error) {
 	plaintexts := make(map[string][]byte, len(s.secrets))
-	for key, encValue := range s.secrets {
-		pt, err := crypto.Decrypt(s.masterKey, encValue)
+	for key, secret := range s.secrets {
+		pt, err := crypto.Decrypt(s.masterKey, string(secret.Value))
 		if err != nil {
 			return nil, fmt.Errorf("failed to decrypt secret %q: %w", key, err)
 		}
@@ -49,14 +51,36 @@ func (s *SecretsStore) decryptAllSecrets() (map[string][]byte, error) {
 }
 
 // reencryptAllSecrets re-encrypts all plaintext secrets with a new key
-func (s *SecretsStore) reencryptAllSecrets(plaintexts map[string][]byte, newKey []byte) (map[string]string, error) {
-	newSecrets := make(map[string]string, len(plaintexts))
+func (s *SecretsStore) reencryptAllSecrets(plaintexts map[string][]byte, newKey []byte) (map[string]secretsmodels.Secret, error) {
+	newSecrets := make(map[string]secretsmodels.Secret, len(plaintexts))
 	for key, pt := range plaintexts {
 		enc, err := crypto.Encrypt(newKey, pt)
 		if err != nil {
 			return nil, fmt.Errorf("failed to encrypt secret %q: %w", key, err)
 		}
-		newSecrets[key] = enc
+
+		// Preserve existing metadata if available, otherwise create new
+		var metadata secretsmodels.SecretMetadata
+		if existingSecret, exists := s.secrets[key]; exists {
+			metadata = existingSecret.Metadata
+			metadata.ModifiedAt = time.Now() // Update modification time due to re-encryption
+		} else {
+			// Create new metadata (shouldn't happen during rotation, but defensive)
+			now := time.Now()
+			metadata = secretsmodels.SecretMetadata{
+				Key:        key,
+				CreatedAt:  now,
+				ModifiedAt: now,
+				Disabled:   false,
+				Size:       len(pt),
+			}
+		}
+
+		newSecrets[key] = secretsmodels.Secret{
+			Key:      key,
+			Value:    []byte(enc),
+			Metadata: metadata,
+		}
 	}
 	return newSecrets, nil
 }
