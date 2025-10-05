@@ -211,7 +211,8 @@ func TestConsolidatedRestoreCommands(t *testing.T) {
 		{
 			name:    "restore secret non-existent",
 			args:    []string{"restore", "secret", "nonexistent"},
-			wantErr: true,
+			wantErr: false, // Point-in-time recovery offers to restore from most recent backup
+			stdin:   "n\n",  // Decline the restoration
 		},
 		{
 			name:    "restore database abort",

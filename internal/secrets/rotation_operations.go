@@ -144,7 +144,13 @@ func (s *SecretsStore) RotateMasterKey(backupDir string) error {
 	}
 	defer os.Remove(tmpKeyPath) // Clean up on error
 
-	newSecretsData, err := json.MarshalIndent(newSecrets, "", "  ")
+	// Wrap secrets in the file format structure
+	fileFormat := SecretsFileFormat{
+		Secrets: newSecrets,
+		Version: "",
+	}
+	
+	newSecretsData, err := json.MarshalIndent(fileFormat, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal new secrets: %w", err)
 	}

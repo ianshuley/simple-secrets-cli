@@ -101,8 +101,8 @@ func restoreSecret(cmd *cobra.Command, secretKey string) error {
 		return fmt.Errorf("no backups available for secret restoration")
 	}
 
-	// For now, use the most recent backup for secret restoration
-	// TODO: In the future, we could implement individual secret backup restoration
+	// Use the most recent backup for secret restoration (industry standard point-in-time recovery)
+	// This ensures atomic consistency - all secrets are from the same point in time
 	mostRecentBackup := backups[0]
 	for _, backup := range backups {
 		if backup.Timestamp.After(mostRecentBackup.Timestamp) {

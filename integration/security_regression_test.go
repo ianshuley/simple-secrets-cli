@@ -181,11 +181,11 @@ func TestPermissionEscalationVulnerability(t *testing.T) {
 		Failure().
 		Contains("Permission denied: manage-users")
 
-	// Test that reader cannot rotate master key - currently disabled during migration
+	// Test that reader cannot rotate master key - proper permission enforcement
 	output, err = env.RunRawCommand([]string{"rotate", "master-key", "--yes", "--token", readerToken}, env.CleanEnvironment(), "")
 	testing_framework.Assert(t, output, err).
 		Failure().
-		Contains("temporarily disabled during platform migration")
+		Contains("Permission denied: manage-users")
 }
 
 // TestTokenSecurityVulnerability tests token handling security

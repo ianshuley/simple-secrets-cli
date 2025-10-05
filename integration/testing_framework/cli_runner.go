@@ -139,6 +139,11 @@ func (s *SecretCommands) Restore(key string) ([]byte, error) {
 	return s.cli.runWithToken([]string{"restore", "secret", key})
 }
 
+func (s *SecretCommands) RestoreWithConfirmation(key string, confirm string) ([]byte, error) {
+	argsWithToken := append([]string{"restore", "secret", key}, "--token", s.cli.env.AdminToken())
+	return s.cli.env.RunRawCommand(argsWithToken, s.cli.env.CleanEnvironment(), confirm)
+}
+
 // User Commands
 
 // Create creates a new user
