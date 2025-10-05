@@ -118,19 +118,15 @@ func rotateMasterKey(cmd *cobra.Command) error {
 	}
 
 	// Perform master key rotation using platform services
-	err = app.Rotation.RotateMasterKey(ctx, rotateNewBackupDir)
+	err = app.Rotation.RotateMasterKey(cmd.Context(), rotateNewBackupDir)
 	if err != nil {
-		return fmt.Errorf("master key rotation failed: %w", err)
+		return fmt.Errorf("failed to rotate master key: %w", err)
 	}
 
-	fmt.Println("✅ Master key rotation completed successfully!")
+	fmt.Println("Master key rotation completed successfully")
 	if rotateNewBackupDir != "" {
-		fmt.Printf("📁 Backup created at %s\n", rotateNewBackupDir)
-	} else {
-		fmt.Println("📁 Backup created in ~/.simple-secrets/backups/")
+		fmt.Printf("Backup created in: %s\n", rotateNewBackupDir)
 	}
-	fmt.Println("All secrets have been re-encrypted with the new master key.")
-
 	return nil
 }
 
