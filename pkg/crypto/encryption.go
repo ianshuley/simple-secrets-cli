@@ -32,6 +32,15 @@ const (
 	AES256KeySize = 32 // AES-256 key size in bytes
 )
 
+// GenerateKey generates a new 256-bit AES key
+func GenerateKey() ([]byte, error) {
+	key := make([]byte, AES256KeySize)
+	if _, err := io.ReadFull(rand.Reader, key); err != nil {
+		return nil, fmt.Errorf("failed to generate random key: %w", err)
+	}
+	return key, nil
+}
+
 // Encrypt encrypts plaintext using AES-256-GCM and returns base64 encoded result
 func Encrypt(key, plaintext []byte) (string, error) {
 	block, err := aes.NewCipher(key)
