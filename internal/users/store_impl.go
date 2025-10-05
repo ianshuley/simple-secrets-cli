@@ -19,12 +19,12 @@ package users
 import (
 	"context"
 	"crypto/rand"
-	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"strings"
 	"time"
 
+	"simple-secrets/pkg/crypto"
 	"simple-secrets/pkg/errors"
 	"simple-secrets/pkg/users"
 )
@@ -282,8 +282,7 @@ func (s *StoreImpl) generateToken() (string, string, error) {
 
 // hashToken creates a secure hash of a token for storage
 func (s *StoreImpl) hashToken(token string) string {
-	hash := sha256.Sum256([]byte(token))
-	return hex.EncodeToString(hash[:])
+	return crypto.HashToken(token)
 }
 
 // validateUsername validates username format and constraints
