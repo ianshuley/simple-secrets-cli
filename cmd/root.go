@@ -70,7 +70,7 @@ func Execute() {
 // This runs before every command to ensure platform services are available
 func initializePlatform(cmd *cobra.Command, args []string) error {
 	// Skip platform initialization for version and help commands
-	if cmd.Name() == "help" || cmd.Name() == "completion" {
+	if cmd.Name() == "help" || cmd.Name() == "completion" || cmd.Name() == "version" {
 		return nil
 	}
 
