@@ -19,27 +19,25 @@ package cmd
 import (
 	"testing"
 	"time"
-
-	internal "simple-secrets/internal/auth"
 )
 
 func TestParseRole(t *testing.T) {
 	tests := []struct {
 		name        string
 		roleStr     string
-		expected    internal.Role
+		expected    string
 		expectError bool
 	}{
 		{
 			name:        "valid_admin_role",
 			roleStr:     "admin",
-			expected:    internal.RoleAdmin,
+			expected:    "admin",
 			expectError: false,
 		},
 		{
 			name:        "valid_reader_role",
 			roleStr:     "reader",
-			expected:    internal.RoleReader,
+			expected:    "reader",
 			expectError: false,
 		},
 		{

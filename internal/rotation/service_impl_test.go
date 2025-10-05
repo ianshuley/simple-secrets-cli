@@ -46,6 +46,9 @@ func (m *mockSecretsStore) Disable(ctx context.Context, key string) error { retu
 func (m *mockSecretsStore) ListDisabled(ctx context.Context) ([]secrets.SecretMetadata, error) {
 	return []secrets.SecretMetadata{}, nil
 }
+func (m *mockSecretsStore) RotateMasterKey(ctx context.Context, backupDir string) error {
+	return nil
+}
 
 // mockUsersStore is a test double for the users store
 type mockUsersStore struct{}
