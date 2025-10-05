@@ -17,7 +17,7 @@ package cmd
 
 import (
 	"fmt"
-	"simple-secrets/internal"
+	"simple-secrets/internal/auth"
 
 	"github.com/spf13/cobra"
 )
@@ -34,7 +34,7 @@ It should be placed at ~/.simple-secrets/config.json
 Available configuration options:
 `,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		configPath, err := internal.DefaultUserConfigPath("config.json")
+		configPath, err := auth.DefaultUserConfigPath("config.json")
 		if err != nil {
 			return fmt.Errorf("get config path: %w", err)
 		}

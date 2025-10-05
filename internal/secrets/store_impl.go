@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 
-	"simple-secrets/internal"
 	"simple-secrets/pkg/errors"
 	"simple-secrets/pkg/secrets"
 )
@@ -194,7 +193,7 @@ func (s *StoreImpl) RotateMasterKey(ctx context.Context, backupDir string) error
 	// This ensures functionality while the platform services architecture is completed.
 
 	// Create old-style secrets store with working rotation implementation
-	oldStore, err := internal.LoadSecretsStore(internal.NewFilesystemBackend())
+	oldStore, err := LoadSecretsStore(NewFilesystemBackend())
 	if err != nil {
 		return fmt.Errorf("failed to load secrets store for rotation: %w", err)
 	}

@@ -17,11 +17,13 @@ package cmd
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"os"
 	"strings"
 
-	"simple-secrets/pkg/api"
+	"simple-secrets/internal/platform"
+	"simple-secrets/pkg/auth"
 
 	"github.com/spf13/cobra"
 )
@@ -39,21 +41,36 @@ var restoreDatabaseCmd = &cobra.Command{
 	Example: "simple-secrets restore-database\nsimple-secrets restore-database rotate-20240901-143022",
 	Args:    cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		helper, err := GetCLIServiceHelper()
+		// Get platform configuration
+		config, err := getPlatformConfig()
 		if err != nil {
 			return err
 		}
 
-		// RBAC: write access (this is a destructive operation)
-		user, _, err := helper.AuthenticateCommand(cmd, true)
+		// Initialize platform services
+		ctx := context.Background()
+		app, err := platform.New(ctx, config)
+		if err != nil {
+			return fmt.Errorf("failed to initialize platform: %w", err)
+		}
+
+		// Resolve token for authentication
+		authToken, err := resolveTokenFromCommand(cmd)
 		if err != nil {
 			return err
 		}
-		if user == nil {
-			return nil
+
+		// Authenticate user
+		user, err := app.Auth.Authenticate(ctx, authToken)
+		if err != nil {
+			return fmt.Errorf("authentication failed: %w", err)
 		}
 
-		service := helper.GetService()
+		// Check write permissions (destructive operation)
+		err = app.Auth.Authorize(ctx, user, auth.PermissionWrite)
+		if err != nil {
+			return fmt.Errorf("write access denied: %w", err)
+		}
 
 		// Determine which backup to restore
 		if len(args) >= 1 {
@@ -62,7 +79,7 @@ var restoreDatabaseCmd = &cobra.Command{
 
 		// Show what backup will be restored
 		if restoreBackupName == "" {
-			backups, err := service.Admin().ListBackups()
+			backups, err := app.Rotation.ListBackups(ctx)
 			if err != nil {
 				return fmt.Errorf("failed to list backups: %w", err)
 			}
@@ -71,21 +88,16 @@ var restoreDatabaseCmd = &cobra.Command{
 				return nil
 			}
 
-			// Find most recent backup (assume all returned backups are valid)
-			var mostRecent *api.BackupInfo
-			for _, backup := range backups {
-				mostRecent = backup
-				break
-			}
-
-			if mostRecent == nil {
+			// Find most recent backup (first one is most recent)
+			mostRecent := backups[0]
+			if !mostRecent.IsValid {
 				fmt.Println("No valid rotation backups found.")
 				return nil
 			}
 
-			fmt.Printf("Will restore from most recent backup: %s\n", mostRecent.ID)
-			fmt.Printf("  Created: %s\n", mostRecent.Timestamp)
-			restoreBackupName = mostRecent.ID
+			fmt.Printf("Will restore from most recent backup: %s\n", mostRecent.Name)
+			fmt.Printf("  Created: %s\n", mostRecent.Timestamp.Format("2006-01-02 15:04:05"))
+			restoreBackupName = mostRecent.Name
 		}
 
 		// Display backup name for non-most-recent restores
@@ -109,11 +121,9 @@ var restoreDatabaseCmd = &cobra.Command{
 		}
 
 		// Perform the restore
-		if err := service.Admin().RestoreDatabase(restoreBackupName); err != nil {
-			return fmt.Errorf("restore failed: %w", err)
-		}
-
-		// Display success message
+		if err := app.Rotation.RestoreFromBackup(ctx, restoreBackupName); err != nil {
+			return fmt.Errorf("database restoration failed: %w", err)
+		} // Display success message
 		successMessage := determineRestoreSuccessMessage(restoreBackupName)
 		fmt.Println(successMessage)
 		fmt.Println("Your previous database was backed up before the restore operation.")

@@ -13,7 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-package internal
+package auth
 
 import (
 	"crypto/subtle"
@@ -412,7 +412,30 @@ func writeConfigFiles(usersPath, rolesPath string, users []*User, roles RolePerm
 
 // writeConfigFileSecurely marshals and writes any config data to JSON with secure permissions
 func writeConfigFileSecurely(path string, data any) error {
-	return config.WriteConfigFileSecurely(path, data, AtomicWriteFile)
+	return config.WriteConfigFileSecurely(path, data, atomicWriteFile)
+}
+
+// atomicWriteFile writes data to a file atomically using a temporary file and rename.
+// This ensures that either the entire write succeeds or fails completely, preventing
+// partial writes that could corrupt the file.
+func atomicWriteFile(path string, data []byte, perm os.FileMode) error {
+	// Use unique temp file name to prevent race conditions in concurrent operations
+	// Include nanosecond timestamp and goroutine ID to ensure uniqueness
+	tmpPath := fmt.Sprintf("%s.tmp.%d.%d", path, os.Getpid(), time.Now().UnixNano())
+
+	// Write to temporary file first
+	if err := os.WriteFile(tmpPath, data, perm); err != nil {
+		return fmt.Errorf("failed to write temporary file: %w", err)
+	}
+
+	// Atomic rename to final location
+	if err := os.Rename(tmpPath, path); err != nil {
+		// Clean up temp file on failure
+		_ = os.Remove(tmpPath)
+		return fmt.Errorf("failed to atomically update file: %w", err)
+	}
+
+	return nil
 }
 
 // ensureConfigDirectory creates the configuration directory if it doesn't exist

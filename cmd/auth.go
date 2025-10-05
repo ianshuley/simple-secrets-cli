@@ -20,7 +20,8 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
-	"simple-secrets/internal"
+
+	internal "simple-secrets/internal/auth"
 
 	"github.com/spf13/cobra"
 )

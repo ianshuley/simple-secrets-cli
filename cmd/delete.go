@@ -19,7 +19,7 @@ import (
 	"context"
 	"fmt"
 
-	"simple-secrets/internal"
+	internal "simple-secrets/internal/auth"
 	"simple-secrets/internal/platform"
 	"simple-secrets/pkg/auth"
 

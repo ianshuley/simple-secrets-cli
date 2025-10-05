@@ -13,7 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-package internal
+package rotation
 
 import (
 	"encoding/json"
@@ -276,13 +276,7 @@ func (s *SecretsStore) scanRotationBackupDirectories(backupRoot string) ([]strin
 	return rotationDirs, nil
 }
 
-// BackupInfo represents information about a rotation backup
-type BackupInfo struct {
-	Name      string    `json:"name"`
-	Path      string    `json:"path"`
-	Timestamp time.Time `json:"timestamp"`
-	IsValid   bool      `json:"is_valid"`
-}
+// Using BackupInfo from models.go in this package
 
 // validateBackupIntegrity checks if a backup directory contains both required files
 func (s *SecretsStore) validateBackupIntegrity(backupPath string) bool {

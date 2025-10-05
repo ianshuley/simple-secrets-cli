@@ -13,7 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-package internal
+package secrets
 
 import (
 	"encoding/json"
@@ -26,11 +26,11 @@ import (
 	"syscall"
 	"time"
 
+	"simple-secrets/internal/auth"
 	"simple-secrets/pkg/crypto"
 )
 
-// FileMode represents file permissions for storage operations
-type FileMode os.FileMode
+// Using FileMode from repository.go
 
 const (
 	FileMode0755 FileMode = 0755
@@ -178,7 +178,7 @@ func getConfigDirectory() (string, error) {
 		return testDir, nil
 	}
 
-	return GetSimpleSecretsPath()
+	return auth.GetSimpleSecretsPath()
 }
 
 // loadSecrets loads secrets from disk and updates in-memory state

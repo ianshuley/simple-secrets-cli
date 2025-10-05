@@ -20,7 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"simple-secrets/internal"
+	internal "simple-secrets/internal/auth"
 	"strings"
 	"testing"
 	"time"
