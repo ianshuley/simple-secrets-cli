@@ -296,8 +296,8 @@ func validatePutKeyName(key string) error {
 var addCmd = &cobra.Command{
 	Use:                   "add [key] [value]",
 	Short:                 "Add a secret (alias for put).",
-	Long:                  "Store a secret with the given key and value. This is an alias for the 'put' command.\n\nUse quotes for values with spaces or special characters.\n\n⚠️  SECURITY: Use single quotes to prevent shell command execution:\n    ✅ SAFE:      simple-secrets add key 'value with $(command)'\n    ❌ DANGEROUS: simple-secrets add key \"value with $(command)\"\n\nDouble quotes allow shell command substitution which executes before the app runs.",
-	Example:               "simple-secrets add db_password mypassword\nsimple-secrets add db_url \"postgresql://user:pass@localhost:5432/db\"",
+	Long:                  "Store a secret with the given key and value. This is an alias for the 'put' command.\n\nUse quotes for values with spaces or special characters.\n\n⚠️  SECURITY: Use single quotes to prevent shell command execution:\n    ✅ SAFE:      simple-secrets add key 'value with $(command)'\n    ❌ DANGEROUS: simple-secrets add key \"value with $(command)\"\n\nDouble quotes allow shell command substitution which executes before the app runs.\n\nUse --generate to automatically create a cryptographically secure secret:\n    simple-secrets add api-key --generate\n    simple-secrets add api-key --generate --length 64\n    simple-secrets add api-key -g -l 64",
+	Example:               "simple-secrets add api-key '--prod-key-abc123'\nsimple-secrets add db_url 'postgresql://user:pass@localhost:5432/db'\nsimple-secrets add script 'echo $(whoami)'  # Stores literally, not executed\n\n# Generate secure secrets automatically\nsimple-secrets add api-key --generate\nsimple-secrets add api-key -g --length 64\nsimple-secrets add api-key -g -l 32",
 	DisableFlagsInUseLine: true,
 	DisableFlagParsing:    true,
 	RunE:                  putCmd.RunE, // Same implementation as put
