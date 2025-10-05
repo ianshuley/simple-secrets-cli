@@ -1,16 +1,55 @@
 # TODO List
 
-## ✅ COMPLETED: Domain-Driven Architecture Restructuring (v1.0)
+## 🚧 IN PROGRESS: Multi-Token Per User Support
 
-### ✅ Architecture Refactoring - COMPLETE
-- ✅ **Package restructuring**: Complete domain-driven structure with `pkg/` public interfaces and `internal/` implementations
-- ✅ **Business logic extraction**: All logic moved from `cmd/` to reusable domain services
-- ✅ **Service composition**: `internal/platform/` composition layer implemented
-- ✅ **Multi-token per user support**: Fully implemented with token management and rotation
-- ✅ **Repository pattern**: Abstract storage interfaces with file-based implementations
-- ✅ **Context integration**: All operations use `context.Context` for cancellation/timeouts
-- ✅ **Error standardization**: Consistent domain error types throughout system
-- ✅ **Test coverage**: 118 test cases covering all domains and integration scenarios
+### Current Status: Domain Layer Complete, CLI Commands Needed
+
+**✅ Completed Infrastructure:**
+
+- ✅ **Domain models**: `User.AddToken()`, `User.RemoveToken()`, `User.ListTokens()` methods implemented
+- ✅ **Service interfaces**: `users.Store.AddToken()` method available in `pkg/users/interfaces.go`
+- ✅ **Storage layer**: Token storage and retrieval working in file-based repository
+- ✅ **Authentication**: Multi-token validation integrated into auth service
+
+**🚧 Missing CLI Commands:**
+
+- [ ] **`token create`**: Add new named token for current user (or other users if admin)
+- [ ] **`token list`**: List all tokens for current user (or specific user if admin) with metadata (name, created date, last used)
+- [ ] **`token revoke`**: Remove specific named token (own tokens, or any user's tokens if admin)
+- [ ] **`token info`**: Show details about current token (name, permissions, expiry if applicable)
+
+### Implementation Plan
+
+1. **Create `cmd/token.go`** with subcommands:
+
+   ```bash
+   # Self-service (any user)
+   simple-secrets token create --name "ci-server" --token <current-token>
+   simple-secrets token list --token <current-token>
+   simple-secrets token revoke --name "ci-server" --token <current-token>
+   simple-secrets token info --token <current-token>
+
+   # Admin operations (admin users only)
+   simple-secrets token create --name "backup-job" --for-user "devops-user" --token <admin-token>
+   simple-secrets token list --for-user "devops-user" --token <admin-token>
+   simple-secrets token revoke --name "backup-job" --for-user "devops-user" --token <admin-token>
+   simple-secrets token list --all-users --token <admin-token>  # Security audit view
+   ```
+
+2. **Enhanced User Experience:**
+   - Named tokens for easier management ("production-deploy", "ci-server", "laptop")
+   - Token metadata display (creation date, last used, permissions)
+   - Bulk token operations for cleanup
+   - Token rotation with name preservation
+
+3. **Security Considerations & RBAC:**
+   - **Regular users**: Can only manage their own tokens (no cross-user access)
+   - **Admin users**: Can create/list/revoke tokens for any user (essential for enterprise)
+   - **Security incident response**: Admins can immediately revoke compromised user tokens
+   - **Employee offboarding**: Admins can revoke all tokens for departing employees
+   - **Audit capabilities**: Admins can list all tokens across all users for security reviews
+   - **Immediate invalidation**: Token revocation immediately blocks access across all operations
+   - **Audit trail**: All token operations logged with user, timestamp, and action details
 
 ## 🚀 Platform Ready: Future v2.0 API Development
 
@@ -63,6 +102,7 @@ type GRPCServer struct {
 ### Current Architecture Benefits
 
 **What Makes Platform Development Easy:**
+
 1. **Clean Domain Boundaries**: Each domain (`secrets`, `users`, `auth`, `rotation`) has clear responsibilities
 2. **Public Interfaces**: All business operations available through `pkg/` interfaces
 3. **Private Implementations**: Internal details hidden in `internal/`, easy to swap/extend
@@ -75,6 +115,7 @@ type GRPCServer struct {
 ### Implementation Guidelines for Platform Extensions
 
 **Best Practices:**
+
 - Import only `pkg/` interfaces, never `internal/` packages
 - Use `internal/platform.New()` pattern for service composition
 - Implement transport-specific concerns (HTTP headers, gRPC metadata, etc.) in your platform
