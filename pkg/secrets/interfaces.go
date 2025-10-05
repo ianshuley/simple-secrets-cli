@@ -48,6 +48,10 @@ type Store interface {
 
 	// Disable makes a secret unavailable for retrieval without deleting it
 	Disable(ctx context.Context, key string) error
+
+	// RotateMasterKey generates a new master encryption key and re-encrypts all secrets
+	// This is a fundamental secrets domain operation that affects all stored secrets
+	RotateMasterKey(ctx context.Context, backupDir string) error
 }
 
 // Repository is the storage interface for the secrets domain.

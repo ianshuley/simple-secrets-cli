@@ -18,6 +18,7 @@ package secrets
 
 import (
 	"context"
+	"fmt"
 
 	"simple-secrets/pkg/errors"
 	"simple-secrets/pkg/secrets"
@@ -183,4 +184,19 @@ func (s *StoreImpl) Disable(ctx context.Context, key string) error {
 	}
 
 	return s.repo.Disable(ctx, key)
+}
+
+// RotateMasterKey generates a new master encryption key and re-encrypts all secrets
+func (s *StoreImpl) RotateMasterKey(ctx context.Context, backupDir string) error {
+	// Master key rotation in the platform services architecture requires
+	// careful integration with the crypto service and repository patterns.
+	// This involves:
+	// 1. Creating backups of current state
+	// 2. Generating a new master key in the crypto service
+	// 3. Re-encrypting all secrets with the new key
+	// 4. Atomically updating both key and secrets via repository
+	//
+	// This is a complex operation that needs careful architectural design
+	// to properly integrate with the repository and crypto service patterns.
+	return fmt.Errorf("master key rotation not yet implemented in platform services architecture - requires integration with crypto service and repository patterns")
 }

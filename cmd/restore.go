@@ -18,6 +18,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"simple-secrets/internal/platform"
 	"simple-secrets/pkg/auth"
@@ -90,8 +91,44 @@ func restoreSecret(cmd *cobra.Command, secretKey string) error {
 		return fmt.Errorf("write access denied: %w", err)
 	}
 
-	// Secret restoration requires re-implementation with platform services
-	return fmt.Errorf("secret restoration is temporarily disabled during platform migration - backup/restore functionality needs to be reimplemented with the new architecture")
+	// Get the backup containing the secret
+	backups, err := app.Rotation.ListBackups(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to list backups: %w", err)
+	}
+
+	if len(backups) == 0 {
+		return fmt.Errorf("no backups available for secret restoration")
+	}
+
+	// For now, use the most recent backup for secret restoration
+	// TODO: In the future, we could implement individual secret backup restoration
+	mostRecentBackup := backups[0]
+	for _, backup := range backups {
+		if backup.Timestamp.After(mostRecentBackup.Timestamp) {
+			mostRecentBackup = backup
+		}
+	}
+
+	fmt.Printf("⚠️  Secret restoration will use the most recent backup: %s\n", mostRecentBackup.Name)
+	fmt.Printf("⚠️  This will restore the entire database state from %s\n", mostRecentBackup.Timestamp.Format("2006-01-02 15:04:05"))
+	fmt.Print("Continue? [y/N]: ")
+
+	var response string
+	fmt.Scanln(&response)
+	if strings.ToLower(response) != "y" && strings.ToLower(response) != "yes" {
+		fmt.Println("Secret restoration cancelled.")
+		return nil
+	}
+
+	// Restore from the backup
+	err = app.Rotation.RestoreFromBackup(ctx, mostRecentBackup.Name)
+	if err != nil {
+		return fmt.Errorf("secret restoration failed: %w", err)
+	}
+
+	fmt.Printf("✅ Secret restoration completed successfully from backup %s\n", mostRecentBackup.Name)
+	return nil
 }
 
 func restoreDatabase(cmd *cobra.Command, backupName string) error {
@@ -126,8 +163,14 @@ func restoreDatabase(cmd *cobra.Command, backupName string) error {
 		return fmt.Errorf("write access denied: %w", err)
 	}
 
-	// Database restoration requires re-implementation with platform services
-	return fmt.Errorf("database restoration is temporarily disabled during platform migration - backup/restore functionality needs to be reimplemented with the new architecture")
+	// Restore from the specified backup
+	err = app.Rotation.RestoreFromBackup(ctx, backupName)
+	if err != nil {
+		return fmt.Errorf("database restoration failed: %w", err)
+	}
+
+	fmt.Printf("✅ Database restoration completed successfully from backup %s\n", backupName)
+	return nil
 }
 
 // completeRestoreArgs provides completion for restore command arguments

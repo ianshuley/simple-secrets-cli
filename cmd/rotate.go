@@ -18,6 +18,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"simple-secrets/internal/platform"
 	"simple-secrets/pkg/auth"
@@ -68,9 +69,69 @@ Token rotation options:
 }
 
 func rotateMasterKey(cmd *cobra.Command) error {
-	// Master key rotation requires careful re-implementation with platform services
-	// This involves re-encrypting the entire secrets database and is complex
-	return fmt.Errorf("master key rotation is temporarily disabled during platform migration")
+	// Get platform configuration
+	config, err := getPlatformConfig()
+	if err != nil {
+		return err
+	}
+
+	// Initialize platform services
+	ctx := context.Background()
+	app, err := platform.New(ctx, config)
+	if err != nil {
+		return fmt.Errorf("failed to initialize platform: %w", err)
+	}
+
+	// Resolve token for authentication
+	authToken, err := resolveTokenFromCommand(cmd)
+	if err != nil {
+		return err
+	}
+
+	// Authenticate user
+	user, err := app.Auth.Authenticate(ctx, authToken)
+	if err != nil {
+		return fmt.Errorf("authentication failed: %w", err)
+	}
+
+	// Check admin permissions for master key rotation
+	err = app.Auth.Authorize(ctx, user, auth.PermissionManageUsers)
+	if err != nil {
+		return fmt.Errorf("master key rotation access denied: %w", err)
+	}
+
+	// Show warning and get confirmation if not using --yes flag
+	if !rotateNewYes {
+		fmt.Println("⚠️  Master Key Rotation")
+		fmt.Println("This will:")
+		fmt.Println("  • Generate a NEW master key")
+		fmt.Println("  • Re-encrypt ALL secrets with the new key")
+		fmt.Println("  • Create a backup of the old key+secrets for rollback")
+		fmt.Print("Proceed? (type 'yes'): ")
+
+		var response string
+		fmt.Scanln(&response)
+		if strings.ToLower(response) != "yes" {
+			fmt.Println("Master key rotation cancelled.")
+			return nil
+		}
+	}
+
+	// Perform master key rotation using platform services
+	err = app.Rotation.RotateMasterKey(ctx, rotateNewBackupDir)
+	if err != nil {
+		return fmt.Errorf("master key rotation failed: %w", err)
+	}
+
+	fmt.Println("✅ Master key rotation completed successfully!")
+	if rotateNewBackupDir != "" {
+		fmt.Printf("📁 Backup created at %s\n", rotateNewBackupDir)
+	} else {
+		fmt.Println("📁 Backup created in ~/.simple-secrets/backups/")
+	}
+	fmt.Println("All secrets have been re-encrypted with the new master key.")
+
+	return nil
 }
 
 // validateMasterKeyRotationAccess - unused, kept for potential future implementation

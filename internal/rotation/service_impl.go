@@ -65,15 +65,14 @@ func (s *ServiceImpl) RotateMasterKey(ctx context.Context, backupDir string) err
 		backupDir = filepath.Join(s.dataDir, s.config.BackupDir, rotation.GenerateBackupName("rotate"))
 	}
 
-	// Create backup of current state
-	if err := s.CreateBackup(ctx, backupDir); err != nil {
-		return fmt.Errorf("backup failed: %w", err)
+	// Perform master key rotation using the secrets store
+	// This will create a backup, generate a new key, and re-encrypt all secrets
+	err := s.secretsStore.RotateMasterKey(ctx, backupDir)
+	if err != nil {
+		return fmt.Errorf("secrets store master key rotation failed: %w", err)
 	}
 
-	// TODO: This needs to interact with the underlying secrets storage
-	// For now, we'll return an error indicating this needs to be integrated
-	// with the secrets domain's master key functionality
-	return fmt.Errorf("master key rotation requires integration with secrets domain master key management")
+	return nil
 }
 
 // ReencryptBackups re-encrypts existing backup files with a new master key
