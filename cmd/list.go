@@ -16,11 +16,14 @@ limitations under the License.
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"time"
 
 	"simple-secrets/internal"
+	"simple-secrets/internal/platform"
+	"simple-secrets/pkg/auth"
 
 	"github.com/spf13/cobra"
 )
@@ -61,10 +64,17 @@ var listCmd = &cobra.Command{
 }
 
 func listKeys(cmd *cobra.Command) error {
-	// Get CLI service helper
-	helper, err := GetCLIServiceHelper()
+	// Get platform configuration
+	config, err := getPlatformConfig()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get platform config: %w", err)
+	}
+
+	// Initialize platform services
+	ctx := context.Background()
+	app, err := platform.New(ctx, config)
+	if err != nil {
+		return fmt.Errorf("failed to initialize platform: %w", err)
 	}
 
 	// Resolve token for authentication
@@ -73,16 +83,34 @@ func listKeys(cmd *cobra.Command) error {
 		return err
 	}
 
-	// Resolve the token (CLI responsibility)
+	// Resolve the token (temporary - use old internal for now)
 	resolvedToken, err := internal.ResolveToken(token)
 	if err != nil {
 		return err
 	}
 
-	// List secrets using focused service operations
-	keys, err := helper.GetService().Secrets().List(resolvedToken)
+	// Authenticate user
+	user, err := app.Auth.Authenticate(ctx, resolvedToken)
+	if err != nil {
+		return fmt.Errorf("authentication failed: %w", err)
+	}
+
+	// Check read permissions
+	err = app.Auth.Authorize(ctx, user, auth.PermissionRead)
+	if err != nil {
+		return fmt.Errorf("read access denied: %w", err)
+	}
+
+	// List secrets using platform services
+	secretsMetadata, err := app.Secrets.List(ctx)
 	if err != nil {
 		return err
+	}
+
+	// Extract keys from metadata
+	keys := make([]string, len(secretsMetadata))
+	for i, metadata := range secretsMetadata {
+		keys[i] = metadata.Key
 	}
 
 	if len(keys) == 0 {
@@ -96,26 +124,45 @@ func listKeys(cmd *cobra.Command) error {
 }
 
 func listBackups(cmd *cobra.Command) error {
-	// RBAC: read access
-	helper, err := GetCLIServiceHelper()
+	// Get platform configuration
+	config, err := getPlatformConfig()
+	if err != nil {
+		return fmt.Errorf("failed to get platform config: %w", err)
+	}
+
+	// Initialize platform services
+	ctx := context.Background()
+	app, err := platform.New(ctx, config)
+	if err != nil {
+		return fmt.Errorf("failed to initialize platform: %w", err)
+	}
+
+	// Resolve token for authentication
+	token, err := resolveTokenFromCommand(cmd)
 	if err != nil {
 		return err
 	}
 
-	user, _, err := helper.AuthenticateCommand(cmd, false)
-	if err != nil {
-		return err
-	}
-	if user == nil {
-		return nil
-	}
-
-	store, err := internal.LoadSecretsStore(internal.NewFilesystemBackend())
+	// Resolve the token (temporary - use old internal for now)
+	resolvedToken, err := internal.ResolveToken(token)
 	if err != nil {
 		return err
 	}
 
-	backups, err := store.ListRotationBackups()
+	// Authenticate user
+	user, err := app.Auth.Authenticate(ctx, resolvedToken)
+	if err != nil {
+		return fmt.Errorf("authentication failed: %w", err)
+	}
+
+	// Check read permissions
+	err = app.Auth.Authorize(ctx, user, auth.PermissionRead)
+	if err != nil {
+		return fmt.Errorf("read access denied: %w", err)
+	}
+
+	// List backups using platform services
+	backups, err := app.Rotation.ListBackups(ctx)
 	if err != nil {
 		return err
 	}
@@ -136,29 +183,45 @@ func listBackups(cmd *cobra.Command) error {
 }
 
 func listUsers(cmd *cobra.Command) error {
-	// RBAC: admin required for user management
-	helper, err := GetCLIServiceHelper()
+	// Get platform configuration
+	config, err := getPlatformConfig()
+	if err != nil {
+		return fmt.Errorf("failed to get platform config: %w", err)
+	}
+
+	// Initialize platform services
+	ctx := context.Background()
+	app, err := platform.New(ctx, config)
+	if err != nil {
+		return fmt.Errorf("failed to initialize platform: %w", err)
+	}
+
+	// Resolve token for authentication
+	token, err := resolveTokenFromCommand(cmd)
 	if err != nil {
 		return err
 	}
 
-	user, store, err := helper.AuthenticateCommand(cmd, true)
+	// Resolve the token (temporary - use old internal for now)
+	resolvedToken, err := internal.ResolveToken(token)
 	if err != nil {
 		return err
-	}
-	if user == nil {
-		return nil
-	}
-	if !user.Can("manage-users", store.Permissions()) {
-		return NewPermissionDeniedError("manage-users")
 	}
 
-	// Load current users
-	usersPath, err := internal.DefaultUserConfigPath("users.json")
+	// Authenticate user
+	user, err := app.Auth.Authenticate(ctx, resolvedToken)
 	if err != nil {
-		return err
+		return fmt.Errorf("authentication failed: %w", err)
 	}
-	users, err := internal.LoadUsersList(usersPath)
+
+	// Check manage users permissions (admin required)
+	err = app.Auth.Authorize(ctx, user, auth.PermissionManageUsers)
+	if err != nil {
+		return fmt.Errorf("user management access denied: %w", err)
+	}
+
+	// List users using platform services
+	users, err := app.Users.List(ctx)
 	if err != nil {
 		return err
 	}
@@ -173,11 +236,11 @@ func listUsers(cmd *cobra.Command) error {
 	for _, u := range users {
 		// User icon based on role
 		icon := "👤"
-		if u.Role == internal.RoleAdmin {
+		if u.Role == string(auth.RoleAdmin) {
 			icon = "🔑"
 		}
 
-		// Current user indicator
+		// Current user indicator (compare with authenticated user username)
 		currentUserIndicator := ""
 		if u.Username == user.Username {
 			currentUserIndicator = " (current user)"
@@ -195,26 +258,54 @@ func listUsers(cmd *cobra.Command) error {
 }
 
 func listDisabledSecrets(cmd *cobra.Command) error {
-	// RBAC: read access
-	helper, err := GetCLIServiceHelper()
+	// Get platform configuration
+	config, err := getPlatformConfig()
+	if err != nil {
+		return fmt.Errorf("failed to get platform config: %w", err)
+	}
+
+	// Initialize platform services
+	ctx := context.Background()
+	app, err := platform.New(ctx, config)
+	if err != nil {
+		return fmt.Errorf("failed to initialize platform: %w", err)
+	}
+
+	// Resolve token for authentication
+	token, err := resolveTokenFromCommand(cmd)
 	if err != nil {
 		return err
 	}
 
-	user, _, err := helper.AuthenticateCommand(cmd, false)
-	if err != nil {
-		return err
-	}
-	if user == nil {
-		return nil
-	}
-
-	store, err := internal.LoadSecretsStore(internal.NewFilesystemBackend())
+	// Resolve the token (temporary - use old internal for now)
+	resolvedToken, err := internal.ResolveToken(token)
 	if err != nil {
 		return err
 	}
 
-	disabledSecrets := store.ListDisabledSecrets()
+	// Authenticate user
+	user, err := app.Auth.Authenticate(ctx, resolvedToken)
+	if err != nil {
+		return fmt.Errorf("authentication failed: %w", err)
+	}
+
+	// Check read permissions
+	err = app.Auth.Authorize(ctx, user, auth.PermissionRead)
+	if err != nil {
+		return fmt.Errorf("read access denied: %w", err)
+	}
+
+	// List disabled secrets using platform services
+	disabledSecretsMetadata, err := app.Secrets.ListDisabled(ctx)
+	if err != nil {
+		return err
+	}
+
+	// Extract keys from metadata
+	disabledSecrets := make([]string, len(disabledSecretsMetadata))
+	for i, metadata := range disabledSecretsMetadata {
+		disabledSecrets[i] = metadata.Key
+	}
 	if len(disabledSecrets) == 0 {
 		fmt.Println("No disabled secrets found.")
 		return nil

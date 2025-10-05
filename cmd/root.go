@@ -17,6 +17,8 @@ package cmd
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -76,14 +78,15 @@ func initializePlatform(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
+	// Skip platform initialization for commands that don't need it
+	if cmd.Name() == "simple-secrets" || cmd.Name() == "setup" {
+		// Allow root command and setup to handle first-run scenarios
+		return nil
+	}
+
 	// Get platform configuration
 	config, err := getPlatformConfig()
 	if err != nil {
-		// For setup and first-run scenarios, platform may not be available yet
-		if cmd.Name() == "simple-secrets" {
-			// Allow root command to handle first-run setup
-			return nil
-		}
 		return fmt.Errorf("failed to initialize platform: %w", err)
 	}
 
@@ -137,28 +140,62 @@ func getDataDirectory() (string, error) {
 	return filepath.Join(homeDir, ".simple-secrets"), nil
 }
 
-// getMasterKey loads the master key for the platform
+// getMasterKey loads or creates the master key for the platform
 func getMasterKey() ([]byte, error) {
-	// For now, use a simple approach - in future this could be more sophisticated
-	// This is compatible with existing internal.LoadSecretsStore behavior
+	// This function provides lazy master key creation compatible with the old internal system
 	dataDir, err := getDataDirectory()
 	if err != nil {
 		return nil, err
 	}
 
-	// Check if master key file exists
 	masterKeyPath := filepath.Join(dataDir, "master.key")
+
+	// Check if master key file exists
 	if _, err := os.Stat(masterKeyPath); os.IsNotExist(err) {
-		return nil, fmt.Errorf("master key not found - run setup first")
+		// Check if this is a setup scenario by looking for users.json
+		usersPath := filepath.Join(dataDir, "users.json")
+		if _, err := os.Stat(usersPath); os.IsNotExist(err) {
+			return nil, fmt.Errorf("master key not found - run setup first")
+		}
+
+		// Setup has run but no master key exists yet - create one (lazy initialization)
+		masterKey, err := generateMasterKey()
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate master key: %w", err)
+		}
+
+		// Save master key in base64 format for compatibility with old internal system
+		base64Key := base64.StdEncoding.EncodeToString(masterKey)
+		if err := os.WriteFile(masterKeyPath, []byte(base64Key), 0600); err != nil {
+			return nil, fmt.Errorf("failed to save master key: %w", err)
+		}
+
+		return masterKey, nil
 	}
 
-	// Read master key
-	masterKey, err := os.ReadFile(masterKeyPath)
+	// Read existing master key (base64 encoded)
+	data, err := os.ReadFile(masterKeyPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read master key: %w", err)
 	}
 
+	// Decode base64 to get raw key bytes
+	masterKey, err := base64.StdEncoding.DecodeString(string(data))
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode master key: %w", err)
+	}
+
 	return masterKey, nil
+}
+
+// generateMasterKey creates a new 32-byte AES key and saves it in base64 format for compatibility
+func generateMasterKey() ([]byte, error) {
+	key := make([]byte, 32)
+	_, err := rand.Read(key)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate random key: %w", err)
+	}
+	return key, nil
 }
 
 func init() {

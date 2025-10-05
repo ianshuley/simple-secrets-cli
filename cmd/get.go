@@ -1,7 +1,7 @@
 /*
 Copyright © 2025 Ian Shuley
 
-Licensed und		// Get secret using platform secrets service\n		key := args[0]\n		ctx := cmd.Context()\n		value, err := app.Secrets.Get(ctx, key)he Apache License, Version 2.0 (the "License");
+Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
@@ -36,13 +36,19 @@ var getCmd = &cobra.Command{
 			return err
 		}
 
-		// Authenticate user with platform auth service\n		_, err = authenticateWithPlatform(cmd, false) // false = read access only\n		if err != nil {\n			return err\n		}		// Get secret using platform secrets service
+		// Authenticate user with platform auth service
+		_, err = authenticateWithPlatform(cmd, false) // false = read access only
+		if err != nil {
+			return err
+		}
+
+		// Get secret using platform secrets service
 		key := args[0]
 		ctx := cmd.Context()
 		value, err := app.Secrets.Get(ctx, key)
 		if err != nil {
 			if errors.Is(err, os.ErrNotExist) {
-				return NewSecretNotFoundError()
+				return fmt.Errorf("secret '%s' not found", key)
 			}
 			return err
 		}

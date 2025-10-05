@@ -27,6 +27,7 @@ type Secret struct {
 
 // SecretMetadata contains information about a secret's lifecycle and status
 type SecretMetadata struct {
+	Key        string    `json:"key"` // Secret key identifier
 	CreatedAt  time.Time `json:"created_at"`
 	ModifiedAt time.Time `json:"modified_at"`
 	Disabled   bool      `json:"disabled"`

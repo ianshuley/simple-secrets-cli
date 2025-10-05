@@ -123,7 +123,9 @@ func (s *StoreImpl) List(ctx context.Context) ([]secrets.SecretMetadata, error) 
 	var result []secrets.SecretMetadata
 	for _, secret := range allSecrets {
 		if secret.IsEnabled() {
-			result = append(result, secret.Metadata)
+			metadata := secret.Metadata
+			metadata.Key = secret.Key // Populate key in metadata
+			result = append(result, metadata)
 		}
 	}
 
@@ -140,7 +142,9 @@ func (s *StoreImpl) ListDisabled(ctx context.Context) ([]secrets.SecretMetadata,
 	var result []secrets.SecretMetadata
 	for _, secret := range allSecrets {
 		if secret.IsDisabled() {
-			result = append(result, secret.Metadata)
+			metadata := secret.Metadata
+			metadata.Key = secret.Key // Populate key in metadata
+			result = append(result, metadata)
 		}
 	}
 

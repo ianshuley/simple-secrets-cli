@@ -16,11 +16,14 @@ limitations under the License.
 package cmd
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
 
 	"simple-secrets/internal"
+	"simple-secrets/internal/platform"
+	"simple-secrets/pkg/auth"
 	"simple-secrets/pkg/crypto"
 
 	"github.com/spf13/cobra"
@@ -191,7 +194,7 @@ func validatePutArguments(filteredArgs []string, generate bool) (string, string,
 
 func determineAuthTokenWithExplicitFlag(parsedToken string, wasTokenFlagUsed bool) (string, error) {
 	if !wasTokenFlagUsed {
-		return internal.ResolveToken("")
+		return resolveTokenFromEnvAndConfig("")
 	}
 
 	if isEmptyToken(parsedToken) {
@@ -199,6 +202,12 @@ func determineAuthTokenWithExplicitFlag(parsedToken string, wasTokenFlagUsed boo
 	}
 
 	return parsedToken, nil
+}
+
+// resolveTokenFromEnvAndConfig returns token from env or config (temporary - use old internal for now)
+func resolveTokenFromEnvAndConfig(cliFlag string) (string, error) {
+	// Temporary: use old internal function during migration
+	return internal.ResolveToken(cliFlag)
 }
 
 func isEmptyToken(token string) bool {
@@ -220,18 +229,29 @@ Or save your token in ~/.simple-secrets/config.json:
 }
 
 func executePutCommand(args *putArguments) error {
-	helper, err := GetCLIServiceHelper()
+	// Get platform configuration
+	config, err := getPlatformConfig()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get platform config: %w", err)
 	}
 
-	// Use direct token authentication (put handles token parsing manually)
-	user, _, err := helper.AuthenticateToken(args.token, true)
+	// Initialize platform services
+	ctx := context.Background()
+	app, err := platform.New(ctx, config)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to initialize platform: %w", err)
 	}
-	if user == nil {
-		return nil
+
+	// Authenticate user
+	user, err := app.Auth.Authenticate(ctx, args.token)
+	if err != nil {
+		return fmt.Errorf("authentication failed: %w", err)
+	}
+
+	// Check write permissions
+	err = app.Auth.Authorize(ctx, user, auth.PermissionWrite)
+	if err != nil {
+		return fmt.Errorf("write access denied: %w", err)
 	}
 
 	if err := validatePutKeyName(args.key); err != nil {
@@ -248,11 +268,8 @@ func executePutCommand(args *putArguments) error {
 		value = generatedValue
 	}
 
-	service := helper.GetService()
-
-	// Backup is handled automatically by the service layer
-
-	err = service.Secrets().Put(args.token, args.key, value)
+	// Store the secret using platform services
+	err = app.Secrets.Put(ctx, args.key, value)
 	if err != nil {
 		return err
 	}

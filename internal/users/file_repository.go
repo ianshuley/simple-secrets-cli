@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"simple-secrets/pkg/errors"
 	"simple-secrets/pkg/users"
@@ -227,13 +228,57 @@ func (r *FileRepository) loadUsersData() (*usersData, error) {
 		return nil, fmt.Errorf("failed to read users file: %w", err)
 	}
 
+	// Try to unmarshal as new format first
 	var result usersData
-	if err := json.Unmarshal(data, &result); err != nil {
-		return nil, fmt.Errorf("failed to parse users file: %w", err)
+	if err := json.Unmarshal(data, &result); err == nil && result.Users != nil {
+		return &result, nil
 	}
 
-	if result.Users == nil {
-		result.Users = make(map[string]*users.User)
+	// If that fails, try legacy format (array of users)
+	var legacyUsers []struct {
+		Username       string `json:"username"`
+		TokenHash      string `json:"token_hash"`
+		Role           string `json:"role"`
+		TokenRotatedAt string `json:"token_rotated_at"`
+		Disabled       bool   `json:"disabled,omitempty"`
+	}
+
+	if err := json.Unmarshal(data, &legacyUsers); err != nil {
+		return nil, fmt.Errorf("failed to parse users file in any known format: %w", err)
+	}
+
+	// Convert legacy format to new format
+	result = usersData{
+		Users:   make(map[string]*users.User),
+		Version: "1.0",
+	}
+
+	for _, legacyUser := range legacyUsers {
+		// Parse the timestamp
+		var tokenRotatedAt *time.Time
+		if legacyUser.TokenRotatedAt != "" {
+			if parsed, err := time.Parse(time.RFC3339Nano, legacyUser.TokenRotatedAt); err == nil {
+				tokenRotatedAt = &parsed
+			}
+		}
+
+		// Create a token for the legacy token hash
+		legacyToken := &users.Token{
+			ID:   "legacy-token", // Default ID for legacy token
+			Name: "Admin Token",  // Default name for legacy token
+			Hash: legacyUser.TokenHash,
+		}
+
+		user := &users.User{
+			ID:             legacyUser.Username, // Use username as ID for legacy compatibility
+			Username:       legacyUser.Username,
+			Tokens:         []*users.Token{legacyToken},
+			Role:           legacyUser.Role,
+			CreatedAt:      time.Now(), // Legacy files don't have created_at
+			TokenRotatedAt: tokenRotatedAt,
+			Disabled:       legacyUser.Disabled,
+		}
+		result.Users[legacyUser.Username] = user
 	}
 
 	return &result, nil
