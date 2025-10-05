@@ -16,9 +16,12 @@ limitations under the License.
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"simple-secrets/internal"
+	"simple-secrets/internal/platform"
 	"simple-secrets/pkg/version"
 	"strings"
 
@@ -60,8 +63,106 @@ func Execute() {
 	}
 }
 
+// initializePlatform sets up platform context for all CLI commands
+// This runs before every command to ensure platform services are available
+func initializePlatform(cmd *cobra.Command, args []string) error {
+	// Skip platform initialization for version and help commands
+	if cmd.Name() == "help" || cmd.Name() == "completion" {
+		return nil
+	}
+
+	// Check for version flag
+	if versionFlag, _ := cmd.Flags().GetBool("version"); versionFlag {
+		return nil
+	}
+
+	// Get platform configuration
+	config, err := getPlatformConfig()
+	if err != nil {
+		// For setup and first-run scenarios, platform may not be available yet
+		if cmd.Name() == "simple-secrets" {
+			// Allow root command to handle first-run setup
+			return nil
+		}
+		return fmt.Errorf("failed to initialize platform: %w", err)
+	}
+
+	// Create platform instance
+	ctx := context.Background()
+	app, err := platform.New(ctx, config)
+	if err != nil {
+		return fmt.Errorf("failed to create platform: %w", err)
+	}
+
+	// Inject platform into command context
+	ctx = platform.WithPlatform(ctx, app)
+	cmd.SetContext(ctx)
+
+	return nil
+}
+
+// getPlatformConfig builds platform configuration from CLI environment
+func getPlatformConfig() (platform.Config, error) {
+	// Get data directory
+	dataDir, err := getDataDirectory()
+	if err != nil {
+		return platform.Config{}, fmt.Errorf("failed to get data directory: %w", err)
+	}
+
+	// Get master key
+	masterKey, err := getMasterKey()
+	if err != nil {
+		return platform.Config{}, fmt.Errorf("failed to get master key: %w", err)
+	}
+
+	return platform.Config{
+		DataDir:   dataDir,
+		MasterKey: masterKey,
+	}, nil
+}
+
+// getDataDirectory returns the CLI data directory
+func getDataDirectory() (string, error) {
+	// Check for test override
+	if testDir := os.Getenv("SIMPLE_SECRETS_CONFIG_DIR"); testDir != "" {
+		return testDir, nil
+	}
+
+	// Use default ~/.simple-secrets
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("failed to get home directory: %w", err)
+	}
+
+	return filepath.Join(homeDir, ".simple-secrets"), nil
+}
+
+// getMasterKey loads the master key for the platform
+func getMasterKey() ([]byte, error) {
+	// For now, use a simple approach - in future this could be more sophisticated
+	// This is compatible with existing internal.LoadSecretsStore behavior
+	dataDir, err := getDataDirectory()
+	if err != nil {
+		return nil, err
+	}
+
+	// Check if master key file exists
+	masterKeyPath := filepath.Join(dataDir, "master.key")
+	if _, err := os.Stat(masterKeyPath); os.IsNotExist(err) {
+		return nil, fmt.Errorf("master key not found - run setup first")
+	}
+
+	// Read master key
+	masterKey, err := os.ReadFile(masterKeyPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read master key: %w", err)
+	}
+
+	return masterKey, nil
+}
+
 func init() {
-	// Set up token generator for internal package
+	// Set up token generator for internal package (legacy compatibility)
 	internal.DefaultTokenGenerator = GenerateSecureToken
 
 	// Persistent token flag for all commands
@@ -72,6 +173,9 @@ func init() {
 
 	// Add standard version flags that users expect
 	rootCmd.Flags().BoolP("version", "v", false, "show version information")
+
+	// Set up platform context injection for all commands
+	rootCmd.PersistentPreRunE = initializePlatform
 }
 
 // completeSecretNames provides completion for secret key names

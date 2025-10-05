@@ -17,17 +17,20 @@ limitations under the License.
 package cmd
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
 	"simple-secrets/internal"
+	"simple-secrets/internal/platform"
 
 	"github.com/spf13/cobra"
 )
 
-// CLIServiceHelper provides a bridge between the service layer and CLI commands
-// Uses composable operations instead of monolithic patterns
+// CLIServiceHelper provides a bridge between the platform and CLI commands
+// Provides backward compatibility while using the new platform architecture
 type CLIServiceHelper struct {
+	// Deprecated: Legacy field for backward compatibility
 	service *internal.Service
 }
 
@@ -143,4 +146,83 @@ func GetCLIServiceHelper() (*CLIServiceHelper, error) {
 // This ensures test isolation works properly
 func getConfigDirOverride() string {
 	return os.Getenv("SIMPLE_SECRETS_CONFIG_DIR")
+}
+
+// getPlatformFromCommand retrieves the platform from command context
+func getPlatformFromCommand(cmd *cobra.Command) (*platform.Platform, error) {
+	ctx := cmd.Context()
+	if ctx == nil {
+		return nil, fmt.Errorf("command context not available")
+	}
+
+	app, err := platform.FromContext(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("platform not available in context: %w", err)
+	}
+
+	return app, nil
+}
+
+// authenticateWithPlatform handles authentication using platform services
+// Returns the UserContext from auth domain
+func authenticateWithPlatform(cmd *cobra.Command, needWrite bool) (*internal.User, error) {
+	// Get platform from command context
+	app, err := getPlatformFromCommand(cmd)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get token from command
+	token, err := resolveTokenFromCommand(cmd)
+	if err != nil {
+		return nil, err
+	}
+
+	// Use platform auth service
+	ctx := cmd.Context()
+	userContext, err := app.Auth.Authenticate(ctx, token)
+	if err != nil {
+		return nil, err
+	}
+
+	// Check write permissions if needed
+	if needWrite {
+		if !userContext.CanWrite() {
+			return nil, fmt.Errorf("write permission required")
+		}
+	}
+
+	// Convert to legacy internal.User for compatibility
+	legacyUser := &internal.User{
+		Username:  userContext.Username,
+		Role:      internal.Role(userContext.Role),
+		TokenHash: userContext.TokenHash,
+	}
+
+	return legacyUser, nil
+}
+
+// authenticateTokenWithPlatform handles authentication with direct token using platform services
+func authenticateTokenWithPlatform(ctx context.Context, app *platform.Platform, token string, needWrite bool) (*internal.User, error) {
+	// Use platform auth service
+	userContext, err := app.Auth.Authenticate(ctx, token)
+	if err != nil {
+		return nil, err
+	}
+
+	// Check write permissions if needed
+	if needWrite {
+		if !userContext.CanWrite() {
+			return nil, fmt.Errorf("write permission required")
+		}
+	}
+
+	// Convert to legacy internal.User for compatibility
+	legacyUser := &internal.User{
+		Username:  userContext.Username,
+		Role:      internal.Role(userContext.Role),
+		TokenHash: userContext.TokenHash,
+	}
+
+	return legacyUser, nil
 }

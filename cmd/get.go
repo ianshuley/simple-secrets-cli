@@ -1,7 +1,7 @@
 /*
 Copyright © 2025 Ian Shuley
 
-Licensed under the Apache License, Version 2.0 (the "License");
+Licensed und		// Get secret using platform secrets service\n		key := args[0]\n		ctx := cmd.Context()\n		value, err := app.Secrets.Get(ctx, key)he Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
@@ -19,7 +19,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"simple-secrets/internal"
 
 	"github.com/spf13/cobra"
 )
@@ -31,27 +30,16 @@ var getCmd = &cobra.Command{
 	Example: "simple-secrets get db_password",
 	Args:    cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// Get CLI service helper
-		helper, err := GetCLIServiceHelper()
+		// Get platform from command context
+		app, err := getPlatformFromCommand(cmd)
 		if err != nil {
 			return err
 		}
 
-		// Resolve token for authentication
-		token, err := resolveTokenFromCommand(cmd)
-		if err != nil {
-			return err
-		}
-
-		// Resolve the token (CLI responsibility)
-		resolvedToken, err := internal.ResolveToken(token)
-		if err != nil {
-			return err
-		}
-
-		// Get secret using focused service operations
+		// Authenticate user with platform auth service\n		_, err = authenticateWithPlatform(cmd, false) // false = read access only\n		if err != nil {\n			return err\n		}		// Get secret using platform secrets service
 		key := args[0]
-		value, err := helper.GetService().Secrets().Get(resolvedToken, key)
+		ctx := cmd.Context()
+		value, err := app.Secrets.Get(ctx, key)
 		if err != nil {
 			if errors.Is(err, os.ErrNotExist) {
 				return NewSecretNotFoundError()
