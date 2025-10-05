@@ -25,6 +25,8 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	"simple-secrets/pkg/crypto"
 )
 
 // FileMode represents file permissions for storage operations
@@ -268,7 +270,7 @@ func (s *SecretsStore) Put(key, value string) error {
 
 	// Encrypt using master key while holding the write lock
 	// Fixed: Previously caused nil pointer panics when rotation occurred between Get/Put operations. See rotation_restore_test.go for regression coverage.
-	encryptedValue, err := encrypt(s.masterKey, []byte(value))
+	encryptedValue, err := crypto.Encrypt(s.masterKey, []byte(value))
 	if err != nil {
 		return err
 	}
@@ -304,7 +306,7 @@ func (s *SecretsStore) Get(key string) (string, error) {
 
 	// Decrypt directly with master key while holding the read lock
 	// This prevents race conditions with key rotation
-	pt, err := decrypt(s.masterKey, enc)
+	pt, err := crypto.Decrypt(s.masterKey, enc)
 	if err != nil {
 		return "", err
 	}
@@ -360,7 +362,7 @@ func (s *SecretsStore) DecryptBackup(encryptedData string) (string, error) {
 
 	// Decrypt directly with master key while holding the read lock
 	// This prevents race conditions with key rotation
-	decrypted, err := decrypt(s.masterKey, encryptedData)
+	decrypted, err := crypto.Decrypt(s.masterKey, encryptedData)
 	if err != nil {
 		return "", err
 	}

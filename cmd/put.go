@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"simple-secrets/internal"
+	"simple-secrets/pkg/crypto"
 
 	"github.com/spf13/cobra"
 )
@@ -54,9 +55,9 @@ type putArguments struct {
 	length   int
 }
 
-// generateSecretValue creates a cryptographically secure random secret (wrapper for internal function)
+// generateSecretValue creates a cryptographically secure random secret (wrapper for crypto function)
 func generateSecretValue(length int) (string, error) {
-	return internal.GenerateSecretValue(length)
+	return crypto.GenerateSecretValue(length)
 }
 
 func parsePutArguments(cmd *cobra.Command, args []string) (*putArguments, error) {

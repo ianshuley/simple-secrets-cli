@@ -17,14 +17,14 @@ package internal
 
 import (
 	"crypto/subtle"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"slices"
 	"sync"
 	"time"
+
+	"simple-secrets/pkg/config"
 )
 
 // UserStore manages users, their permissions, and authentication
@@ -367,17 +367,7 @@ func (us *UserStore) countAdminUsers() int {
 
 // resolveConfigPaths determines the file paths for users.json and roles.json
 func resolveConfigPaths() (string, string, error) {
-	usersPath, err := DefaultUserConfigPath("users.json")
-	if err != nil {
-		return "", "", err
-	}
-
-	rolesPath, err := DefaultUserConfigPath("roles.json")
-	if err != nil {
-		return "", "", err
-	}
-
-	return usersPath, rolesPath, nil
+	return config.ResolveConfigPaths()
 }
 
 // loadUsers reads and validates users from the specified JSON file
@@ -404,11 +394,7 @@ func loadRoles(path string) (RolePermissions, error) {
 
 // readConfigFile reads and unmarshals a JSON config file
 func readConfigFile(path string, target any) error {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return err
-	}
-	return json.Unmarshal(data, target)
+	return config.ReadConfigFile(path, target)
 }
 
 // writeConfigFiles writes users and roles to their respective JSON files
@@ -426,25 +412,17 @@ func writeConfigFiles(usersPath, rolesPath string, users []*User, roles RolePerm
 
 // writeConfigFileSecurely marshals and writes any config data to JSON with secure permissions
 func writeConfigFileSecurely(path string, data any) error {
-	encoded, err := marshalConfigData(data)
-	if err != nil {
-		return err
-	}
-	return AtomicWriteFile(path, encoded, 0600)
+	return config.WriteConfigFileSecurely(path, data, AtomicWriteFile)
 }
 
 // ensureConfigDirectory creates the configuration directory if it doesn't exist
 func ensureConfigDirectory(usersPath string) error {
-	return os.MkdirAll(filepath.Dir(usersPath), 0700)
+	return config.EnsureConfigDirectory(usersPath)
 }
 
 // marshalConfigData converts config data to formatted JSON
 func marshalConfigData(data any) ([]byte, error) {
-	encoded, err := json.MarshalIndent(data, "", "  ")
-	if err != nil {
-		return nil, fmt.Errorf("marshal config data: %w", err)
-	}
-	return encoded, nil
+	return config.MarshalConfigData(data)
 }
 
 // validateUsersList ensures users list meets business rules

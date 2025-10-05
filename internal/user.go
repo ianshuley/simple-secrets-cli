@@ -17,28 +17,19 @@ package internal
 
 import (
 	"crypto/rand"
-	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"slices"
 	"strings"
 	"time"
-)
 
-// Role represents a user role with specific permissions
-type Role string
-
-const (
-	RoleAdmin  Role = "admin"
-	RoleReader Role = "reader"
-)
-
-// TokenGenerator is a function type for generating secure tokens
+	"simple-secrets/pkg/config"
+	"simple-secrets/pkg/crypto"
+) // TokenGenerator is a function type for generating secure tokens
 type TokenGenerator func() (string, error)
 
 // DefaultTokenGenerator holds the token generation function (set by cmd package)
@@ -66,6 +57,14 @@ func (u *User) Can(perm string, perms RolePermissions) bool {
 	return perms.Has(u.Role, perm)
 }
 
+// Role represents a user role with specific permissions
+type Role string
+
+const (
+	RoleAdmin  Role = "admin"
+	RoleReader Role = "reader"
+)
+
 // DisableToken disables the user's token by clearing the token hash and updating the timestamp
 func (u *User) DisableToken() {
 	u.TokenHash = ""
@@ -75,8 +74,7 @@ func (u *User) DisableToken() {
 
 // HashToken creates a SHA-256 hash of a token for secure storage
 func HashToken(token string) string {
-	h := sha256.Sum256([]byte(token))
-	return base64.RawURLEncoding.EncodeToString(h[:])
+	return crypto.HashToken(token)
 }
 
 // generateSecureToken calls the registered token generator or uses fallback
@@ -100,16 +98,7 @@ func generateSecureTokenFallback() (string, error) {
 
 // DefaultUserConfigPath exports defaultUserConfigPath for CLI use.
 func DefaultUserConfigPath(filename string) (string, error) {
-	// Check for test override first
-	if testDir := os.Getenv("SIMPLE_SECRETS_CONFIG_DIR"); testDir != "" {
-		return filepath.Join(testDir, filename), nil
-	}
-
-	configDir, err := GetSimpleSecretsPath()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(configDir, filename), nil
+	return config.DefaultConfigPath(filename)
 }
 
 // ResolveToken returns the token from CLI flag, env, or config file (in that order).
@@ -185,9 +174,5 @@ For more config options, run: simple-secrets help config`)
 
 // GetSimpleSecretsPath returns the path to the .simple-secrets directory
 func GetSimpleSecretsPath() (string, error) {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return "", fmt.Errorf("failed to get user home directory: %w", err)
-	}
-	return filepath.Join(homeDir, ".simple-secrets"), nil
+	return config.GetSimpleSecretsPath()
 }

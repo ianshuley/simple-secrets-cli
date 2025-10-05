@@ -23,6 +23,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"simple-secrets/pkg/crypto"
 )
 
 const (
@@ -36,7 +38,7 @@ const (
 func (s *SecretsStore) decryptAllSecrets() (map[string][]byte, error) {
 	plaintexts := make(map[string][]byte, len(s.secrets))
 	for key, encValue := range s.secrets {
-		pt, err := decrypt(s.masterKey, encValue)
+		pt, err := crypto.Decrypt(s.masterKey, encValue)
 		if err != nil {
 			return nil, fmt.Errorf("failed to decrypt secret %q: %w", key, err)
 		}
@@ -49,7 +51,7 @@ func (s *SecretsStore) decryptAllSecrets() (map[string][]byte, error) {
 func (s *SecretsStore) reencryptAllSecrets(plaintexts map[string][]byte, newKey []byte) (map[string]string, error) {
 	newSecrets := make(map[string]string, len(plaintexts))
 	for key, pt := range plaintexts {
-		enc, err := encrypt(newKey, pt)
+		enc, err := crypto.Encrypt(newKey, pt)
 		if err != nil {
 			return nil, fmt.Errorf("failed to encrypt secret %q: %w", key, err)
 		}
@@ -174,7 +176,7 @@ func (s *SecretsStore) reencryptBackups(oldKey, newKey []byte) error {
 		}
 
 		// Decrypt with old key
-		plaintext, err := decrypt(oldKey, string(encryptedData))
+		plaintext, err := crypto.Decrypt(oldKey, string(encryptedData))
 		if err != nil {
 			// If we can't decrypt with old key, it might already be encrypted with new key
 			// or it might be corrupted. Skip this file.
@@ -183,7 +185,7 @@ func (s *SecretsStore) reencryptBackups(oldKey, newKey []byte) error {
 		}
 
 		// Re-encrypt with new key
-		newEncrypted, err := encrypt(newKey, plaintext)
+		newEncrypted, err := crypto.Encrypt(newKey, plaintext)
 		if err != nil {
 			return fmt.Errorf("failed to re-encrypt backup file %s: %w", path, err)
 		}
