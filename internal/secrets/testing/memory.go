@@ -45,10 +45,10 @@ type Repository interface {
 
 // fileEntry represents a file in memory
 type fileEntry struct {
-	data []byte
-	mode FileMode
+	data    []byte
+	mode    FileMode
 	modTime time.Time
-	isDir bool
+	isDir   bool
 }
 
 // MemoryRepository implements Repository for in-memory operations during testing

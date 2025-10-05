@@ -37,16 +37,16 @@ func (b *BackupInfo) String() string {
 	if b.Name == "" || b.Timestamp.IsZero() {
 		return "Invalid backup info"
 	}
-	return fmt.Sprintf("%s (%s, %s ago)", 
-		b.Name, 
-		b.Timestamp.Format("2006-01-02 15:04:05"), 
+	return fmt.Sprintf("%s (%s, %s ago)",
+		b.Name,
+		b.Timestamp.Format("2006-01-02 15:04:05"),
 		b.Age())
 }
 
 // Age returns a human-readable age of the backup
 func (b *BackupInfo) Age() string {
 	duration := time.Since(b.Timestamp)
-	
+
 	if duration < time.Minute {
 		return "less than a minute"
 	}
@@ -64,7 +64,7 @@ func (b *BackupInfo) Age() string {
 		}
 		return fmt.Sprintf("%d hours", hours)
 	}
-	
+
 	days := int(duration.Hours() / 24)
 	if days == 1 {
 		return "1 day"
@@ -81,10 +81,10 @@ func (b *BackupInfo) IsRecent() bool {
 // Example: "secrets_backup_20240101_120000.json" -> "secrets_backup"
 func (b *BackupInfo) BaseName() string {
 	name := b.Name
-	
+
 	// Remove file extension if present
 	name = strings.TrimSuffix(name, filepath.Ext(name))
-	
+
 	// Look for timestamp pattern at the end: _YYYYMMDD_HHMMSS
 	parts := strings.Split(name, "_")
 	if len(parts) >= 3 {
@@ -93,7 +93,7 @@ func (b *BackupInfo) BaseName() string {
 		if dateTimePattern {
 			lastPart := parts[len(parts)-1]
 			secondLastPart := parts[len(parts)-2]
-			
+
 			// Simple check: date should be 8 digits, time should be 6 digits
 			if len(secondLastPart) == 8 && len(lastPart) == 6 {
 				// Remove the timestamp parts
@@ -101,7 +101,7 @@ func (b *BackupInfo) BaseName() string {
 			}
 		}
 	}
-	
+
 	// If no timestamp pattern found, return the whole name
 	return name
 }

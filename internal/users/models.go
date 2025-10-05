@@ -103,12 +103,12 @@ func (u *User) GetTokenRotationDisplay() string {
 func ParseRole(roleStr string) (Role, error) {
 	// Trim whitespace
 	roleStr = strings.TrimSpace(roleStr)
-	
+
 	// Check for empty string
 	if roleStr == "" {
 		return "", &ValidationError{Field: "role", Message: "role cannot be empty"}
 	}
-	
+
 	// Validate against known roles
 	role := Role(roleStr)
 	switch role {

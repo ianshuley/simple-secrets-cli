@@ -238,7 +238,7 @@ func (r *FileRepository) atomicWriteFile(path string, data []byte, perm os.FileM
 	}
 
 	tmpPath := tmpFile.Name()
-	
+
 	// Ensure cleanup on error
 	defer func() {
 		tmpFile.Close()

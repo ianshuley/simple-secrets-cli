@@ -21,7 +21,7 @@ import "time"
 // Secret represents a stored secret with its encrypted value and metadata
 type Secret struct {
 	Key      string         `json:"key"`
-	Value    []byte         `json:"value"`    // Encrypted value
+	Value    []byte         `json:"value"` // Encrypted value
 	Metadata SecretMetadata `json:"metadata"`
 }
 

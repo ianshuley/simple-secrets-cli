@@ -26,39 +26,39 @@ import (
 
 func TestStoreWithMemoryRepository(t *testing.T) {
 	// Use memory repository for testing
-	repo := secretstesting.NewMemoryRepository() 
-	
+	repo := secretstesting.NewMemoryRepository()
+
 	// Create temporary config directory for test
 	tempDir := t.TempDir()
 	os.Setenv("SIMPLE_SECRETS_CONFIG_DIR", tempDir)
 	defer os.Unsetenv("SIMPLE_SECRETS_CONFIG_DIR")
-	
+
 	// Load store
 	store, err := LoadStore(repo)
 	if err != nil {
 		t.Fatalf("LoadStore() failed: %v", err)
 	}
-	
+
 	// Test basic operations
 	testKey := "test-secret"
 	testValue := "secret-value-123"
-	
+
 	// Put a secret
 	err = store.Put(testKey, testValue)
 	if err != nil {
 		t.Fatalf("Put() failed: %v", err)
 	}
-	
+
 	// Get the secret back
 	retrieved, err := store.Get(testKey)
 	if err != nil {
 		t.Fatalf("Get() failed: %v", err)
 	}
-	
+
 	if retrieved != testValue {
 		t.Errorf("Get() = %v, want %v", retrieved, testValue)
 	}
-	
+
 	// List keys
 	keys := store.ListKeys()
 	if len(keys) != 1 || keys[0] != testKey {
@@ -69,46 +69,46 @@ func TestStoreWithMemoryRepository(t *testing.T) {
 func TestStoreWithFilesystemRepository(t *testing.T) {
 	// Use filesystem repository
 	repo := NewFilesystemRepository()
-	
+
 	// Create temporary config directory for test
 	tempDir := t.TempDir()
 	os.Setenv("SIMPLE_SECRETS_CONFIG_DIR", tempDir)
 	defer os.Unsetenv("SIMPLE_SECRETS_CONFIG_DIR")
-	
+
 	// Load store
 	store, err := LoadStore(repo)
 	if err != nil {
 		t.Fatalf("LoadStore() failed: %v", err)
 	}
-	
+
 	// Test that key and secrets files are created
 	expectedKeyPath := filepath.Join(tempDir, "master.key")
 	expectedSecretsPath := filepath.Join(tempDir, "secrets.json")
-	
+
 	if _, err := os.Stat(expectedKeyPath); os.IsNotExist(err) {
 		t.Error("Master key file was not created")
 	}
-	
+
 	// Test basic operation
 	testKey := "filesystem-test"
 	testValue := "filesystem-value"
-	
+
 	err = store.Put(testKey, testValue)
 	if err != nil {
 		t.Fatalf("Put() failed: %v", err)
 	}
-	
+
 	// Verify secrets file was created
 	if _, err := os.Stat(expectedSecretsPath); os.IsNotExist(err) {
 		t.Error("Secrets file was not created after Put()")
 	}
-	
+
 	// Verify we can retrieve the secret
 	retrieved, err := store.Get(testKey)
 	if err != nil {
 		t.Fatalf("Get() failed: %v", err)
 	}
-	
+
 	if retrieved != testValue {
 		t.Errorf("Get() = %v, want %v", retrieved, testValue)
 	}

@@ -176,18 +176,18 @@ func TestGetTokenRotationDisplay(t *testing.T) {
 		expected string
 	}{
 		{
-			name: "nil timestamp shows legacy user",
-			user: &User{TokenRotatedAt: nil},
+			name:     "nil timestamp shows legacy user",
+			user:     &User{TokenRotatedAt: nil},
 			expected: "Legacy user (no rotation info)",
 		},
 		{
-			name: "valid timestamp formatted correctly",
-			user: &User{TokenRotatedAt: &time.Time{}},
+			name:     "valid timestamp formatted correctly",
+			user:     &User{TokenRotatedAt: &time.Time{}},
 			expected: "0001-01-01 00:00:00",
 		},
 		{
-			name: "zero time formatted",
-			user: &User{TokenRotatedAt: &time.Time{}},
+			name:     "zero time formatted",
+			user:     &User{TokenRotatedAt: &time.Time{}},
 			expected: "0001-01-01 00:00:00",
 		},
 	}
