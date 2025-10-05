@@ -16,17 +16,17 @@ limitations under the License.
 package secrets
 
 import (
-	"crypto/rand"
 	"encoding/base64"
 	"fmt"
+	"simple-secrets/pkg/crypto"
 )
 
 // loadOrCreateKey sets s.masterKey; creates the file if missing.
 func (s *SecretsStore) loadOrCreateKey() error {
 	if !s.storage.Exists(s.KeyPath) {
-		key := make([]byte, AES256KeySize) // AES-256
-		if _, err := rand.Read(key); err != nil {
-			return err
+		key, err := crypto.GenerateKey()
+		if err != nil {
+			return fmt.Errorf("failed to generate master key: %w", err)
 		}
 		if err := s.writeMasterKey(key); err != nil {
 			return err

@@ -16,6 +16,7 @@ limitations under the License.
 package secrets
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -688,4 +689,45 @@ func (fl *FileLock) Unlock() error {
 	}
 
 	return nil
+}
+
+// Master key management functions (moved from crypto_keys.go)
+
+// loadOrCreateKey sets s.masterKey; creates the file if missing.
+func (s *SecretsStore) loadOrCreateKey() error {
+	if !s.storage.Exists(s.KeyPath) {
+		key, err := crypto.GenerateKey()
+		if err != nil {
+			return fmt.Errorf("failed to generate master key: %w", err)
+		}
+		if err := s.writeMasterKey(key); err != nil {
+			return err
+		}
+		s.masterKey = key
+		return nil
+	}
+
+	data, err := s.storage.ReadFile(s.KeyPath)
+	if err != nil {
+		return err
+	}
+
+	key, err := base64.StdEncoding.DecodeString(string(data))
+	if err != nil {
+		return fmt.Errorf("master key file appears corrupted - try restoring from backup or removing ~/.simple-secrets/ to start fresh: %w", err)
+	}
+
+	s.masterKey = key
+	return nil
+}
+
+// writeMasterKey overwrites the key file (0600).
+func (s *SecretsStore) writeMasterKey(newKey []byte) error {
+	return s.writeMasterKeyToPath(s.KeyPath, newKey)
+}
+
+// writeMasterKeyToPath writes a master key to the specified path atomically.
+func (s *SecretsStore) writeMasterKeyToPath(path string, key []byte) error {
+	enc := base64.StdEncoding.EncodeToString(key)
+	return s.storage.AtomicWriteFile(path, []byte(enc), FileMode(0600))
 }
