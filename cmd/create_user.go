@@ -17,11 +17,13 @@ package cmd
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"os"
 	"strings"
 
-	"simple-secrets/internal"
+	"simple-secrets/internal/platform"
+	"simple-secrets/pkg/auth"
 
 	"github.com/spf13/cobra"
 )
@@ -38,21 +40,35 @@ var createUserCmd = &cobra.Command{
 			return ErrAuthenticationRequired
 		}
 
-		helper, err := GetCLIServiceHelper()
+		// Get platform configuration
+		config, err := getPlatformConfig()
 		if err != nil {
 			return err
+		}
+
+		// Initialize platform services
+		ctx := context.Background()
+		app, err := platform.New(ctx, config)
+		if err != nil {
+			return fmt.Errorf("failed to initialize platform: %w", err)
 		}
 
 		// Resolve token for authentication
-		token, err := resolveTokenFromCommand(cmd)
+		authToken, err := resolveTokenFromCommand(cmd)
 		if err != nil {
 			return err
 		}
 
-		// Resolve the token (CLI responsibility)
-		resolvedToken, err := internal.ResolveToken(token)
+		// Authenticate user
+		user, err := app.Auth.Authenticate(ctx, authToken)
 		if err != nil {
-			return err
+			return fmt.Errorf("authentication failed: %w", err)
+		}
+
+		// Check manage-users permissions
+		err = app.Auth.Authorize(ctx, user, auth.PermissionManageUsers)
+		if err != nil {
+			return fmt.Errorf("manage-users access denied: %w", err)
 		}
 
 		// Collect user input
@@ -61,13 +77,13 @@ var createUserCmd = &cobra.Command{
 			return err
 		}
 
-		// Use service layer for user creation
-		newToken, err := helper.GetService().Users().CreateUser(resolvedToken, userInput.Username, string(userInput.Role))
+		// Create user using platform services
+		newUser, newToken, err := app.Users.Create(ctx, userInput.Username, userInput.Role)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to create user: %w", err)
 		}
 
-		printUserCreationSuccess(userInput.Username, newToken)
+		printUserCreationSuccess(newUser.Username, newToken)
 		return nil
 	},
 }
@@ -75,7 +91,7 @@ var createUserCmd = &cobra.Command{
 // UserInput represents the input data for creating a new user
 type UserInput struct {
 	Username string
-	Role     internal.Role
+	Role     string
 }
 
 // collectUserInput gathers username and role from args or interactive prompts
@@ -115,13 +131,13 @@ func collectUserInput(args []string) (*UserInput, error) {
 	}, nil
 }
 
-// parseRole converts a role string to the appropriate Role type
-func parseRole(roleStr string) (internal.Role, error) {
+// parseRole validates a role string
+func parseRole(roleStr string) (string, error) {
 	switch roleStr {
 	case "admin":
-		return internal.RoleAdmin, nil
+		return "admin", nil
 	case "reader":
-		return internal.RoleReader, nil
+		return "reader", nil
 	default:
 		return "", fmt.Errorf("invalid role: must be 'admin' or 'reader'")
 	}

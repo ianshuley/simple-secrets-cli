@@ -17,10 +17,13 @@ package cmd
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"os"
-	"simple-secrets/internal"
 	"strings"
+
+	"simple-secrets/internal/platform"
+	"simple-secrets/pkg/auth"
 
 	"github.com/spf13/cobra"
 )
@@ -60,22 +63,35 @@ Disabled secrets are hidden from normal operations but can be re-enabled.`,
 }
 
 func disableUser(cmd *cobra.Command, username string) error {
-	helper, err := GetCLIServiceHelper()
+	// Get platform configuration
+	config, err := getPlatformConfig()
+	if err != nil {
+		return fmt.Errorf("failed to get platform config: %w", err)
+	}
+
+	// Initialize platform services
+	ctx := context.Background()
+	app, err := platform.New(ctx, config)
+	if err != nil {
+		return fmt.Errorf("failed to initialize platform: %w", err)
+	}
+
+	// Resolve token for authentication
+	authToken, err := resolveTokenFromCommand(cmd)
 	if err != nil {
 		return err
 	}
 
-	// Check permissions first before showing confirmation prompt
-	currentUser, store, err := helper.AuthenticateCommand(cmd, true)
+	// Authenticate user
+	user, err := app.Auth.Authenticate(ctx, authToken)
 	if err != nil {
-		return err
-	}
-	if currentUser == nil {
-		return nil
+		return fmt.Errorf("authentication failed: %w", err)
 	}
 
-	if !currentUser.Can("manage-users", store.Permissions()) {
-		return NewPermissionDeniedError("manage-users")
+	// Check manage-users permissions
+	err = app.Auth.Authorize(ctx, user, auth.PermissionManageUsers)
+	if err != nil {
+		return fmt.Errorf("manage-users access denied: %w", err)
 	}
 
 	// Show detailed help for the disable user operation
@@ -92,19 +108,10 @@ func disableUser(cmd *cobra.Command, username string) error {
 		return nil
 	}
 
-	token, err := resolveTokenFromCommand(cmd)
+	// Disable user using platform services
+	err = app.Users.Disable(ctx, username)
 	if err != nil {
-		return err
-	}
-
-	resolvedToken, err := internal.ResolveToken(token)
-	if err != nil {
-		return err
-	}
-
-	// Disable by username
-	if err := helper.GetService().Users().DisableUser(resolvedToken, username); err != nil {
-		return err
+		return fmt.Errorf("failed to disable user: %w", err)
 	}
 
 	fmt.Printf("✅ Token disabled for user '%s'\n", username)
@@ -114,22 +121,35 @@ func disableUser(cmd *cobra.Command, username string) error {
 }
 
 func disableTokenByValue(cmd *cobra.Command, tokenValue string) error {
-	helper, err := GetCLIServiceHelper()
+	// Get platform configuration
+	config, err := getPlatformConfig()
 	if err != nil {
 		return err
 	}
 
-	// Check permissions first before showing confirmation prompt
-	currentUser, store, err := helper.AuthenticateCommand(cmd, true)
+	// Initialize platform services
+	ctx := context.Background()
+	app, err := platform.New(ctx, config)
+	if err != nil {
+		return fmt.Errorf("failed to initialize platform: %w", err)
+	}
+
+	// Resolve token for authentication
+	authToken, err := resolveTokenFromCommand(cmd)
 	if err != nil {
 		return err
 	}
-	if currentUser == nil {
-		return nil
+
+	// Authenticate user
+	user, err := app.Auth.Authenticate(ctx, authToken)
+	if err != nil {
+		return fmt.Errorf("authentication failed: %w", err)
 	}
 
-	if !currentUser.Can("manage-users", store.Permissions()) {
-		return NewPermissionDeniedError("manage-users")
+	// Check manage-users permissions
+	err = app.Auth.Authorize(ctx, user, auth.PermissionManageUsers)
+	if err != nil {
+		return fmt.Errorf("manage-users access denied: %w", err)
 	}
 
 	// Show detailed help for the disable token operation
@@ -146,23 +166,19 @@ func disableTokenByValue(cmd *cobra.Command, tokenValue string) error {
 		return nil
 	}
 
-	token, err := resolveTokenFromCommand(cmd)
+	// Find the user who owns this token
+	targetUser, err := app.Users.GetByToken(ctx, tokenValue)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to find user for token: %w", err)
 	}
 
-	resolvedToken, err := internal.ResolveToken(token)
+	// Disable the user (which effectively disables all their tokens)
+	err = app.Users.Disable(ctx, targetUser.Username)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to disable user: %w", err)
 	}
 
-	// Disable by token value
-	targetUsername, err := helper.GetService().Users().DisableUserByToken(resolvedToken, tokenValue)
-	if err != nil {
-		return err
-	}
-
-	fmt.Printf("✅ Token disabled for user '%s'\n", targetUsername)
+	fmt.Printf("✅ Token disabled for user '%s'\n", targetUser.Username)
 	fmt.Println("• The user can no longer authenticate with that token")
 	fmt.Println("• Use 'enable user' to generate a new token for this user")
 	return nil
@@ -177,27 +193,41 @@ func min(a, b int) int {
 }
 
 func disableSecret(cmd *cobra.Command, key string) error {
-	helper, err := GetCLIServiceHelper()
+	// Get platform configuration
+	config, err := getPlatformConfig()
 	if err != nil {
 		return err
+	}
+
+	// Initialize platform services
+	ctx := context.Background()
+	app, err := platform.New(ctx, config)
+	if err != nil {
+		return fmt.Errorf("failed to initialize platform: %w", err)
 	}
 
 	// Resolve token for authentication
-	token, err := resolveTokenFromCommand(cmd)
+	authToken, err := resolveTokenFromCommand(cmd)
 	if err != nil {
 		return err
 	}
 
-	// Resolve the token (CLI responsibility)
-	resolvedToken, err := internal.ResolveToken(token)
+	// Authenticate user
+	user, err := app.Auth.Authenticate(ctx, authToken)
 	if err != nil {
-		return err
+		return fmt.Errorf("authentication failed: %w", err)
 	}
 
-	// Use service layer for secret disabling
-	err = helper.GetService().Secrets().Disable(resolvedToken, key)
+	// Check write permissions (needed for disabling secrets)
+	err = app.Auth.Authorize(ctx, user, auth.PermissionWrite)
 	if err != nil {
-		return err
+		return fmt.Errorf("write access denied: %w", err)
+	}
+
+	// Disable the secret using platform services
+	err = app.Secrets.Disable(ctx, key)
+	if err != nil {
+		return fmt.Errorf("failed to disable secret: %w", err)
 	}
 
 	fmt.Printf("✅ Secret '%s' has been disabled\n", key)

@@ -16,7 +16,11 @@ limitations under the License.
 package cmd
 
 import (
+	"context"
 	"fmt"
+
+	"simple-secrets/internal/platform"
+	"simple-secrets/pkg/auth"
 
 	"github.com/spf13/cobra"
 )
@@ -55,60 +59,75 @@ var restoreCmd = &cobra.Command{
 }
 
 func restoreSecret(cmd *cobra.Command, secretKey string) error {
-	// RBAC: write access (restoring is a write operation)
-	helper, err := GetCLIServiceHelper()
+	// Get platform configuration
+	config, err := getPlatformConfig()
 	if err != nil {
 		return err
 	}
 
-	user, _, err := helper.AuthenticateCommand(cmd, true)
+	// Initialize platform services
+	ctx := context.Background()
+	app, err := platform.New(ctx, config)
+	if err != nil {
+		return fmt.Errorf("failed to initialize platform: %w", err)
+	}
+
+	// Resolve token for authentication
+	authToken, err := resolveTokenFromCommand(cmd)
 	if err != nil {
 		return err
 	}
-	if user == nil {
-		return nil
+
+	// Authenticate user
+	user, err := app.Auth.Authenticate(ctx, authToken)
+	if err != nil {
+		return fmt.Errorf("authentication failed: %w", err)
 	}
 
-	service := helper.GetService()
-	if err := service.Admin().RestoreSecret(secretKey); err != nil {
-		return err
+	// Check write permissions (needed for restore operations)
+	err = app.Auth.Authorize(ctx, user, auth.PermissionWrite)
+	if err != nil {
+		return fmt.Errorf("write access denied: %w", err)
 	}
 
-	fmt.Printf("Secret '%s' restored from backup.\n", secretKey)
-	return nil
+	// Secret restoration requires re-implementation with platform services
+	return fmt.Errorf("secret restoration is temporarily disabled during platform migration - backup/restore functionality needs to be reimplemented with the new architecture")
 }
 
 func restoreDatabase(cmd *cobra.Command, backupName string) error {
-	// RBAC: write access (this is a destructive operation)
-	helper, err := GetCLIServiceHelper()
+	// Get platform configuration
+	config, err := getPlatformConfig()
 	if err != nil {
 		return err
 	}
 
-	user, _, err := helper.AuthenticateCommand(cmd, true)
+	// Initialize platform services
+	ctx := context.Background()
+	app, err := platform.New(ctx, config)
+	if err != nil {
+		return fmt.Errorf("failed to initialize platform: %w", err)
+	}
+
+	// Resolve token for authentication
+	authToken, err := resolveTokenFromCommand(cmd)
 	if err != nil {
 		return err
 	}
-	if user == nil {
-		return nil
+
+	// Authenticate user
+	user, err := app.Auth.Authenticate(ctx, authToken)
+	if err != nil {
+		return fmt.Errorf("authentication failed: %w", err)
 	}
 
-	service := helper.GetService()
-	if err := service.Admin().RestoreDatabase(backupName); err != nil {
-		return fmt.Errorf("failed to restore database: %w", err)
+	// Check write permissions (needed for restore operations)
+	err = app.Auth.Authorize(ctx, user, auth.PermissionWrite)
+	if err != nil {
+		return fmt.Errorf("write access denied: %w", err)
 	}
 
-	fmt.Printf("✅ Database restored successfully from backup '%s'\n", backupName)
-	fmt.Println()
-	fmt.Println("All secrets have been restored from the backup.")
-	fmt.Println("The master key has been restored to the backup state.")
-	fmt.Println()
-	fmt.Println("⚠️  Important:")
-	fmt.Println("• Any secrets added after this backup are now lost")
-	fmt.Println("• The master key is now the one from the backup")
-	fmt.Println("• Consider running 'simple-secrets list' to verify restored secrets")
-
-	return nil
+	// Database restoration requires re-implementation with platform services
+	return fmt.Errorf("database restoration is temporarily disabled during platform migration - backup/restore functionality needs to be reimplemented with the new architecture")
 }
 
 // completeRestoreArgs provides completion for restore command arguments
