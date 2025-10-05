@@ -230,7 +230,7 @@ func TestRolePermissions_GetAllRoles(t *testing.T) {
 
 func TestNewUserContext(t *testing.T) {
 	rolePerms := NewDefaultRolePermissions()
-	
+
 	userContext := NewUserContext("testuser", RoleAdmin, "hash123", rolePerms)
 
 	if userContext.Username != "testuser" {

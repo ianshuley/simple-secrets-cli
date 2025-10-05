@@ -65,7 +65,7 @@ func ParseRole(roleStr string) (Role, error) {
 	}
 
 	role := Role(roleStr)
-	
+
 	// Validate against known roles
 	switch role {
 	case RoleAdmin, RoleReader:
@@ -83,11 +83,11 @@ func ParsePermission(permStr string) (Permission, error) {
 	}
 
 	permission := Permission(permStr)
-	
+
 	// Validate against known permissions
 	switch permission {
-	case PermissionRead, PermissionWrite, PermissionRotateOwn, 
-		 PermissionRotateTokens, PermissionManageUsers:
+	case PermissionRead, PermissionWrite, PermissionRotateOwn,
+		PermissionRotateTokens, PermissionManageUsers:
 		return permission, nil
 	default:
 		return "", fmt.Errorf("invalid permission: %s", permStr)
@@ -114,7 +114,7 @@ func NewDefaultRolePermissions() RolePermissions {
 // NewUserContext creates a new user context with permissions populated from role
 func NewUserContext(username string, role Role, tokenHash string, rolePermissions RolePermissions) *UserContext {
 	permissions := rolePermissions.GetPermissions(role)
-	
+
 	return &UserContext{
 		Username:    username,
 		Role:        role,
@@ -137,7 +137,7 @@ const (
 	AuthErrorInvalidToken     AuthErrorType = "INVALID_TOKEN"
 	AuthErrorTokenExpired     AuthErrorType = "TOKEN_EXPIRED"
 	AuthErrorPermissionDenied AuthErrorType = "PERMISSION_DENIED"
-	AuthErrorInvalidRole      AuthErrorType = "INVALID_ROLE" 
+	AuthErrorInvalidRole      AuthErrorType = "INVALID_ROLE"
 	AuthErrorInvalidUser      AuthErrorType = "INVALID_USER"
 )
 

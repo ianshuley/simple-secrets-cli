@@ -73,11 +73,11 @@ func (s *ServiceImpl) ValidateToken(ctx context.Context, token string) (*auth.Us
 
 	// Create user context with permissions
 	userContext := auth.NewUserContext(user.Username, role, tokenHash, s.rolePermissions)
-	
+
 	return userContext, nil
 }
 
-// ValidateTokenHash validates a token hash and returns the associated user context  
+// ValidateTokenHash validates a token hash and returns the associated user context
 func (s *ServiceImpl) ValidateTokenHash(ctx context.Context, tokenHash string) (*auth.UserContext, error) {
 	if tokenHash == "" {
 		return nil, auth.NewInvalidTokenError("token hash cannot be empty")
@@ -111,7 +111,7 @@ func (s *ServiceImpl) ValidateTokenHash(ctx context.Context, tokenHash string) (
 
 				// Create user context with permissions
 				userContext := auth.NewUserContext(user.Username, role, tokenHash, s.rolePermissions)
-				
+
 				return userContext, nil
 			}
 		}

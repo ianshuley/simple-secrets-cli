@@ -26,13 +26,13 @@ type Permission string
 
 const (
 	// Core permissions
-	PermissionRead         Permission = "read"           // Read secrets
-	PermissionWrite        Permission = "write"          // Create/update/delete secrets
-	PermissionRotateOwn    Permission = "rotate-own-token" // Rotate own token
-	
-	// Administrative permissions  
-	PermissionRotateTokens Permission = "rotate-tokens"  // Rotate any user's token
-	PermissionManageUsers  Permission = "manage-users"   // Create/delete/modify users
+	PermissionRead      Permission = "read"             // Read secrets
+	PermissionWrite     Permission = "write"            // Create/update/delete secrets
+	PermissionRotateOwn Permission = "rotate-own-token" // Rotate own token
+
+	// Administrative permissions
+	PermissionRotateTokens Permission = "rotate-tokens" // Rotate any user's token
+	PermissionManageUsers  Permission = "manage-users"  // Create/delete/modify users
 )
 
 // Role represents a user role with associated permissions
@@ -47,7 +47,7 @@ const (
 type TokenValidator interface {
 	// ValidateToken validates a token and returns the associated user context
 	ValidateToken(ctx context.Context, token string) (*UserContext, error)
-	
+
 	// ValidateTokenHash validates a token hash and returns the associated user context
 	ValidateTokenHash(ctx context.Context, tokenHash string) (*UserContext, error)
 }
@@ -56,10 +56,10 @@ type TokenValidator interface {
 type PermissionChecker interface {
 	// HasPermission checks if a user has a specific permission
 	HasPermission(ctx context.Context, user *UserContext, permission Permission) bool
-	
+
 	// RequirePermission checks permission and returns error if not granted
 	RequirePermission(ctx context.Context, user *UserContext, permission Permission) error
-	
+
 	// GetPermissions returns all permissions for a role
 	GetPermissions(ctx context.Context, role Role) []Permission
 }
@@ -68,10 +68,10 @@ type PermissionChecker interface {
 type RoleManager interface {
 	// ValidateRole checks if a role is valid
 	ValidateRole(ctx context.Context, role Role) error
-	
-	// GetRolePermissions returns the permissions for a specific role  
+
+	// GetRolePermissions returns the permissions for a specific role
 	GetRolePermissions(ctx context.Context, role Role) ([]Permission, error)
-	
+
 	// ListRoles returns all available roles
 	ListRoles(ctx context.Context) ([]Role, error)
 }
@@ -82,23 +82,23 @@ type AuthService interface {
 	TokenValidator
 	PermissionChecker
 	RoleManager
-	
+
 	// Authenticate validates credentials and returns user context
 	Authenticate(ctx context.Context, token string) (*UserContext, error)
-	
+
 	// Authorize checks if user can perform specific action
 	Authorize(ctx context.Context, user *UserContext, permission Permission) error
-	
+
 	// HashToken creates a secure hash of a token for storage (utility function)
 	HashToken(token string) string
 }
 
 // UserContext represents an authenticated user with their role and permissions
 type UserContext struct {
-	Username    string      `json:"username"`
-	Role        Role        `json:"role"`
+	Username    string       `json:"username"`
+	Role        Role         `json:"role"`
 	Permissions []Permission `json:"permissions"`
-	TokenHash   string      `json:"token_hash"`
+	TokenHash   string       `json:"token_hash"`
 }
 
 // HasPermission checks if this user context has a specific permission
