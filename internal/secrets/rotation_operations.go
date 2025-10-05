@@ -149,7 +149,7 @@ func (s *SecretsStore) RotateMasterKey(backupDir string) error {
 		Secrets: newSecrets,
 		Version: "",
 	}
-	
+
 	newSecretsData, err := json.MarshalIndent(fileFormat, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal new secrets: %w", err)
