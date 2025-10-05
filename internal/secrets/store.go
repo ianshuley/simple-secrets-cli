@@ -27,6 +27,7 @@ import (
 	"sync"
 	"time"
 
+	"simple-secrets/internal"
 	"simple-secrets/pkg/crypto"
 )
 
@@ -504,18 +505,16 @@ func (s *Store) IsEnabled(key string) bool {
 
 // RotateMasterKey generates a new master encryption key and re-encrypts all secrets
 func (s *Store) RotateMasterKey(ctx context.Context, backupDir string) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	// For master key rotation during platform migration, we delegate to the working
+	// SecretsStore implementation that has the proven rotation logic.
+	// This ensures functionality while the platform services architecture is completed.
 
-	// For now, master key rotation in the new platform services architecture
-	// requires careful integration with the crypto service and repository patterns.
-	// This is a complex operation that involves:
-	// 1. Creating backups of current state
-	// 2. Generating a new master key
-	// 3. Re-encrypting all secrets with the new key
-	// 4. Atomically updating both key and secrets files
-	//
-	// This requires significant architectural work to properly integrate with
-	// the repository pattern and crypto service.
-	return fmt.Errorf("master key rotation not yet implemented in platform services architecture - requires integration with crypto service and repository patterns")
+	// Create old-style secrets store with our current state
+	oldStore, err := internal.LoadSecretsStore(internal.NewFilesystemBackend())
+	if err != nil {
+		return fmt.Errorf("failed to load secrets store for rotation: %w", err)
+	}
+
+	// Delegate to the working rotation implementation
+	return oldStore.RotateMasterKey(backupDir)
 }
