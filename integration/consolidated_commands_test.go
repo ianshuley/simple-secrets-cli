@@ -399,7 +399,7 @@ func TestConsolidatedDisableEnableCommands(t *testing.T) {
 			name:     "get disabled secret fails",
 			args:     []string{"get", "test-key"},
 			wantErr:  true,
-			contains: "not found",
+			contains: "Secret is disabled",
 		},
 		{
 			name:     "enable secret",
@@ -443,13 +443,13 @@ func TestConsolidatedDisableEnableCommands(t *testing.T) {
 			name:     "disable nonexistent secret",
 			args:     []string{"disable", "secret", "nonexistent"},
 			wantErr:  true,
-			contains: "file does not exist",
+			contains: "secret not found",
 		},
 		{
 			name:     "enable nonexistent secret",
 			args:     []string{"enable", "secret", "nonexistent"},
 			wantErr:  true,
-			contains: "disabled secret not found",
+			contains: "secret not found",
 		},
 	}
 

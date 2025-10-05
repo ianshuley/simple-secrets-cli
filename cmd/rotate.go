@@ -16,11 +16,8 @@ limitations under the License.
 package cmd
 
 import (
-	"bufio"
 	"context"
 	"fmt"
-	"os"
-	"strings"
 
 	"simple-secrets/internal/platform"
 	"simple-secrets/pkg/auth"
@@ -80,38 +77,6 @@ func rotateMasterKey(cmd *cobra.Command) error {
 // func validateMasterKeyRotationAccess(cmd *cobra.Command) (*internal.User, *internal.SecretsStore, error) {
 //   // Implementation removed during platform migration
 // }
-
-// confirmMasterKeyRotation prompts the user for confirmation and returns their choice
-func confirmMasterKeyRotation() bool {
-	printMasterKeyRotationWarning()
-
-	fmt.Print("Proceed? (type 'yes'): ")
-	in := bufio.NewReader(os.Stdin)
-	line, _ := in.ReadString('\n')
-
-	if strings.TrimSpace(strings.ToLower(line)) != "yes" {
-		fmt.Println("Aborted.")
-		return false
-	}
-	return true
-}
-
-// printMasterKeyRotationWarning displays the warning about what master key rotation will do
-func printMasterKeyRotationWarning() {
-	fmt.Println("This will:")
-	fmt.Println("  • Generate a NEW master key")
-	fmt.Println("  • Re-encrypt ALL secrets with the new key")
-	fmt.Println("  • Create a backup of the old key+secrets for rollback")
-}
-
-// printMasterKeyRotationSuccess displays the success message after rotation
-func printMasterKeyRotationSuccess() {
-	fmt.Println("✅ Master key rotation completed successfully!")
-	printBackupLocation(rotateNewBackupDir)
-	fmt.Println()
-	fmt.Println("All secrets have been re-encrypted with the new master key.")
-	fmt.Println("The old master key and secrets are backed up for emergency recovery.")
-}
 
 func rotateSelfToken(cmd *cobra.Command) error {
 	// Get platform configuration
@@ -231,37 +196,6 @@ func init() {
 	// Add custom completion for rotate command
 	rotateCmd.ValidArgsFunction = completeRotateArgs
 }
-
-func printBackupLocation(backupDir string) {
-	if backupDir == "" {
-		fmt.Println("📁 Backup created under ~/.simple-secrets/backups/")
-		return
-	}
-	fmt.Printf("📁 Backup created at %s\n", backupDir)
-}
-
-// Legacy helper functions - unused after platform migration
-/*
-func validateTokenRotationAccess(cmd *cobra.Command, targetUsername string) (*internal.User, string, []*internal.User, error) {
-	// Implementation removed during platform migration
-	return nil, "", nil, fmt.Errorf("legacy function not implemented")
-}
-*/
-
-// Legacy functions - commented out after platform migration
-/*
-All the helper functions for the old internal system have been replaced
-by platform services in the main rotateSelfToken() and rotateToken() functions.
-This includes:
-- validateSelfTokenRotationAccess
-- findUserIndex
-- generateAndUpdateUserToken
-- TokenRotationContext
-- prepareTokenRotationContext
-- prepareTokenRotationContextForUser
-- executeTokenRotation
-- saveUsersList
-*/
 
 // printTokenRotationSuccess displays the success message and instructions
 func printTokenRotationSuccess(username string, role string, newToken string) {
