@@ -106,9 +106,11 @@ func (s *StoreImpl) Delete(ctx context.Context, key string) error {
 	}
 
 	// Verify secret exists before deletion
-	if exists, err := s.repo.Exists(ctx, key); err != nil {
+	exists, err := s.repo.Exists(ctx, key)
+	if err != nil {
 		return err
-	} else if !exists {
+	}
+	if !exists {
 		return errors.NewNotFoundError("secret", key)
 	}
 

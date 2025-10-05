@@ -60,21 +60,7 @@ func (s *SecretsStore) reencryptAllSecrets(plaintexts map[string][]byte, newKey 
 		}
 
 		// Preserve existing metadata if available, otherwise create new
-		var metadata secretsmodels.SecretMetadata
-		if existingSecret, exists := s.secrets[key]; exists {
-			metadata = existingSecret.Metadata
-			metadata.ModifiedAt = time.Now() // Update modification time due to re-encryption
-		} else {
-			// Create new metadata (shouldn't happen during rotation, but defensive)
-			now := time.Now()
-			metadata = secretsmodels.SecretMetadata{
-				Key:        key,
-				CreatedAt:  now,
-				ModifiedAt: now,
-				Disabled:   false,
-				Size:       len(pt),
-			}
-		}
+		metadata := s.createRotationMetadata(key, pt)
 
 		newSecrets[key] = secretsmodels.Secret{
 			Key:      key,
@@ -498,4 +484,25 @@ func extractTimestampString(dirName string) string {
 	}
 
 	return "" // Unknown format
+}
+
+// createRotationMetadata creates metadata for a secret during rotation, preserving existing data when available
+func (s *SecretsStore) createRotationMetadata(key string, plaintext []byte) secretsmodels.SecretMetadata {
+	// Default metadata for new secrets (defensive - shouldn't happen during rotation)
+	now := time.Now()
+	metadata := secretsmodels.SecretMetadata{
+		Key:        key,
+		CreatedAt:  now,
+		ModifiedAt: now,
+		Disabled:   false,
+		Size:       len(plaintext),
+	}
+
+	// Override with existing metadata if available
+	if existingSecret, exists := s.secrets[key]; exists {
+		metadata = existingSecret.Metadata
+		metadata.ModifiedAt = now // Update modification time due to re-encryption
+	}
+
+	return metadata
 }

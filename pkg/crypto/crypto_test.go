@@ -72,14 +72,8 @@ func TestDecrypt_TamperFails(t *testing.T) {
 	// Corrupt the base64 - change one character
 	corrupted := strings.Replace(ciphertext, string(ciphertext[0]), "Z", 1)
 	if corrupted == ciphertext {
-		// If replacement didn't work, manually change first char
-		runes := []rune(ciphertext)
-		if runes[0] == 'Z' {
-			runes[0] = 'A'
-		} else {
-			runes[0] = 'Z'
-		}
-		corrupted = string(runes)
+		// If replacement didn't work, manually change first char to something different
+		corrupted = replaceFirstCharacter(ciphertext)
 	}
 
 	_, err = Decrypt(key, corrupted)
@@ -218,4 +212,16 @@ func TestHashToken(t *testing.T) {
 			}
 		})
 	}
+}
+
+// replaceFirstCharacter changes the first character of a string to ensure corruption
+func replaceFirstCharacter(s string) string {
+	runes := []rune(s)
+	// Default to 'Z' replacement
+	replacement := 'Z'
+	if runes[0] == 'Z' {
+		replacement = 'A'
+	}
+	runes[0] = replacement
+	return string(runes)
 }

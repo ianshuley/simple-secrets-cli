@@ -79,7 +79,9 @@ func TestStoreImpl_UserCreation(t *testing.T) {
 	var structErr *errors.StructuredError
 	if !stderrors.As(err, &structErr) {
 		t.Errorf("Expected StructuredError, got %T", err)
-	} else if structErr.Code != errors.ErrCodeAlreadyExists {
+		return
+	}
+	if structErr.Code != errors.ErrCodeAlreadyExists {
 		t.Errorf("Expected ALREADY_EXISTS error, got %s", structErr.Code)
 	}
 }

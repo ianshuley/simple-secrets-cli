@@ -172,14 +172,17 @@ func (s *StoreImpl) RotateToken(ctx context.Context, username string) (string, e
 
 	// Find primary token and replace it, or create if none exists
 	primaryToken := user.GetPrimaryToken()
-	if primaryToken != nil {
-		primaryToken.Hash = tokenHash
-		primaryToken.CreatedAt = time.Now()
-		primaryToken.LastUsedAt = nil
-	} else {
+	if primaryToken == nil {
 		// Create new default token
 		token := users.NewToken("default", tokenHash)
 		user.AddToken(token)
+	}
+
+	if primaryToken != nil {
+		// Update existing primary token
+		primaryToken.Hash = tokenHash
+		primaryToken.CreatedAt = time.Now()
+		primaryToken.LastUsedAt = nil
 	}
 
 	if err := s.repo.Store(ctx, user); err != nil {
