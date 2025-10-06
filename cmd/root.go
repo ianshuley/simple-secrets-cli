@@ -16,9 +16,15 @@ limitations under the License.
 package cmd
 
 import (
+	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"fmt"
 	"os"
-	"simple-secrets/internal"
+	"path/filepath"
+	internal "simple-secrets/internal/auth"
+	"simple-secrets/internal/platform"
+	"simple-secrets/pkg/auth"
 	"simple-secrets/pkg/version"
 	"strings"
 
@@ -60,8 +66,141 @@ func Execute() {
 	}
 }
 
+// initializePlatform sets up platform context for all CLI commands
+// This runs before every command to ensure platform services are available
+func initializePlatform(cmd *cobra.Command, args []string) error {
+	// Skip platform initialization for version and help commands
+	if cmd.Name() == "help" || cmd.Name() == "completion" || cmd.Name() == "version" {
+		return nil
+	}
+
+	// Check for version flag
+	if versionFlag, _ := cmd.Flags().GetBool("version"); versionFlag {
+		return nil
+	}
+
+	// Skip platform initialization for commands that don't need it
+	if cmd.Name() == "simple-secrets" || cmd.Name() == "setup" {
+		// Allow root command and setup to handle first-run scenarios
+		return nil
+	}
+
+	// Get platform configuration
+	config, err := getPlatformConfig()
+	if err != nil {
+		return fmt.Errorf("failed to initialize platform: %w", err)
+	}
+
+	// Create platform instance
+	ctx := context.Background()
+	app, err := platform.New(ctx, config)
+	if err != nil {
+		return fmt.Errorf("failed to create platform: %w", err)
+	}
+
+	// Inject platform into command context
+	ctx = platform.WithPlatform(ctx, app)
+	cmd.SetContext(ctx)
+
+	return nil
+}
+
+// getPlatformConfig builds platform configuration from CLI environment
+func getPlatformConfig() (platform.Config, error) {
+	// Get data directory
+	dataDir, err := getDataDirectory()
+	if err != nil {
+		return platform.Config{}, fmt.Errorf("failed to get data directory: %w", err)
+	}
+
+	// Get master key
+	masterKey, err := getMasterKey()
+	if err != nil {
+		return platform.Config{}, fmt.Errorf("failed to get master key: %w", err)
+	}
+
+	return platform.Config{
+		DataDir:   dataDir,
+		MasterKey: masterKey,
+	}, nil
+}
+
+// getDataDirectory returns the CLI data directory
+func getDataDirectory() (string, error) {
+	// Check for test override
+	if testDir := os.Getenv("SIMPLE_SECRETS_CONFIG_DIR"); testDir != "" {
+		return testDir, nil
+	}
+
+	// Use default ~/.simple-secrets
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("failed to get home directory: %w", err)
+	}
+
+	return filepath.Join(homeDir, ".simple-secrets"), nil
+}
+
+// getMasterKey loads or creates the master key for the platform
+func getMasterKey() ([]byte, error) {
+	// This function provides lazy master key creation compatible with the old internal system
+	dataDir, err := getDataDirectory()
+	if err != nil {
+		return nil, err
+	}
+
+	masterKeyPath := filepath.Join(dataDir, "master.key")
+
+	// Check if master key file exists
+	if _, err := os.Stat(masterKeyPath); os.IsNotExist(err) {
+		// Check if this is a setup scenario by looking for users.json
+		usersPath := filepath.Join(dataDir, "users.json")
+		if _, err := os.Stat(usersPath); os.IsNotExist(err) {
+			return nil, fmt.Errorf("master key not found - run setup first")
+		}
+
+		// Setup has run but no master key exists yet - create one (lazy initialization)
+		masterKey, err := generateMasterKey()
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate master key: %w", err)
+		}
+
+		// Save master key in base64 format for compatibility with old internal system
+		base64Key := base64.StdEncoding.EncodeToString(masterKey)
+		if err := os.WriteFile(masterKeyPath, []byte(base64Key), 0600); err != nil {
+			return nil, fmt.Errorf("failed to save master key: %w", err)
+		}
+
+		return masterKey, nil
+	}
+
+	// Read existing master key (base64 encoded)
+	data, err := os.ReadFile(masterKeyPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read master key: %w", err)
+	}
+
+	// Decode base64 to get raw key bytes
+	masterKey, err := base64.StdEncoding.DecodeString(string(data))
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode master key: %w", err)
+	}
+
+	return masterKey, nil
+}
+
+// generateMasterKey creates a new 32-byte AES key and saves it in base64 format for compatibility
+func generateMasterKey() ([]byte, error) {
+	key := make([]byte, 32)
+	_, err := rand.Read(key)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate random key: %w", err)
+	}
+	return key, nil
+}
+
 func init() {
-	// Set up token generator for internal package
+	// Set up token generator for internal package (legacy compatibility)
 	internal.DefaultTokenGenerator = GenerateSecureToken
 
 	// Persistent token flag for all commands
@@ -72,6 +211,54 @@ func init() {
 
 	// Add standard version flags that users expect
 	rootCmd.Flags().BoolP("version", "v", false, "show version information")
+
+	// Set up platform context injection for all commands
+	rootCmd.PersistentPreRunE = initializePlatform
+}
+
+// getPlatformFromCommand is a helper that initializes the platform services
+func getPlatformFromCommand(cmd *cobra.Command) (*platform.Platform, error) {
+	config, err := getPlatformConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	ctx := context.Background()
+	return platform.New(ctx, config)
+}
+
+// authenticateWithPlatform is a helper that handles authentication and authorization
+func authenticateWithPlatform(cmd *cobra.Command, needWrite bool) (*auth.UserContext, error) {
+	app, err := getPlatformFromCommand(cmd)
+	if err != nil {
+		return nil, err
+	}
+
+	// Resolve token for authentication
+	authToken, err := resolveTokenFromCommand(cmd)
+	if err != nil {
+		return nil, err
+	}
+
+	// Authenticate user
+	ctx := context.Background()
+	user, err := app.Auth.Authenticate(ctx, authToken)
+	if err != nil {
+		return nil, fmt.Errorf("authentication failed: %w", err)
+	}
+
+	// Check permissions
+	permission := auth.PermissionRead
+	if needWrite {
+		permission = auth.PermissionWrite
+	}
+
+	err = app.Auth.Authorize(ctx, user, permission)
+	if err != nil {
+		return nil, fmt.Errorf("access denied: %w", err)
+	}
+
+	return user, nil
 }
 
 // completeSecretNames provides completion for secret key names
@@ -88,8 +275,15 @@ func completeSecretNames(cmd *cobra.Command, args []string, toComplete string) (
 
 // getAvailableSecretKeys retrieves all available secret keys for completion
 func getAvailableSecretKeys(cmd *cobra.Command) ([]string, error) {
-	// Get CLI service helper
-	helper, err := GetCLIServiceHelper()
+	// Get platform configuration
+	config, err := getPlatformConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	// Initialize platform services
+	ctx := context.Background()
+	app, err := platform.New(ctx, config)
 	if err != nil {
 		return nil, err
 	}
@@ -100,16 +294,28 @@ func getAvailableSecretKeys(cmd *cobra.Command) ([]string, error) {
 		return nil, err
 	}
 
-	// Resolve the token (CLI responsibility)
-	resolvedToken, err := internal.ResolveToken(token)
+	// Authenticate user
+	user, err := app.Auth.Authenticate(ctx, token)
+	if err != nil {
+		return nil, err // No auth = no completion
+	}
+
+	// Check read permissions
+	err = app.Auth.Authorize(ctx, user, auth.PermissionRead)
 	if err != nil {
 		return nil, err
 	}
 
-	// List secrets using focused service operations
-	keys, err := helper.GetService().Secrets().List(resolvedToken)
+	// List secrets for completion
+	metadata, err := app.Secrets.List(ctx)
 	if err != nil {
 		return nil, err
+	}
+
+	// Extract keys from metadata
+	keys := make([]string, len(metadata))
+	for i, meta := range metadata {
+		keys[i] = meta.Key
 	}
 
 	return keys, nil
@@ -117,134 +323,193 @@ func getAvailableSecretKeys(cmd *cobra.Command) ([]string, error) {
 
 // getAvailableDisabledSecrets retrieves all disabled secret keys for completion
 func getAvailableDisabledSecrets(cmd *cobra.Command) ([]string, error) {
-	// Get CLI service helper
-	helper, err := GetCLIServiceHelper()
+	// Get platform configuration
+	config, err := getPlatformConfig()
 	if err != nil {
 		return nil, err
 	}
 
-	// For disabled secrets, we need to access the store directly
-	user, _, err := helper.AuthenticateCommand(cmd, false)
-	if err != nil {
-		return nil, err
-	}
-	if user == nil {
-		return nil, fmt.Errorf("authentication required")
-	}
-
-	store, err := internal.LoadSecretsStore(internal.NewFilesystemBackend())
+	// Initialize platform services
+	ctx := context.Background()
+	app, err := platform.New(ctx, config)
 	if err != nil {
 		return nil, err
 	}
 
-	disabledSecrets := store.ListDisabledSecrets()
-	return disabledSecrets, nil
+	// Try to resolve token for authentication
+	token, err := resolveTokenFromCommand(cmd)
+	if err != nil {
+		return nil, err
+	}
+
+	// Authenticate user
+	user, err := app.Auth.Authenticate(ctx, token)
+	if err != nil {
+		return nil, err // No auth = no completion
+	}
+
+	// Check read permissions
+	err = app.Auth.Authorize(ctx, user, auth.PermissionRead)
+	if err != nil {
+		return nil, err
+	}
+
+	// List disabled secrets for completion
+	metadata, err := app.Secrets.ListDisabled(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Extract keys from metadata
+	keys := make([]string, len(metadata))
+	for i, meta := range metadata {
+		keys[i] = meta.Key
+	}
+
+	return keys, nil
 }
 
 // getAvailableBackupSecrets retrieves all secret keys that have backups for completion
 func getAvailableBackupSecrets(cmd *cobra.Command) ([]string, error) {
-	// Get CLI service helper
-	helper, err := GetCLIServiceHelper()
+	// Get platform configuration
+	config, err := getPlatformConfig()
 	if err != nil {
 		return nil, err
 	}
 
-	// Authenticate to access backups
-	user, _, err := helper.AuthenticateCommand(cmd, false)
-	if err != nil {
-		return nil, err
-	}
-	if user == nil {
-		return nil, fmt.Errorf("authentication required")
-	}
-
-	store, err := internal.LoadSecretsStore(internal.NewFilesystemBackend())
+	// Initialize platform services
+	ctx := context.Background()
+	app, err := platform.New(ctx, config)
 	if err != nil {
 		return nil, err
 	}
 
-	// Get all secret keys and check which have backups
-	secretKeys := store.ListKeys()
-	var backedUpSecrets []string
-
-	for _, key := range secretKeys {
-		backupPath := store.GetBackupPath(key)
-		if _, err := os.Stat(backupPath); err == nil {
-			backedUpSecrets = append(backedUpSecrets, key)
-		}
+	// Try to resolve token for authentication
+	token, err := resolveTokenFromCommand(cmd)
+	if err != nil {
+		return nil, err
 	}
 
-	return backedUpSecrets, nil
+	// Authenticate user
+	user, err := app.Auth.Authenticate(ctx, token)
+	if err != nil {
+		return nil, err // No auth = no completion
+	}
+
+	// Check read permissions
+	err = app.Auth.Authorize(ctx, user, auth.PermissionRead)
+	if err != nil {
+		return nil, err
+	}
+
+	// For completion of secrets with backups, we can't easily determine which
+	// individual secrets have backups without reading backup contents.
+	// For now, return all secrets as potentially having backups.
+	metadata, err := app.Secrets.List(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Extract keys from metadata
+	keys := make([]string, len(metadata))
+	for i, meta := range metadata {
+		keys[i] = meta.Key
+	}
+
+	return keys, nil
 }
 
 // getAvailableBackupNames retrieves all database backup names for completion
 func getAvailableBackupNames(cmd *cobra.Command) ([]string, error) {
-	// Get CLI service helper
-	helper, err := GetCLIServiceHelper()
+	// Get platform configuration
+	config, err := getPlatformConfig()
 	if err != nil {
 		return nil, err
 	}
 
-	// Authenticate to access backups
-	user, _, err := helper.AuthenticateCommand(cmd, false)
-	if err != nil {
-		return nil, err
-	}
-	if user == nil {
-		return nil, fmt.Errorf("authentication required")
-	}
-
-	store, err := internal.LoadSecretsStore(internal.NewFilesystemBackend())
+	// Initialize platform services
+	ctx := context.Background()
+	app, err := platform.New(ctx, config)
 	if err != nil {
 		return nil, err
 	}
 
-	backups, err := store.ListRotationBackups()
+	// Try to resolve token for authentication
+	token, err := resolveTokenFromCommand(cmd)
 	if err != nil {
 		return nil, err
 	}
 
-	var backupNames []string
-	for _, backup := range backups {
-		backupNames = append(backupNames, backup.Name)
+	// Authenticate user
+	user, err := app.Auth.Authenticate(ctx, token)
+	if err != nil {
+		return nil, err // No auth = no completion
 	}
 
-	return backupNames, nil
+	// Check read permissions
+	err = app.Auth.Authorize(ctx, user, auth.PermissionRead)
+	if err != nil {
+		return nil, err
+	}
+
+	// List backup names for completion
+	backups, err := app.Rotation.ListBackups(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Extract backup names
+	names := make([]string, len(backups))
+	for i, backup := range backups {
+		names[i] = backup.Name
+	}
+
+	return names, nil
 }
 
 // getAvailableUsernames retrieves all available usernames for completion
 func getAvailableUsernames(cmd *cobra.Command) ([]string, error) {
-	// Get CLI service helper
-	helper, err := GetCLIServiceHelper()
+	// Get platform configuration
+	config, err := getPlatformConfig()
 	if err != nil {
 		return nil, err
 	}
 
-	// Check authentication and permissions
-	user, store, err := helper.AuthenticateCommand(cmd, false)
-	if err != nil {
-		return nil, err
-	}
-	if user == nil {
-		return nil, fmt.Errorf("authentication required")
-	}
-	if !user.Can("manage-users", store.Permissions()) {
-		return nil, fmt.Errorf("permission denied")
-	}
-
-	// Load users list
-	usersPath, err := internal.DefaultUserConfigPath("users.json")
-	if err != nil {
-		return nil, err
-	}
-	users, err := internal.LoadUsersList(usersPath)
+	// Initialize platform services
+	ctx := context.Background()
+	app, err := platform.New(ctx, config)
 	if err != nil {
 		return nil, err
 	}
 
-	var usernames []string
-	for _, u := range users {
-		usernames = append(usernames, u.Username)
+	// Try to resolve token for authentication
+	token, err := resolveTokenFromCommand(cmd)
+	if err != nil {
+		return nil, err
+	}
+
+	// Authenticate user
+	user, err := app.Auth.Authenticate(ctx, token)
+	if err != nil {
+		return nil, err // No auth = no completion
+	}
+
+	// Check user management permissions
+	err = app.Auth.Authorize(ctx, user, auth.PermissionManageUsers)
+	if err != nil {
+		return nil, err
+	}
+
+	// List users for completion
+	users, err := app.Users.List(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Extract usernames
+	usernames := make([]string, len(users))
+	for i, u := range users {
+		usernames[i] = u.Username
 	}
 
 	return usernames, nil

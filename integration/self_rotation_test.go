@@ -1,7 +1,10 @@
 /*
 Copyright © 2025 Ian Shuley
 
-Licensed under the Apache License, Version 2.0 (the "License");
+	Licensed under the Apache License, Version 2	if !strings.Contains(string(output), "Permission denied: rotate-tokens") {
+			t.Fatalf("expected permission denied error, got: %s", output)
+		}(the "License");
+
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
@@ -74,7 +77,7 @@ func TestSelfTokenRotationBothWays(t *testing.T) {
 	if err == nil {
 		t.Fatalf("expected reader to fail when rotating admin token, but succeeded: %s", output)
 	}
-	if !strings.Contains(string(output), "permission denied") {
+	if !strings.Contains(string(output), "Permission denied: rotate-tokens") {
 		t.Errorf("expected permission denied error, got: %s", output)
 	}
 }

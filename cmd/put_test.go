@@ -1,7 +1,13 @@
 /*
 Copyright © 2025 Ian Shuley
 
-Licensed under the Apache License, Version 2.0 (the "License");
+	Licensed under the Apa		{
+				name:        "negative_length",
+				length:      -1,
+				wantErr:     true,
+				errContains: "must be at least 8 characters for security",
+			},cense, Version 2.0 (the "License");
+
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
@@ -37,20 +43,26 @@ func TestGenerateSecretValue(t *testing.T) {
 			length: 64,
 		},
 		{
-			name:   "small_length_8",
+			name:   "minimum_length_8",
 			length: 8,
+		},
+		{
+			name:        "too_short_length",
+			length:      4,
+			wantErr:     true,
+			errContains: "must be at least 8 characters",
 		},
 		{
 			name:        "zero_length",
 			length:      0,
 			wantErr:     true,
-			errContains: "length must be positive",
+			errContains: "must be at least 8 characters",
 		},
 		{
 			name:        "negative_length",
 			length:      -5,
 			wantErr:     true,
-			errContains: "length must be positive",
+			errContains: "must be at least 8 characters for security",
 		},
 	}
 

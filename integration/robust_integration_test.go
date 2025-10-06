@@ -139,8 +139,8 @@ func TestConsolidatedDisableEnableCommandsRefactored(t *testing.T) {
 		if err == nil {
 			t.Fatalf("expected error when getting disabled secret, but got none. Output: %s", output)
 		}
-		if !strings.Contains(string(output), "not found") {
-			t.Fatalf("expected not found error message, got: %s", output)
+		if !strings.Contains(string(output), "Secret is disabled") {
+			t.Fatalf("expected 'Secret is disabled' error message, got: %s", output)
 		}
 	})
 

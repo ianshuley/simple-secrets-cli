@@ -16,11 +16,15 @@ limitations under the License.
 package cmd
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
 
-	"simple-secrets/internal"
+	internal "simple-secrets/internal/auth"
+	"simple-secrets/internal/platform"
+	"simple-secrets/pkg/auth"
+	"simple-secrets/pkg/crypto"
 
 	"github.com/spf13/cobra"
 )
@@ -54,9 +58,9 @@ type putArguments struct {
 	length   int
 }
 
-// generateSecretValue creates a cryptographically secure random secret (wrapper for internal function)
+// generateSecretValue creates a cryptographically secure random secret (wrapper for crypto function)
 func generateSecretValue(length int) (string, error) {
-	return internal.GenerateSecretValue(length)
+	return crypto.GenerateSecretValue(length)
 }
 
 func parsePutArguments(cmd *cobra.Command, args []string) (*putArguments, error) {
@@ -65,7 +69,10 @@ func parsePutArguments(cmd *cobra.Command, args []string) (*putArguments, error)
 	var generate bool
 	var length int = 32 // Default length
 
-	filteredArgs := extractArgumentsAndFlags(args, &token, &tokenExplicitlySet, &generate, &length)
+	filteredArgs, err := extractArgumentsAndFlags(args, &token, &tokenExplicitlySet, &generate, &length)
+	if err != nil {
+		return nil, err
+	}
 
 	if shouldShowHelp(args) {
 		return nil, cmd.Help()
@@ -90,7 +97,7 @@ func parsePutArguments(cmd *cobra.Command, args []string) (*putArguments, error)
 	}, nil
 }
 
-func extractArgumentsAndFlags(args []string, token *string, tokenExplicitlySet *bool, generate *bool, length *int) []string {
+func extractArgumentsAndFlags(args []string, token *string, tokenExplicitlySet *bool, generate *bool, length *int) ([]string, error) {
 	filteredArgs := []string{}
 
 	for i := 0; i < len(args); i++ {
@@ -103,12 +110,16 @@ func extractArgumentsAndFlags(args []string, token *string, tokenExplicitlySet *
 			continue
 		}
 		if isLengthFlag(args, i) {
-			i = processLengthFlag(args, i, length)
+			var err error
+			i, err = processLengthFlag(args, i, length)
+			if err != nil {
+				return nil, err
+			}
 			continue
 		}
 		filteredArgs = append(filteredArgs, args[i])
 	}
-	return filteredArgs
+	return filteredArgs, nil
 }
 
 func isTokenFlag(args []string, position int) bool {
@@ -138,18 +149,17 @@ func hasLengthValue(args []string, flagPosition int) bool {
 	return flagPosition+1 < len(args)
 }
 
-func processLengthFlag(args []string, flagPosition int, length *int) int {
+func processLengthFlag(args []string, flagPosition int, length *int) (int, error) {
 	valuePosition := flagPosition + 1
 	lengthStr := args[valuePosition]
 
 	parsedLength := parsePositiveInteger(lengthStr)
 	if parsedLength <= 0 {
-		*length = 32 // Default for invalid values
-		return valuePosition
+		return valuePosition, fmt.Errorf("length must be a positive integer, got '%s'", lengthStr)
 	}
 
 	*length = parsedLength
-	return valuePosition
+	return valuePosition, nil
 }
 
 func parsePositiveInteger(value string) int {
@@ -190,7 +200,7 @@ func validatePutArguments(filteredArgs []string, generate bool) (string, string,
 
 func determineAuthTokenWithExplicitFlag(parsedToken string, wasTokenFlagUsed bool) (string, error) {
 	if !wasTokenFlagUsed {
-		return internal.ResolveToken("")
+		return resolveTokenFromEnvAndConfig("")
 	}
 
 	if isEmptyToken(parsedToken) {
@@ -198,6 +208,12 @@ func determineAuthTokenWithExplicitFlag(parsedToken string, wasTokenFlagUsed boo
 	}
 
 	return parsedToken, nil
+}
+
+// resolveTokenFromEnvAndConfig returns token from env or config (temporary - use old internal for now)
+func resolveTokenFromEnvAndConfig(cliFlag string) (string, error) {
+	// Temporary: use old internal function during migration
+	return internal.ResolveToken(cliFlag)
 }
 
 func isEmptyToken(token string) bool {
@@ -219,18 +235,29 @@ Or save your token in ~/.simple-secrets/config.json:
 }
 
 func executePutCommand(args *putArguments) error {
-	helper, err := GetCLIServiceHelper()
+	// Get platform configuration
+	config, err := getPlatformConfig()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get platform config: %w", err)
 	}
 
-	// Use direct token authentication (put handles token parsing manually)
-	user, _, err := helper.AuthenticateToken(args.token, true)
+	// Initialize platform services
+	ctx := context.Background()
+	app, err := platform.New(ctx, config)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to initialize platform: %w", err)
 	}
-	if user == nil {
-		return nil
+
+	// Authenticate user
+	user, err := app.Auth.Authenticate(ctx, args.token)
+	if err != nil {
+		return fmt.Errorf("authentication failed: %w", err)
+	}
+
+	// Check write permissions
+	err = app.Auth.Authorize(ctx, user, auth.PermissionWrite)
+	if err != nil {
+		return fmt.Errorf("write access denied: %w", err)
 	}
 
 	if err := validatePutKeyName(args.key); err != nil {
@@ -247,11 +274,8 @@ func executePutCommand(args *putArguments) error {
 		value = generatedValue
 	}
 
-	service := helper.GetService()
-
-	// Backup is handled automatically by the service layer
-
-	err = service.Secrets().Put(args.token, args.key, value)
+	// Store the secret using platform services
+	err = app.Secrets.Put(ctx, args.key, value)
 	if err != nil {
 		return err
 	}
@@ -278,8 +302,8 @@ func validatePutKeyName(key string) error {
 var addCmd = &cobra.Command{
 	Use:                   "add [key] [value]",
 	Short:                 "Add a secret (alias for put).",
-	Long:                  "Store a secret with the given key and value. This is an alias for the 'put' command.\n\nUse quotes for values with spaces or special characters.\n\n⚠️  SECURITY: Use single quotes to prevent shell command execution:\n    ✅ SAFE:      simple-secrets add key 'value with $(command)'\n    ❌ DANGEROUS: simple-secrets add key \"value with $(command)\"\n\nDouble quotes allow shell command substitution which executes before the app runs.",
-	Example:               "simple-secrets add db_password mypassword\nsimple-secrets add db_url \"postgresql://user:pass@localhost:5432/db\"",
+	Long:                  "Store a secret with the given key and value. This is an alias for the 'put' command.\n\nUse quotes for values with spaces or special characters.\n\n⚠️  SECURITY: Use single quotes to prevent shell command execution:\n    ✅ SAFE:      simple-secrets add key 'value with $(command)'\n    ❌ DANGEROUS: simple-secrets add key \"value with $(command)\"\n\nDouble quotes allow shell command substitution which executes before the app runs.\n\nUse --generate to automatically create a cryptographically secure secret:\n    simple-secrets add api-key --generate\n    simple-secrets add api-key --generate --length 64\n    simple-secrets add api-key -g -l 64",
+	Example:               "simple-secrets add api-key '--prod-key-abc123'\nsimple-secrets add db_url 'postgresql://user:pass@localhost:5432/db'\nsimple-secrets add script 'echo $(whoami)'  # Stores literally, not executed\n\n# Generate secure secrets automatically\nsimple-secrets add api-key --generate\nsimple-secrets add api-key -g --length 64\nsimple-secrets add api-key -g -l 32",
 	DisableFlagsInUseLine: true,
 	DisableFlagParsing:    true,
 	RunE:                  putCmd.RunE, // Same implementation as put

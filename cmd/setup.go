@@ -19,7 +19,7 @@ import (
 	"fmt"
 	"strings"
 
-	"simple-secrets/internal"
+	internal "simple-secrets/internal/auth"
 
 	"github.com/spf13/cobra"
 )

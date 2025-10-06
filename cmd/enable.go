@@ -17,10 +17,13 @@ package cmd
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"os"
-	"simple-secrets/internal"
 	"strings"
+
+	"simple-secrets/internal/platform"
+	"simple-secrets/pkg/auth"
 
 	"github.com/spf13/cobra"
 )
@@ -56,22 +59,35 @@ Re-enabled users receive a new authentication token.`,
 }
 
 func enableUser(cmd *cobra.Command, username string) error {
-	helper, err := GetCLIServiceHelper()
+	// Get platform configuration
+	config, err := getPlatformConfig()
 	if err != nil {
 		return err
 	}
 
-	// Check permissions first
-	currentUser, store, err := helper.AuthenticateCommand(cmd, true)
+	// Initialize platform services
+	ctx := context.Background()
+	app, err := platform.New(ctx, config)
+	if err != nil {
+		return fmt.Errorf("failed to initialize platform: %w", err)
+	}
+
+	// Resolve token for authentication
+	authToken, err := resolveTokenFromCommand(cmd)
 	if err != nil {
 		return err
 	}
-	if currentUser == nil {
-		return nil
+
+	// Authenticate user
+	user, err := app.Auth.Authenticate(ctx, authToken)
+	if err != nil {
+		return fmt.Errorf("authentication failed: %w", err)
 	}
 
-	if !currentUser.Can("manage-users", store.Permissions()) {
-		return NewPermissionDeniedError("manage-users")
+	// Check manage-users permissions
+	err = app.Auth.Authorize(ctx, user, auth.PermissionManageUsers)
+	if err != nil {
+		return fmt.Errorf("manage-users access denied: %w", err)
 	}
 
 	// Show help for the enable user operation
@@ -88,20 +104,16 @@ func enableUser(cmd *cobra.Command, username string) error {
 		return nil
 	}
 
-	token, err := resolveTokenFromCommand(cmd)
+	// Enable user using platform services
+	err = app.Users.Enable(ctx, username)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to enable user: %w", err)
 	}
 
-	resolvedToken, err := internal.ResolveToken(token)
+	// Generate a new token for the enabled user
+	newToken, err := app.Users.RotateToken(ctx, username)
 	if err != nil {
-		return err
-	}
-
-	// Use service layer to generate new token for user
-	newToken, err := helper.GetService().Users().EnableUser(resolvedToken, username)
-	if err != nil {
-		return err
+		return fmt.Errorf("failed to generate new token: %w", err)
 	}
 
 	fmt.Printf("✅ New token generated for user '%s'\n", username)
@@ -112,27 +124,41 @@ func enableUser(cmd *cobra.Command, username string) error {
 }
 
 func enableSecret(cmd *cobra.Command, key string) error {
-	helper, err := GetCLIServiceHelper()
+	// Get platform configuration
+	config, err := getPlatformConfig()
 	if err != nil {
 		return err
+	}
+
+	// Initialize platform services
+	ctx := context.Background()
+	app, err := platform.New(ctx, config)
+	if err != nil {
+		return fmt.Errorf("failed to initialize platform: %w", err)
 	}
 
 	// Resolve token for authentication
-	token, err := resolveTokenFromCommand(cmd)
+	authToken, err := resolveTokenFromCommand(cmd)
 	if err != nil {
 		return err
 	}
 
-	// Resolve the token (CLI responsibility)
-	resolvedToken, err := internal.ResolveToken(token)
+	// Authenticate user
+	user, err := app.Auth.Authenticate(ctx, authToken)
 	if err != nil {
-		return err
+		return fmt.Errorf("authentication failed: %w", err)
 	}
 
-	// Use service layer for secret enabling
-	err = helper.GetService().Secrets().Enable(resolvedToken, key)
+	// Check write permissions (needed for enabling secrets)
+	err = app.Auth.Authorize(ctx, user, auth.PermissionWrite)
 	if err != nil {
-		return err
+		return fmt.Errorf("write access denied: %w", err)
+	}
+
+	// Enable the secret using platform services
+	err = app.Secrets.Enable(ctx, key)
+	if err != nil {
+		return fmt.Errorf("failed to enable secret: %w", err)
 	}
 
 	fmt.Printf("✅ Secret '%s' has been re-enabled\n", key)

@@ -16,9 +16,12 @@ limitations under the License.
 package cmd
 
 import (
+	"context"
 	"fmt"
 
-	"simple-secrets/internal"
+	internal "simple-secrets/internal/auth"
+	"simple-secrets/internal/platform"
+	"simple-secrets/pkg/auth"
 
 	"github.com/spf13/cobra"
 )
@@ -31,10 +34,17 @@ var deleteCmd = &cobra.Command{
 	Example: "simple-secrets delete db_password",
 	Args:    cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// Get CLI service helper
-		helper, err := GetCLIServiceHelper()
+		// Get platform configuration
+		config, err := getPlatformConfig()
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to get platform config: %w", err)
+		}
+
+		// Initialize platform services
+		ctx := context.Background()
+		app, err := platform.New(ctx, config)
+		if err != nil {
+			return fmt.Errorf("failed to initialize platform: %w", err)
 		}
 
 		// Resolve token for authentication
@@ -43,16 +53,28 @@ var deleteCmd = &cobra.Command{
 			return err
 		}
 
-		// Resolve the token (CLI responsibility)
+		// Resolve the token (temporary - use old internal for now)
 		resolvedToken, err := internal.ResolveToken(token)
 		if err != nil {
 			return err
 		}
 
+		// Authenticate user
+		user, err := app.Auth.Authenticate(ctx, resolvedToken)
+		if err != nil {
+			return fmt.Errorf("authentication failed: %w", err)
+		}
+
+		// Check write permissions
+		err = app.Auth.Authorize(ctx, user, auth.PermissionWrite)
+		if err != nil {
+			return fmt.Errorf("write access denied: %w", err)
+		}
+
 		key := args[0]
 
-		service := helper.GetService()
-		if err := service.Secrets().Delete(resolvedToken, key); err != nil {
+		// Delete secret using platform services
+		if err := app.Secrets.Delete(ctx, key); err != nil {
 			return err
 		}
 

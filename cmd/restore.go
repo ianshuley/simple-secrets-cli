@@ -16,7 +16,12 @@ limitations under the License.
 package cmd
 
 import (
+	"context"
 	"fmt"
+	"strings"
+
+	"simple-secrets/internal/platform"
+	"simple-secrets/pkg/auth"
 
 	"github.com/spf13/cobra"
 )
@@ -55,59 +60,116 @@ var restoreCmd = &cobra.Command{
 }
 
 func restoreSecret(cmd *cobra.Command, secretKey string) error {
-	// RBAC: write access (restoring is a write operation)
-	helper, err := GetCLIServiceHelper()
+	// Get platform configuration
+	config, err := getPlatformConfig()
 	if err != nil {
 		return err
 	}
 
-	user, _, err := helper.AuthenticateCommand(cmd, true)
+	// Initialize platform services
+	ctx := context.Background()
+	app, err := platform.New(ctx, config)
+	if err != nil {
+		return fmt.Errorf("failed to initialize platform: %w", err)
+	}
+
+	// Resolve token for authentication
+	authToken, err := resolveTokenFromCommand(cmd)
 	if err != nil {
 		return err
 	}
-	if user == nil {
+
+	// Authenticate user
+	user, err := app.Auth.Authenticate(ctx, authToken)
+	if err != nil {
+		return fmt.Errorf("authentication failed: %w", err)
+	}
+
+	// Check write permissions (needed for restore operations)
+	err = app.Auth.Authorize(ctx, user, auth.PermissionWrite)
+	if err != nil {
+		return fmt.Errorf("write access denied: %w", err)
+	}
+
+	// Get the backup containing the secret
+	backups, err := app.Rotation.ListBackups(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to list backups: %w", err)
+	}
+
+	if len(backups) == 0 {
+		return fmt.Errorf("no backups available for secret restoration")
+	}
+
+	// Use the most recent backup for secret restoration (industry standard point-in-time recovery)
+	// This ensures atomic consistency - all secrets are from the same point in time
+	mostRecentBackup := backups[0]
+	for _, backup := range backups {
+		if backup.Timestamp.After(mostRecentBackup.Timestamp) {
+			mostRecentBackup = backup
+		}
+	}
+
+	fmt.Printf("⚠️  Secret restoration will use the most recent backup: %s\n", mostRecentBackup.Name)
+	fmt.Printf("⚠️  This will restore the entire database state from %s\n", mostRecentBackup.Timestamp.Format("2006-01-02 15:04:05"))
+	fmt.Print("Continue? [y/N]: ")
+
+	var response string
+	fmt.Scanln(&response)
+	if strings.ToLower(response) != "y" && strings.ToLower(response) != "yes" {
+		fmt.Println("Secret restoration cancelled.")
 		return nil
 	}
 
-	service := helper.GetService()
-	if err := service.Admin().RestoreSecret(secretKey); err != nil {
-		return err
+	// Restore from the backup
+	err = app.Rotation.RestoreFromBackup(ctx, mostRecentBackup.Name)
+	if err != nil {
+		return fmt.Errorf("secret restoration failed: %w", err)
 	}
 
-	fmt.Printf("Secret '%s' restored from backup.\n", secretKey)
+	fmt.Printf("✅ Secret restoration completed successfully from backup %s\n", mostRecentBackup.Name)
 	return nil
 }
 
 func restoreDatabase(cmd *cobra.Command, backupName string) error {
-	// RBAC: write access (this is a destructive operation)
-	helper, err := GetCLIServiceHelper()
+	// Get platform configuration
+	config, err := getPlatformConfig()
 	if err != nil {
 		return err
 	}
 
-	user, _, err := helper.AuthenticateCommand(cmd, true)
+	// Initialize platform services
+	ctx := context.Background()
+	app, err := platform.New(ctx, config)
+	if err != nil {
+		return fmt.Errorf("failed to initialize platform: %w", err)
+	}
+
+	// Resolve token for authentication
+	authToken, err := resolveTokenFromCommand(cmd)
 	if err != nil {
 		return err
 	}
-	if user == nil {
-		return nil
+
+	// Authenticate user
+	user, err := app.Auth.Authenticate(ctx, authToken)
+	if err != nil {
+		return fmt.Errorf("authentication failed: %w", err)
 	}
 
-	service := helper.GetService()
-	if err := service.Admin().RestoreDatabase(backupName); err != nil {
-		return fmt.Errorf("failed to restore database: %w", err)
+	// Check write permissions (needed for restore operations)
+	err = app.Auth.Authorize(ctx, user, auth.PermissionWrite)
+	if err != nil {
+		return fmt.Errorf("write access denied: %w", err)
 	}
 
-	fmt.Printf("✅ Database restored successfully from backup '%s'\n", backupName)
-	fmt.Println()
-	fmt.Println("All secrets have been restored from the backup.")
-	fmt.Println("The master key has been restored to the backup state.")
-	fmt.Println()
-	fmt.Println("⚠️  Important:")
-	fmt.Println("• Any secrets added after this backup are now lost")
-	fmt.Println("• The master key is now the one from the backup")
-	fmt.Println("• Consider running 'simple-secrets list' to verify restored secrets")
+	// Restore from the specified backup
+	err = app.Rotation.RestoreFromBackup(ctx, backupName)
+	if err != nil {
+		return fmt.Errorf("database restoration failed: %w", err)
+	}
 
+	fmt.Printf("✅ Database restoration completed successfully from backup %s\n", backupName)
 	return nil
 }
 

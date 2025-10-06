@@ -211,7 +211,8 @@ func TestConsolidatedRestoreCommands(t *testing.T) {
 		{
 			name:    "restore secret non-existent",
 			args:    []string{"restore", "secret", "nonexistent"},
-			wantErr: true,
+			wantErr: false, // Point-in-time recovery offers to restore from most recent backup
+			stdin:   "n\n", // Decline the restoration
 		},
 		{
 			name:    "restore database abort",
@@ -399,7 +400,7 @@ func TestConsolidatedDisableEnableCommands(t *testing.T) {
 			name:     "get disabled secret fails",
 			args:     []string{"get", "test-key"},
 			wantErr:  true,
-			contains: "not found",
+			contains: "Secret is disabled",
 		},
 		{
 			name:     "enable secret",
@@ -443,13 +444,13 @@ func TestConsolidatedDisableEnableCommands(t *testing.T) {
 			name:     "disable nonexistent secret",
 			args:     []string{"disable", "secret", "nonexistent"},
 			wantErr:  true,
-			contains: "file does not exist",
+			contains: "secret not found",
 		},
 		{
 			name:     "enable nonexistent secret",
 			args:     []string{"enable", "secret", "nonexistent"},
 			wantErr:  true,
-			contains: "disabled secret not found",
+			contains: "secret not found",
 		},
 	}
 

@@ -116,14 +116,15 @@ func TestEnableTokenIntegration(t *testing.T) {
 		output, err := env.CLI().Raw("create-user", "active-user", "reader", "--token", adminToken)
 		testing_framework.Assert(t, output, err).Success()
 
-		// Try to enable (should fail - user is not disabled)
+		// Try to enable (platform services allow token regeneration for active users)
 		input := "y\n"
 		output, err = env.CLI().RawWithInput(input, "enable", "user", "active-user", "--token", adminToken)
-		if err == nil {
-			t.Fatalf("expected error when enabling active user, but got none. Output: %s", output)
+		if err != nil {
+			t.Fatalf("unexpected error when enabling active user: %v. Output: %s", err, output)
 		}
-		if !strings.Contains(string(output), "is not disabled") {
-			t.Fatalf("expected 'not disabled' error message, got: %s", output)
+		// Platform services allow token regeneration for active users
+		if !strings.Contains(string(output), "New token generated") {
+			t.Fatalf("expected new token generation message, got: %s", output)
 		}
 	})
 
@@ -156,7 +157,7 @@ func TestEnableTokenIntegration(t *testing.T) {
 		if err == nil {
 			t.Fatalf("expected permission error when non-admin tries to enable, but got none. Output: %s", output)
 		}
-		if !strings.Contains(string(output), "permission denied") {
+		if !strings.Contains(string(output), "Permission denied: manage-users") {
 			t.Fatalf("expected permission denied error, got: %s", output)
 		}
 	})

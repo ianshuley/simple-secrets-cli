@@ -19,7 +19,7 @@ import (
 	"os"
 	"testing"
 
-	"simple-secrets/internal"
+	internal "simple-secrets/internal/auth"
 )
 
 func TestDeleteCommandTokenResolution(t *testing.T) {

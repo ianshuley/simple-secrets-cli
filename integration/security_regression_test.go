@@ -98,21 +98,21 @@ func TestInputValidationVulnerabilities(t *testing.T) {
 			key:       "../../../etc/passwd",
 			putErr:    "key name cannot contain path separators",
 			getErr:    "secret not found",
-			deleteErr: "file does not exist",
+			deleteErr: "secret not found",
 		},
 		{
 			name:      "absolute_path",
 			key:       "/etc/passwd",
 			putErr:    "key name cannot contain path separators",
 			getErr:    "secret not found",
-			deleteErr: "file does not exist",
+			deleteErr: "secret not found",
 		},
 		{
 			name:      "backslash_path",
 			key:       "..\\..\\windows\\system32",
 			putErr:    "key name cannot contain path separators",
 			getErr:    "secret not found",
-			deleteErr: "file does not exist",
+			deleteErr: "secret not found",
 		},
 	}
 
@@ -173,19 +173,19 @@ func TestPermissionEscalationVulnerability(t *testing.T) {
 	output, err := env.RunRawCommand([]string{"create-user", "hacker", "admin", "--token", readerToken}, env.CleanEnvironment(), "")
 	testing_framework.Assert(t, output, err).
 		Failure().
-		Contains("permission denied")
+		Contains("Permission denied: manage-users")
 
 	// Test that reader cannot disable other users
 	output, err = env.RunRawCommand([]string{"disable", "user", "admin", "--token", readerToken}, env.CleanEnvironment(), "")
 	testing_framework.Assert(t, output, err).
 		Failure().
-		Contains("permission denied")
+		Contains("Permission denied: manage-users")
 
-	// Test that reader cannot rotate master key
+	// Test that reader cannot rotate master key - proper permission enforcement
 	output, err = env.RunRawCommand([]string{"rotate", "master-key", "--yes", "--token", readerToken}, env.CleanEnvironment(), "")
 	testing_framework.Assert(t, output, err).
 		Failure().
-		Contains("permission denied")
+		Contains("Permission denied: manage-users")
 }
 
 // TestTokenSecurityVulnerability tests token handling security

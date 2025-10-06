@@ -19,7 +19,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"simple-secrets/internal"
 
 	"github.com/spf13/cobra"
 )
@@ -31,30 +30,25 @@ var getCmd = &cobra.Command{
 	Example: "simple-secrets get db_password",
 	Args:    cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// Get CLI service helper
-		helper, err := GetCLIServiceHelper()
+		// Get platform from command context
+		app, err := getPlatformFromCommand(cmd)
 		if err != nil {
 			return err
 		}
 
-		// Resolve token for authentication
-		token, err := resolveTokenFromCommand(cmd)
+		// Authenticate user with platform auth service
+		_, err = authenticateWithPlatform(cmd, false) // false = read access only
 		if err != nil {
 			return err
 		}
 
-		// Resolve the token (CLI responsibility)
-		resolvedToken, err := internal.ResolveToken(token)
-		if err != nil {
-			return err
-		}
-
-		// Get secret using focused service operations
+		// Get secret using platform secrets service
 		key := args[0]
-		value, err := helper.GetService().Secrets().Get(resolvedToken, key)
+		ctx := cmd.Context()
+		value, err := app.Secrets.Get(ctx, key)
 		if err != nil {
 			if errors.Is(err, os.ErrNotExist) {
-				return NewSecretNotFoundError()
+				return fmt.Errorf("secret '%s' not found", key)
 			}
 			return err
 		}

@@ -84,25 +84,102 @@ simple-secrets setup
 # Then use the token for actual operations:
 simple-secrets list keys --token YOUR_ADMIN_TOKEN
 
-# Store a secret (use single quotes to prevent shell command execution)
+# Store secrets securely (use single quotes to prevent shell expansion)
 simple-secrets put api-key '--prod-key-abc123' --token YOUR_ADMIN_TOKEN
 simple-secrets put db-url 'postgresql://user:pass@localhost:5432/db' --token YOUR_ADMIN_TOKEN
+
+# Generate secure random secrets directly
+simple-secrets put jwt-secret --generate --length 64 --token YOUR_ADMIN_TOKEN
+simple-secrets put api-key --generate -l 32 --token YOUR_ADMIN_TOKEN
 
 # ⚠️  SECURITY: Single quotes vs double quotes
 simple-secrets put safe-key 'echo $(whoami)'     # ✅ Stores literally: "echo $(whoami)"
 simple-secrets put danger "echo $(whoami)"       # ❌ Executes command before storing!
 
-# Retrieve a secret
+# Retrieve secrets
 simple-secrets get api-key --token YOUR_ADMIN_TOKEN
+
+# List and manage secrets
+simple-secrets list keys --token YOUR_ADMIN_TOKEN
+simple-secrets list users --token YOUR_ADMIN_TOKEN
+simple-secrets list backups --token YOUR_ADMIN_TOKEN
+simple-secrets list disabled --token YOUR_ADMIN_TOKEN
+
+# Advanced operations
+simple-secrets disable secret-name --token YOUR_ADMIN_TOKEN
+simple-secrets enable secret-name --token YOUR_ADMIN_TOKEN
+simple-secrets delete secret-name --token YOUR_ADMIN_TOKEN
 ```
 
 ## Configuration
 
+### Advanced Features
+
+```bash
+# User Management (Admin only)
+simple-secrets create-user alice reader --token YOUR_ADMIN_TOKEN
+simple-secrets create-user bob admin --token YOUR_ADMIN_TOKEN
+
+# Token Management & Rotation
+simple-secrets rotate token alice --token YOUR_ADMIN_TOKEN
+simple-secrets rotate token --self --token YOUR_TOKEN  # Self-rotate
+
+# Master Key Rotation (creates automatic backup)
+simple-secrets rotate master-key --token YOUR_ADMIN_TOKEN
+
+# Backup & Restore Operations
+simple-secrets restore secret old-secret-name --token YOUR_ADMIN_TOKEN
+simple-secrets restore database backup-20250105-143022 --token YOUR_ADMIN_TOKEN
+```
+
+## ⚙️ Configuration
+
+### Data Storage Locations
+
+**Linux/macOS**:
+- Config: `~/.config/simple-secrets/`
+- Data: `~/.local/share/simple-secrets/`
+- Backups: `~/.local/share/simple-secrets/backups/`
+
+**Windows**:
+- Config: `%APPDATA%\\simple-secrets\\`
+- Data: `%LOCALAPPDATA%\\simple-secrets\\`
+- Backups: `%LOCALAPPDATA%\\simple-secrets\\backups\\`
+
+### Environment Variables
+
+```bash
+# Authentication token (alternative to --token flag)
+export SIMPLE_SECRETS_TOKEN=your-token-here
+
+# Custom data directory
+export SIMPLE_SECRETS_DATA_DIR=/custom/path/to/data
+
+# Custom config directory
+export SIMPLE_SECRETS_CONFIG_DIR=/custom/path/to/config
+```
+
 ### Configuration File
 
-You can optionally create a `~/.simple-secrets/config.json` file with the following structure:
+Optional config file at `~/.config/simple-secrets/config.yaml`:
 
-```json
+```yaml
+# Default authentication token
+token: your-default-token-here
+
+# Custom data directory
+data_dir: /custom/path/to/secrets
+
+# Backup retention (days)
+backup_retention_days: 30
+
+# Enable debug logging
+debug: false
+```
+
+### Legacy Configuration
+
+For backwards compatibility, you can still use `~/.simple-secrets/config.json`:\n\n```json
 {
   "_comment": "Configuration file for simple-secrets CLI - run 'simple-secrets config' for full documentation",
   "rotation_backup_count": 1

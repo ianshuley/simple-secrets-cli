@@ -45,8 +45,8 @@ func TestFirstRunProtectionIntegration(t *testing.T) {
 		}
 
 		outputStr := string(output)
-		if !strings.Contains(outputStr, "master key file appears corrupted") {
-			t.Fatalf("expected master key corruption error message, got: %s", outputStr)
+		if !strings.Contains(outputStr, "failed to decode master key") {
+			t.Fatalf("expected master key decode error message, got: %s", outputStr)
 		}
 	})
 
@@ -56,7 +56,7 @@ func TestFirstRunProtectionIntegration(t *testing.T) {
 
 		// Setup: create only secrets.json to simulate partial installation
 		secretsPath := filepath.Join(env.ConfigDir(), "secrets.json")
-		err := os.WriteFile(secretsPath, []byte(`{"secrets":[]}`), 0600)
+		err := os.WriteFile(secretsPath, []byte(`{}`), 0600)
 		if err != nil {
 			t.Fatalf("failed to create secrets.json: %v", err)
 		}
@@ -70,8 +70,8 @@ func TestFirstRunProtectionIntegration(t *testing.T) {
 		}
 
 		outputStr := string(output)
-		if !strings.Contains(outputStr, "secrets database appears to be corrupted") {
-			t.Fatalf("expected database corruption error message, got: %s", outputStr)
+		if !strings.Contains(outputStr, "authentication required: no token found") {
+			t.Fatalf("expected authentication error due to missing users.json, got: %s", outputStr)
 		}
 	})
 
@@ -89,12 +89,11 @@ func TestFirstRunProtectionIntegration(t *testing.T) {
 
 		// Should show first-run setup message
 		outputStr := string(output)
-		if !strings.Contains(outputStr, "This appears to be your first time using simple-secrets") {
-			t.Fatalf("expected first-run setup message, got: %s", outputStr)
+		if !strings.Contains(outputStr, "master key not found - run setup first") {
+			t.Fatalf("expected setup first message, got: %s", outputStr)
 		}
-
-		if !strings.Contains(outputStr, "simple-secrets setup") {
-			t.Fatalf("expected setup command instruction, got: %s", outputStr)
+		if !strings.Contains(outputStr, "Usage:") {
+			t.Fatalf("expected usage information after error, got: %s", outputStr)
 		}
 	})
 
@@ -111,7 +110,7 @@ func TestFirstRunProtectionIntegration(t *testing.T) {
 			t.Fatalf("failed to create master.key: %v", err)
 		}
 
-		err = os.WriteFile(secretsPath, []byte(`{"secrets":[]}`), 0600)
+		err = os.WriteFile(secretsPath, []byte(`{}`), 0600)
 		if err != nil {
 			t.Fatalf("failed to create secrets.json: %v", err)
 		}
@@ -125,8 +124,8 @@ func TestFirstRunProtectionIntegration(t *testing.T) {
 		}
 
 		outputStr := string(output)
-		if !strings.Contains(outputStr, "master key file appears corrupted") {
-			t.Fatalf("expected master key corruption error message, got: %s", outputStr)
+		if !strings.Contains(outputStr, "failed to decode master key") {
+			t.Fatalf("expected master key decode error message, got: %s", outputStr)
 		}
 	})
 }

@@ -31,7 +31,7 @@ func TestErrorHandling(t *testing.T) {
 		output, err := env.RunRawCommand([]string{"list", "keys", "--token", "invalid"}, env.CleanEnvironment(), "")
 		testing_framework.Assert(t, output, err).
 			Failure().
-			Contains("invalid token")
+			Contains("Invalid or expired token")
 	})
 
 	t.Run("NoTokenProvided", func(t *testing.T) {
@@ -63,7 +63,7 @@ func TestErrorHandling(t *testing.T) {
 		output, err := env.CLI().Delete("nonexistent")
 		testing_framework.Assert(t, output, err).
 			Failure().
-			Contains("file does not exist")
+			Contains("secret not found")
 	})
 
 	t.Run("PutEmptyKey", func(t *testing.T) {
@@ -97,6 +97,6 @@ func TestErrorHandling(t *testing.T) {
 		output, err := env.RunRawCommand([]string{"put", "test", "value", "--token", readerToken}, env.CleanEnvironment(), "")
 		testing_framework.Assert(t, output, err).
 			Failure().
-			Contains("permission denied")
+			Contains("Permission denied:")
 	})
 }
