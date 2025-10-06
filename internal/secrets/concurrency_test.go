@@ -68,7 +68,7 @@ func TestConcurrentSecretsOperations(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to list secrets: %v", err)
 		}
-		
+
 		// We expect at least some operations to succeed under normal concurrency
 		if len(secrets) == 0 {
 			t.Error("No secrets were stored - possible deadlock or complete failure")
