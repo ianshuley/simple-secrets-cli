@@ -19,6 +19,7 @@ package secrets
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"simple-secrets/pkg/crypto"
 	"simple-secrets/pkg/errors"
@@ -27,8 +28,9 @@ import (
 
 // StoreImpl implements the secrets.Store interface
 type StoreImpl struct {
-	repo   secrets.Repository
-	crypto *CryptoService
+	repo         secrets.Repository
+	crypto       *CryptoService
+	masterKeyMgr secrets.MasterKeyManager // For master key lifecycle management
 }
 
 // NewStore creates a new Store implementation
@@ -36,6 +38,15 @@ func NewStore(repo secrets.Repository, cryptoService *CryptoService) secrets.Sto
 	return &StoreImpl{
 		repo:   repo,
 		crypto: cryptoService,
+	}
+}
+
+// NewStoreWithMasterKeyManager creates a new Store implementation with master key management
+func NewStoreWithMasterKeyManager(repo secrets.Repository, cryptoService *CryptoService, masterKeyMgr secrets.MasterKeyManager) secrets.Store {
+	return &StoreImpl{
+		repo:         repo,
+		crypto:       cryptoService,
+		masterKeyMgr: masterKeyMgr,
 	}
 }
 
@@ -191,8 +202,15 @@ func (s *StoreImpl) Disable(ctx context.Context, key string) error {
 
 // RotateMasterKey generates a new master encryption key and re-encrypts all secrets
 func (s *StoreImpl) RotateMasterKey(ctx context.Context, backupDir string) error {
-	// Generate a new master key
-	newKey, err := crypto.GenerateKey()
+	// Generate a new master key using the key manager if available
+	var newKey []byte
+	var err error
+
+	if s.masterKeyMgr != nil {
+		newKey, err = s.masterKeyMgr.GenerateKey(ctx)
+	} else {
+		newKey, err = crypto.GenerateKey()
+	}
 	if err != nil {
 		return fmt.Errorf("failed to generate new master key: %w", err)
 	}
@@ -209,7 +227,8 @@ func (s *StoreImpl) RotateMasterKey(ctx context.Context, backupDir string) error
 	// Create new crypto service with new key
 	newCrypto := NewCryptoService(newKey)
 
-	// Re-encrypt all secrets with new key
+	// Re-encrypt all secrets with new key and update rotation metadata
+	rotationTime := time.Now()
 	for _, secret := range allSecrets {
 		// Decrypt with old key
 		plaintext, err := oldCrypto.Decrypt(secret.Value)
@@ -223,8 +242,12 @@ func (s *StoreImpl) RotateMasterKey(ctx context.Context, backupDir string) error
 			return fmt.Errorf("failed to encrypt secret %s with new key: %w", secret.Key, err)
 		}
 
-		// Update secret with new encrypted value
+		// Update secret with new encrypted value and rotation metadata
 		secret.UpdateValue(newEncryptedValue, len(plaintext))
+
+		// Track rotation metadata
+		secret.Metadata.LastRotatedAt = &rotationTime
+		secret.Metadata.RotationCount++
 
 		// Store updated secret
 		if err := s.repo.Store(ctx, secret); err != nil {
@@ -234,6 +257,13 @@ func (s *StoreImpl) RotateMasterKey(ctx context.Context, backupDir string) error
 
 	// Update crypto service to use new key
 	s.crypto = newCrypto
+
+	// Persist the new master key using the key manager if available
+	if s.masterKeyMgr != nil {
+		if err := s.masterKeyMgr.SaveMasterKey(ctx, newKey); err != nil {
+			return fmt.Errorf("failed to persist new master key: %w", err)
+		}
+	}
 
 	return nil
 }

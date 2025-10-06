@@ -488,20 +488,28 @@ func extractTimestampString(dirName string) string {
 
 // createRotationMetadata creates metadata for a secret during rotation, preserving existing data when available
 func (s *SecretsStore) createRotationMetadata(key string, plaintext []byte) secretsmodels.SecretMetadata {
-	// Default metadata for new secrets (defensive - shouldn't happen during rotation)
 	now := time.Now()
+
+	// Default metadata for new secrets (defensive - shouldn't happen during rotation)
 	metadata := secretsmodels.SecretMetadata{
-		Key:        key,
-		CreatedAt:  now,
-		ModifiedAt: now,
-		Disabled:   false,
-		Size:       len(plaintext),
+		Key:           key,
+		CreatedAt:     now,
+		ModifiedAt:    now,
+		LastRotatedAt: &now,
+		RotationCount: 1,
+		Disabled:      false,
+		Size:          len(plaintext),
 	}
 
-	// Override with existing metadata if available
+	// Override with existing metadata if available, preserving user modification timestamps
 	if existingSecret, exists := s.secrets[key]; exists {
 		metadata = existingSecret.Metadata
-		metadata.ModifiedAt = now // Update modification time due to re-encryption
+		// Update rotation tracking - this IS a cryptographic operation we want to track
+		metadata.LastRotatedAt = &now
+		metadata.RotationCount++
+		// Update size in case of data corruption fixes during rotation
+		metadata.Size = len(plaintext)
+		// DO NOT update ModifiedAt - rotation is a cryptographic operation, not content modification
 	}
 
 	return metadata

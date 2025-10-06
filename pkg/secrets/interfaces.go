@@ -53,6 +53,19 @@ type Store interface {
 	RotateMasterKey(ctx context.Context, backupDir string) error
 }
 
+// MasterKeyManager handles master encryption key lifecycle operations.
+// This interface abstracts master key storage and rotation from the business logic.
+type MasterKeyManager interface {
+	// LoadMasterKey loads the current master key from storage
+	LoadMasterKey(ctx context.Context) ([]byte, error)
+
+	// SaveMasterKey persists a new master key to storage atomically
+	SaveMasterKey(ctx context.Context, key []byte) error
+
+	// GenerateKey creates a new cryptographically secure master key
+	GenerateKey(ctx context.Context) ([]byte, error)
+}
+
 // Repository is the storage interface for the secrets domain.
 // This interface defines business operations, not technical file operations.
 // Different implementations can use files, databases, cloud storage, etc.

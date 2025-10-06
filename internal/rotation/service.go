@@ -65,9 +65,15 @@ func (s *ServiceImpl) RotateMasterKey(ctx context.Context, backupDir string) err
 		backupDir = filepath.Join(s.dataDir, s.config.BackupDir, rotation.GenerateBackupName("rotate"))
 	}
 
+	// Create backup before rotation
+	err := s.CreateBackup(ctx, backupDir)
+	if err != nil {
+		return fmt.Errorf("failed to create backup before rotation: %w", err)
+	}
+
 	// Perform master key rotation using the secrets store
-	// This will create a backup, generate a new key, and re-encrypt all secrets
-	err := s.secretsStore.RotateMasterKey(ctx, backupDir)
+	// This will generate a new key and re-encrypt all secrets
+	err = s.secretsStore.RotateMasterKey(ctx, backupDir)
 	if err != nil {
 		return fmt.Errorf("secrets store master key rotation failed: %w", err)
 	}

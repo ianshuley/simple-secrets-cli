@@ -27,11 +27,13 @@ type Secret struct {
 
 // SecretMetadata contains information about a secret's lifecycle and status
 type SecretMetadata struct {
-	Key        string    `json:"key"` // Secret key identifier
-	CreatedAt  time.Time `json:"created_at"`
-	ModifiedAt time.Time `json:"modified_at"`
-	Disabled   bool      `json:"disabled"`
-	Size       int       `json:"size"` // Size of plaintext value for display
+	Key           string     `json:"key"` // Secret key identifier
+	CreatedAt     time.Time  `json:"created_at"`
+	ModifiedAt    time.Time  `json:"modified_at"`
+	LastRotatedAt *time.Time `json:"last_rotated_at,omitempty"` // When key was last rotated (cryptographic operation)
+	RotationCount int        `json:"rotation_count,omitempty"`  // Number of key rotations performed
+	Disabled      bool       `json:"disabled"`
+	Size          int        `json:"size"` // Size of plaintext value for display
 }
 
 // IsDisabled returns true if the secret is currently disabled

@@ -81,8 +81,11 @@ func New(ctx context.Context, config Config) (*Platform, error) {
 	secretsRepo := secretsImpl.NewFileRepository(config.DataDir)
 	usersRepo := usersImpl.NewFileRepository(config.DataDir)
 
+	// Create master key manager for rotation support
+	masterKeyMgr := secretsImpl.NewFileMasterKeyManager(config.DataDir)
+
 	// Create domain stores
-	secretsStore := secretsImpl.NewStore(secretsRepo, cryptoService)
+	secretsStore := secretsImpl.NewStoreWithMasterKeyManager(secretsRepo, cryptoService, masterKeyMgr)
 	usersStore := usersImpl.NewStore(usersRepo)
 
 	// Create auth service (depends on users store)
