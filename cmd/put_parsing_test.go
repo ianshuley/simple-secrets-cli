@@ -320,18 +320,11 @@ func TestProcessLengthFlag(t *testing.T) {
 			expectedNextPosition: 1,
 		},
 		{
-			name:                 "length_with_invalid_value",
-			args:                 []string{"--length", "abc", "key"},
+			name:                 "length_with_valid_value_64",
+			args:                 []string{"-l", "64", "key"},
 			flagPosition:         0,
-			expectedLength:       32, // Default for zero/invalid
+			expectedLength:       64,
 			expectedNextPosition: 1,
-		},
-		{
-			name:                 "length_with_next_arg",
-			args:                 []string{"--length", "key"},
-			flagPosition:         0,
-			expectedLength:       32, // parsePositiveInteger("key") = 0, so default
-			expectedNextPosition: 1,  // Still processes next arg
 		},
 		{
 			name:                 "short_length_with_valid_value",
@@ -340,12 +333,58 @@ func TestProcessLengthFlag(t *testing.T) {
 			expectedLength:       64,
 			expectedNextPosition: 1,
 		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			length := 32 // Default
+
+			nextPos, err := processLengthFlag(tt.args, tt.flagPosition, &length)
+			if err != nil {
+				t.Errorf("processLengthFlag() unexpected error = %v", err)
+				return
+			}
+
+			if length != tt.expectedLength {
+				t.Errorf("processLengthFlag() length = %d, want %d", length, tt.expectedLength)
+			}
+			if nextPos != tt.expectedNextPosition {
+				t.Errorf("processLengthFlag() nextPos = %d, want %d", nextPos, tt.expectedNextPosition)
+			}
+		})
+	}
+}
+
+func TestProcessLengthFlagErrors(t *testing.T) {
+	tests := []struct {
+		name          string
+		args          []string
+		flagPosition  int
+		expectedError string
+	}{
 		{
-			name:                 "short_length_with_invalid_value",
-			args:                 []string{"-l", "xyz", "key"},
-			flagPosition:         0,
-			expectedLength:       32, // Default for zero/invalid
-			expectedNextPosition: 1,
+			name:          "length_with_invalid_string",
+			args:          []string{"--length", "abc", "key"},
+			flagPosition:  0,
+			expectedError: "length must be a positive integer, got 'abc'",
+		},
+		{
+			name:          "length_with_zero",
+			args:          []string{"--length", "0", "key"},
+			flagPosition:  0,
+			expectedError: "length must be a positive integer, got '0'",
+		},
+		{
+			name:          "length_with_negative",
+			args:          []string{"--length", "-5", "key"},
+			flagPosition:  0,
+			expectedError: "length must be a positive integer, got '-5'",
+		},
+		{
+			name:          "length_with_key_as_value",
+			args:          []string{"--length", "key"},
+			flagPosition:  0,
+			expectedError: "length must be a positive integer, got 'key'",
 		},
 	}
 
@@ -353,13 +392,14 @@ func TestProcessLengthFlag(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			length := 32 // Default
 
-			nextPos := processLengthFlag(tt.args, tt.flagPosition, &length)
+			_, err := processLengthFlag(tt.args, tt.flagPosition, &length)
 
-			if length != tt.expectedLength {
-				t.Errorf("processLengthFlag() length = %d, want %d", length, tt.expectedLength)
+			if err == nil {
+				t.Errorf("processLengthFlag() expected error, got none")
+				return
 			}
-			if nextPos != tt.expectedNextPosition {
-				t.Errorf("processLengthFlag() nextPos = %d, want %d", nextPos, tt.expectedNextPosition)
+			if err.Error() != tt.expectedError {
+				t.Errorf("processLengthFlag() error message = %q, want %q", err.Error(), tt.expectedError)
 			}
 		})
 	}
@@ -541,7 +581,11 @@ func TestExtractArgumentsAndFlags(t *testing.T) {
 			var generate bool
 			length := 32
 
-			filteredArgs := extractArgumentsAndFlags(tt.args, &token, &tokenExplicitlySet, &generate, &length)
+			filteredArgs, err := extractArgumentsAndFlags(tt.args, &token, &tokenExplicitlySet, &generate, &length)
+			if err != nil {
+				t.Errorf("extractArgumentsAndFlags() unexpected error = %v", err)
+				return
+			}
 
 			if !stringSlicesEqual(filteredArgs, tt.expectedFilteredArgs) {
 				t.Errorf("extractArgumentsAndFlags() filteredArgs = %v, want %v", filteredArgs, tt.expectedFilteredArgs)

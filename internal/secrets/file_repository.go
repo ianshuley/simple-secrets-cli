@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"simple-secrets/pkg/errors"
@@ -37,6 +38,7 @@ const (
 type FileRepository struct {
 	dataDir     string
 	secretsFile string
+	mu          sync.RWMutex // Protects concurrent access to secrets data
 }
 
 // NewFileRepository creates a new file-based repository
@@ -65,6 +67,10 @@ func (r *FileRepository) Store(ctx context.Context, secret *secrets.Secret) erro
 		return fmt.Errorf("failed to create data directory: %w", err)
 	}
 
+	// Use write lock for read-modify-write operation
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	data, err := r.loadSecretsData()
 	if err != nil {
 		return err
@@ -81,6 +87,10 @@ func (r *FileRepository) Retrieve(ctx context.Context, key string) (*secrets.Sec
 		return nil, ctx.Err()
 	default:
 	}
+
+	// Use read lock for data access
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 
 	data, err := r.loadSecretsData()
 	if err != nil {
@@ -103,6 +113,10 @@ func (r *FileRepository) Delete(ctx context.Context, key string) error {
 	default:
 	}
 
+	// Use write lock for read-modify-write operation
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	data, err := r.loadSecretsData()
 	if err != nil {
 		return err
@@ -123,6 +137,10 @@ func (r *FileRepository) List(ctx context.Context) ([]*secrets.Secret, error) {
 		return nil, ctx.Err()
 	default:
 	}
+
+	// Use read lock for data access
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 
 	data, err := r.loadSecretsData()
 	if err != nil {
@@ -155,6 +173,10 @@ func (r *FileRepository) Exists(ctx context.Context, key string) (bool, error) {
 	default:
 	}
 
+	// Use read lock for data access
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
 	data, err := r.loadSecretsData()
 	if err != nil {
 		return false, err
@@ -171,6 +193,10 @@ func (r *FileRepository) updateSecretStatus(ctx context.Context, key string, dis
 		return ctx.Err()
 	default:
 	}
+
+	// Use write lock for read-modify-write operation
+	r.mu.Lock()
+	defer r.mu.Unlock()
 
 	data, err := r.loadSecretsData()
 	if err != nil {

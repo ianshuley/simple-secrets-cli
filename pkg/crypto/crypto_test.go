@@ -123,8 +123,9 @@ func TestGenerateSecretValue(t *testing.T) {
 		wantErr bool
 	}{
 		{"valid length", 32, false},
-		{"minimum length", 1, false},
+		{"minimum length", 8, false},
 		{"large length", 1000, false},
+		{"too short", 7, true},
 		{"zero length", 0, true},
 		{"negative length", -1, true},
 	}

@@ -69,7 +69,10 @@ func parsePutArguments(cmd *cobra.Command, args []string) (*putArguments, error)
 	var generate bool
 	var length int = 32 // Default length
 
-	filteredArgs := extractArgumentsAndFlags(args, &token, &tokenExplicitlySet, &generate, &length)
+	filteredArgs, err := extractArgumentsAndFlags(args, &token, &tokenExplicitlySet, &generate, &length)
+	if err != nil {
+		return nil, err
+	}
 
 	if shouldShowHelp(args) {
 		return nil, cmd.Help()
@@ -94,7 +97,7 @@ func parsePutArguments(cmd *cobra.Command, args []string) (*putArguments, error)
 	}, nil
 }
 
-func extractArgumentsAndFlags(args []string, token *string, tokenExplicitlySet *bool, generate *bool, length *int) []string {
+func extractArgumentsAndFlags(args []string, token *string, tokenExplicitlySet *bool, generate *bool, length *int) ([]string, error) {
 	filteredArgs := []string{}
 
 	for i := 0; i < len(args); i++ {
@@ -107,12 +110,16 @@ func extractArgumentsAndFlags(args []string, token *string, tokenExplicitlySet *
 			continue
 		}
 		if isLengthFlag(args, i) {
-			i = processLengthFlag(args, i, length)
+			var err error
+			i, err = processLengthFlag(args, i, length)
+			if err != nil {
+				return nil, err
+			}
 			continue
 		}
 		filteredArgs = append(filteredArgs, args[i])
 	}
-	return filteredArgs
+	return filteredArgs, nil
 }
 
 func isTokenFlag(args []string, position int) bool {
@@ -142,18 +149,17 @@ func hasLengthValue(args []string, flagPosition int) bool {
 	return flagPosition+1 < len(args)
 }
 
-func processLengthFlag(args []string, flagPosition int, length *int) int {
+func processLengthFlag(args []string, flagPosition int, length *int) (int, error) {
 	valuePosition := flagPosition + 1
 	lengthStr := args[valuePosition]
 
 	parsedLength := parsePositiveInteger(lengthStr)
 	if parsedLength <= 0 {
-		*length = 32 // Default for invalid values
-		return valuePosition
+		return valuePosition, fmt.Errorf("length must be a positive integer, got '%s'", lengthStr)
 	}
 
 	*length = parsedLength
-	return valuePosition
+	return valuePosition, nil
 }
 
 func parsePositiveInteger(value string) int {

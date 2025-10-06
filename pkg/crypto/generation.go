@@ -22,9 +22,13 @@ import (
 )
 
 // GenerateSecretValue creates a cryptographically secure random secret
+// For generated secrets, length is bounded for security and resource management (8-1024 chars)
 func GenerateSecretValue(length int) (string, error) {
-	if length <= 0 {
-		return "", fmt.Errorf("length must be positive, got %d", length)
+	if length < 8 {
+		return "", fmt.Errorf("generated secret length must be at least 8 characters for security, got %d", length)
+	}
+	if length > 1024 {
+		return "", fmt.Errorf("generated secret length cannot exceed 1024 characters, got %d (use manual storage for larger secrets like SSH keys)", length)
 	}
 
 	// Character set: A-Z, a-z, 0-9, and URL-safe symbols
