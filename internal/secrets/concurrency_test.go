@@ -24,17 +24,18 @@ import (
 	"time"
 )
 
-// TestConcurrentSecretsOperations validates that concurrent operations on SecretsStore
+// TestConcurrentSecretsOperations validates that concurrent operations on the new Store
 // don't cause race conditions or data corruption
 func TestConcurrentSecretsOperations(t *testing.T) {
 	// Setup test environment
 	tmpDir := t.TempDir()
 	t.Setenv("SIMPLE_SECRETS_CONFIG_DIR", tmpDir+"/.simple-secrets")
 
-	store, err := LoadSecretsStore(NewFilesystemBackend())
-	if err != nil {
-		t.Fatalf("Failed to load secrets store: %v", err)
-	}
+	// Create new domain-driven store
+	repo := NewFileRepository(tmpDir)
+	cryptoService := NewCryptoService(nil) // Will generate key automatically
+	masterKeyMgr := NewFileMasterKeyManager(tmpDir)
+	store := NewStoreWithMasterKeyManager(repo, cryptoService, masterKeyMgr)
 
 	const numGoroutines = 5           // More realistic concurrency level
 	const operationsPerGoroutine = 20 // More realistic operation count

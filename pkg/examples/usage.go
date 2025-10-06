@@ -1,32 +1,120 @@
-/*
+/*/*/*
 
 Copyright © 2025 Ian Shuley
 
+
+
 Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
+
+you may not use this file except in compliance with the License.Copyright © 2025 Ian ShuleyCopyright © 2025 Ian Shuley
+
 You may obtain a copy of the License at
+
+
 
 	http://www.apache.org/licenses/LICENSE-2.0
 
+Licensed under the Apache License, Version 2.0 (the "License");Licensed under the Apache License, Version 2.0 (the "License");
+
 Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
+
+distributed under the License is distributed on an "AS IS" BASIS,you may not use this file except in compliance with the License.you may not use this file except in compliance with the License.
+
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
+
+See the License for the specific language governing permissions andYou may obtain a copy of the License atYou may obtain a copy of the License at
+
 limitations under the License.
+
 */
 
-// Package examples shows how external tools would use the simple-secrets API interfaces
-package examples
 
-import (
-	"fmt"
-	"simple-secrets/pkg/api"
-)
 
-// AnsibleFactsGatherer demonstrates read-only access for ansible fact gathering
-type AnsibleFactsGatherer struct {
-	reader api.SecretReader
-}
+// Package examples shows how external tools would use the simple-secrets domain interfaces	http://www.apache.org/licenses/LICENSE-2.0	http://www.apache.org/licenses/LICENSE-2.0
+
+//
+
+// The simple-secrets CLI now uses a domain-driven architecture with clean interfaces:
+
+//
+
+// - pkg/secrets.Store: Core secret storage and retrieval operationsUnless required by applicable law or agreed to in writing, softwareUnless required by applicable law or agreed to in writing, software
+
+// - pkg/users.Store: User management and authentication operations
+
+// - pkg/auth.AuthService: Role-based access control and token managementdistributed under the License is distributed on an "AS IS" BASIS,distributed under the License is distributed on an "AS IS" BASIS,
+
+// - pkg/rotation.Service: Backup, restore, and rotation operations
+
+//WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+
+// External integrations can import these interfaces and compose them as needed.
+
+// The internal/platform package shows how to wire these together into a complete system.See the License for the specific language governing permissions andSee the License for the specific language governing permissions and
+
+//
+
+// Example integration patterns:limitations under the License.limitations under the License.
+
+// - Ansible fact gathering: Use secrets.Store for read-only secret access
+
+// - Monitoring agents: Use secrets.Store with appropriate authentication*/*/
+
+// - API servers: Use full platform.Platform for complete functionality
+
+// - Backup tools: Use rotation.Service for backup/restore operations
+
+//
+
+// For concrete implementation examples, see:// Package examples shows how external tools would use the simple-secrets domain interfaces// Package examples shows how external tools would use the simple-secrets domain interfaces
+
+// - internal/platform/platform.go: Shows how to compose all services
+
+// - cmd/: Shows how to use the platform for CLI operations////
+
+// - integration/: Shows end-to-end usage patterns
+
+package examples// The simple-secrets CLI now uses a domain-driven architecture with clean interfaces:// The simple-secrets CLI now uses a domain-driven architecture with clean interfaces:
+
+////
+
+// - pkg/secrets.Store: Core secret storage and retrieval operations// - pkg/secrets.Store: Core secret storage and retrieval operations
+
+// - pkg/users.Store: User management and authentication operations  // - pkg/users.Store: User management and authentication operations
+
+// - pkg/auth.AuthService: Role-based access control and token management// - pkg/auth.AuthService: Role-based access control and token management
+
+// - pkg/rotation.Service: Backup, restore, and rotation operations// - pkg/rotation.Service: Backup, restore, and rotation operations
+
+////
+
+// External integrations can import these interfaces and compose them as needed.// External integrations can import these interfaces and compose them as needed.
+
+// The internal/platform package shows how to wire these together into a complete system.// The internal/platform package shows how to wire these together into a complete system.
+
+////
+
+// Example integration patterns:// Example integration patterns:
+
+// - Ansible fact gathering: Use secrets.Store for read-only secret access// - Ansible fact gathering: Use secrets.Store for read-only secret access
+
+// - Monitoring agents: Use secrets.Store with appropriate authentication// - Monitoring agents: Use secrets.Store with appropriate authentication
+
+// - API servers: Use full platform.Platform for complete functionality// - API servers: Use full platform.Platform for complete functionality
+
+// - Backup tools: Use rotation.Service for backup/restore operations// - Backup tools: Use rotation.Service for backup/restore operations
+
+//package examples
+
+// For concrete implementation examples, see:
+
+// - internal/platform/platform.go: Shows how to compose all services// AnsibleFactsGatherer demonstrates read-only access for ansible fact gathering
+
+// - cmd/: Shows how to use the platform for CLI operationstype AnsibleFactsGatherer struct {
+
+// - integration/: Shows end-to-end usage patterns	reader api.SecretReader
+
+package examples}
 
 // NewAnsibleFactsGatherer creates a new facts gatherer with read-only access
 func NewAnsibleFactsGatherer(reader api.SecretReader) *AnsibleFactsGatherer {

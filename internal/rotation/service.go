@@ -18,6 +18,7 @@ package rotation
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -71,11 +72,36 @@ func (s *ServiceImpl) RotateMasterKey(ctx context.Context, backupDir string) err
 		return fmt.Errorf("failed to create backup before rotation: %w", err)
 	}
 
+	// Get the old key before rotation for backup re-encryption
+	oldKey, err := s.getCurrentMasterKey()
+	if err != nil {
+		return fmt.Errorf("failed to get current master key: %w", err)
+	}
+
 	// Perform master key rotation using the secrets store
 	// This will generate a new key and re-encrypt all secrets
 	err = s.secretsStore.RotateMasterKey(ctx, backupDir)
 	if err != nil {
 		return fmt.Errorf("secrets store master key rotation failed: %w", err)
+	}
+
+	// Get the new key after rotation
+	newKey, err := s.getCurrentMasterKey()
+	if err != nil {
+		return fmt.Errorf("failed to get new master key after rotation: %w", err)
+	}
+
+	// Re-encrypt existing backups with the new key
+	if err := s.ReencryptBackups(ctx, oldKey, newKey); err != nil {
+		// Log warning but don't fail the rotation
+		fmt.Printf("Warning: failed to re-encrypt some backups: %v\n", err)
+	}
+
+	// Clean up old backups based on configuration
+	retentionCount := s.getRotationBackupCount()
+	if err := s.CleanupOldBackups(ctx, retentionCount); err != nil {
+		// Log warning but don't fail the rotation
+		fmt.Printf("Warning: failed to clean up old backups: %v\n", err)
 	}
 
 	return nil
@@ -420,4 +446,31 @@ func (s *ServiceImpl) validateSpecifiedBackup(ctx context.Context, backupName st
 	}
 
 	return backupPath, nil
+}
+
+// getCurrentMasterKey loads the current master key from disk
+func (s *ServiceImpl) getCurrentMasterKey() ([]byte, error) {
+	keyPath := filepath.Join(s.dataDir, "master.key")
+	data, err := os.ReadFile(keyPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read master key file: %w", err)
+	}
+
+	key, err := base64.StdEncoding.DecodeString(string(data))
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode master key: %w", err)
+	}
+
+	return key, nil
+}
+
+// getRotationBackupCount returns the configured rotation backup count or default
+func (s *ServiceImpl) getRotationBackupCount() int {
+	// Use the config from the rotation service if available
+	if s.config != nil && s.config.BackupRetentionCount > 0 {
+		return s.config.BackupRetentionCount
+	}
+
+	// Default to 1 backup for security (minimize attack surface)
+	return 1
 }

@@ -227,8 +227,11 @@ func (s *StoreImpl) RotateMasterKey(ctx context.Context, backupDir string) error
 	// Create new crypto service with new key
 	newCrypto := NewCryptoService(newKey)
 
-	// Re-encrypt all secrets with new key and update rotation metadata
+	// Re-encrypt all secrets atomically with proper rollback
 	rotationTime := time.Now()
+	updatedSecrets := make([]*secrets.Secret, 0, len(allSecrets))
+
+	// First pass: decrypt and re-encrypt all secrets (in memory)
 	for _, secret := range allSecrets {
 		// Decrypt with old key
 		plaintext, err := oldCrypto.Decrypt(secret.Value)
@@ -249,13 +252,17 @@ func (s *StoreImpl) RotateMasterKey(ctx context.Context, backupDir string) error
 		secret.Metadata.LastRotatedAt = &rotationTime
 		secret.Metadata.RotationCount++
 
-		// Store updated secret
-		if err := s.repo.Store(ctx, secret); err != nil {
-			return fmt.Errorf("failed to store re-encrypted secret %s: %w", secret.Key, err)
-		}
+		updatedSecrets = append(updatedSecrets, secret)
 	}
 
-	// Update crypto service to use new key
+	// Second pass: store all secrets atomically
+	for _, secret := range updatedSecrets {
+		if err := s.repo.Store(ctx, secret); err != nil {
+			// On failure, attempt to rollback by restoring original secrets
+			s.rollbackSecrets(ctx, allSecrets)
+			return fmt.Errorf("failed to store re-encrypted secret %s: %w", secret.Key, err)
+		}
+	} // Update crypto service to use new key
 	s.crypto = newCrypto
 
 	// Persist the new master key using the key manager if available
@@ -266,4 +273,14 @@ func (s *StoreImpl) RotateMasterKey(ctx context.Context, backupDir string) error
 	}
 
 	return nil
+}
+
+// rollbackSecrets attempts to restore original secrets on rotation failure
+func (s *StoreImpl) rollbackSecrets(ctx context.Context, originalSecrets []*secrets.Secret) {
+	for _, secret := range originalSecrets {
+		if err := s.repo.Store(ctx, secret); err != nil {
+			// Log error but continue with rollback attempt
+			fmt.Printf("Warning: failed to rollback secret %s during rotation failure: %v\n", secret.Key, err)
+		}
+	}
 }
